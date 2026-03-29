@@ -1,0 +1,1 @@
+CREATE POLICY "Platform admins can insert companies" ON public.companies FOR INSERT TO authenticated WITH CHECK (is_platform_admin());

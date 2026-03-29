@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <title>توطين | المساعد المالي v2.5</title>
+    <meta name="description" content="توطين - المساعد المالي المتكامل لإدارة الحسابات والمشاريع والشحن v2.5.0" />
+    <meta name="author" content="توطين" />
+    <meta name="theme-color" content="#1a3a5c" />
+    
+    <!-- PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="توطين" />
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="توطين - المساعد المالي" />
+    <meta property="og:description" content="المساعد المالي المتكامل لإدارة الحسابات والمشاريع والشحن" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ar_SA" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="توطين - المساعد المالي" />
+    <meta name="twitter:description" content="المساعد المالي المتكامل لإدارة الحسابات والمشاريع والشحن" />
+
+    <!-- Print Styles -->
+    <style>
+      @media print {
+        body > div#root > div > header,
+        body > div#root > div > nav,
+        [data-no-print],
+        .bottom-nav,
+        .floating-add-btn { display: none !important; }
+        body { background: white !important; }
+        @page { margin: 10mm; size: A4; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

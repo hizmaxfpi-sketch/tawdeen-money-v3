@@ -1,0 +1,703 @@
+import { useState, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BookOpen, Plus, Search, UserCheck, Truck, Ship, Briefcase, Handshake, User, ChevronLeft, Phone, MessageCircle, Building2, MoreVertical, TrendingUp, TrendingDown, ArrowRightLeft, Receipt, RefreshCw, Eye, FileText, FileSpreadsheet, Download, Filter, LayoutGrid, List, X, CheckSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
+import { Contact, ContactType, CONTACT_TYPE_LABELS, CONTACT_TYPE_COLORS } from '@/types/contacts';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { useSupabaseFinance } from '@/hooks/useSupabaseFinance';
+import { exportAccountStatement } from '@/utils/accountStatementPdf';
+import { generateHDPreviewPDF } from '@/utils/hdPreview';
+import { Transaction } from '@/types/finance';
+import { formatDateGregorian, formatDateShort, formatAmount, formatNumber } from '@/utils/formatUtils';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { usePersistedFilter } from '@/hooks/usePersistedFilters';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
+
+const LEGAL_DISCLAIMER = 'هذا المستند تم إنشاؤه آلياً من النظام وهو معتمد بدون توقيع أو ختم. تخلي المؤسسة مسؤوليتها عن أي كشط، شطب، أو تعديل يدوي يطرأ على هذه الورقة.';
+
+const TypeIcons: Record<ContactType | 'all', any> = {
+  all: BookOpen, client: UserCheck, vendor: Truck, shipping_agent: Ship,
+  employee: Briefcase, partner: Handshake, other: User,
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  client_collection: 'تحصيل', vendor_payment: 'صرف مورد', expense: 'مصروفات',
+  partner_payment: 'صرف شريك', partner_collection: 'تحصيل شريك',
+  fund_transfer: 'تحويل', debt_payment: 'سداد دين', other: 'أخرى',
+};
+
+type ViewMode = 'grid' | 'list';
+
+export function LedgerAccountsPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { contacts, deleteContact, getStats, syncBalances } = useSupabaseContacts();
+  const { transactions } = useSupabaseFinance();
+  const perms = useUserPermissions();
+  const canEdit = perms.canEdit('contacts');
+  const canDelete = perms.canDelete('contacts');
+  const canCreate = perms.canCreate('contacts');
+
+  const [searchQuery, setSearchQuery] = usePersistedFilter('ledger-search', '');
+  const [selectedTypes, setSelectedTypes] = usePersistedFilter<Set<ContactType>>('ledger-types', new Set());
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [tempSelectedTypes, setTempSelectedTypes] = useState<Set<ContactType>>(new Set());
+  const [viewMode, setViewMode] = usePersistedFilter<ViewMode>('ledger-view', 'grid');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [statementContact, setStatementContact] = useState<Contact | null>(null);
+  const [statementTxs, setStatementTxs] = useState<Transaction[]>([]);
+  const [loadingStatement, setLoadingStatement] = useState(false);
+  const statementRef = useRef<HTMLDivElement>(null);
+
+  const stats = getStats();
+
+  // Get all unique types from actual contacts in DB, with custom types expanded
+  const availableTypes = useMemo(() => {
+    const types = new Set<ContactType>();
+    contacts.forEach(c => types.add(c.type));
+    return Array.from(types);
+  }, [contacts]);
+
+  // Get unique custom type names for 'other' contacts
+  const customTypeNames = useMemo(() => {
+    const names = new Set<string>();
+    contacts.filter(c => c.type === 'other' && c.customType).forEach(c => names.add(c.customType!));
+    return Array.from(names);
+  }, [contacts]);
+
+  // Custom type filter: track selected custom type names separately
+  const [selectedCustomTypes, setSelectedCustomTypes] = usePersistedFilter<Set<string>>('ledger-custom-types', new Set());
+
+  const ledgerTransactionStats = useMemo(() => {
+    const activeContacts = contacts.filter(c => c.status === 'active');
+    const totalTransactions = activeContacts.reduce((sum, c) => sum + c.totalTransactions, 0);
+    const totalDebit = activeContacts.reduce((sum, c) => sum + c.totalDebit, 0);
+    const totalCredit = activeContacts.reduce((sum, c) => sum + c.totalCredit, 0);
+    const netBalance = totalDebit - totalCredit;
+    return { totalTransactions, totalIncome: totalDebit, totalExpenses: totalCredit, netBalance };
+  }, [contacts]);
+
+  const handleSyncBalances = async () => {
+    setIsSyncing(true);
+    try {
+      await syncBalances();
+      toast.success('تم تحديث الأرصدة بنجاح');
+    } catch {
+      toast.error('خطأ في تحديث الأرصدة');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const filteredContacts = useMemo(() => {
+    let result = [...contacts];
+    if (selectedTypes.size > 0 || selectedCustomTypes.size > 0) {
+      result = result.filter(c => {
+        // Standard type match
+        if (c.type !== 'other' && selectedTypes.has(c.type)) return true;
+        // Custom type match
+        if (c.type === 'other' && c.customType && selectedCustomTypes.has(c.customType)) return true;
+        // If only standard types selected and no custom types, exclude 'other' unless explicitly selected
+        if (c.type === 'other' && !c.customType && selectedTypes.has('other')) return true;
+        // If nothing selected from relevant sets, exclude
+        if (selectedTypes.size === 0 && selectedCustomTypes.size > 0) return false;
+        if (selectedCustomTypes.size === 0 && selectedTypes.size > 0 && c.type === 'other') return false;
+        return false;
+      });
+    }
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(c =>
+        c.name.toLowerCase().includes(query) ||
+        c.phone?.includes(query) ||
+        c.email?.toLowerCase().includes(query) ||
+        c.company?.toLowerCase().includes(query)
+      );
+    }
+    result.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    return result;
+  }, [contacts, selectedTypes, selectedCustomTypes, searchQuery]);
+
+  const handleAddAccount = () => navigate('/contacts/add');
+  const handleViewAccount = (contact: Contact) => navigate(`/ledger/${contact.id}`);
+  const handleEditAccount = (contact: Contact) => navigate(`/contacts/edit/${contact.id}`);
+  const handleDeleteAccount = async (contactId: string) => {
+    // Check if account has related transactions
+    const hasTransactions = transactions.some(t => t.contactId === contactId);
+    if (hasTransactions) {
+      toast.error('لا يمكن حذف هذا الحساب لوجود عمليات مالية مرتبطة به. قم بحذف العمليات أولاً.');
+      return;
+    }
+    const contact = contacts.find(c => c.id === contactId);
+    if (confirm('هل أنت متأكد من حذف هذا الحساب الدفتري؟')) {
+      // Log to activity log
+      if (user && contact) {
+        await supabase.from('activity_log').insert({
+          user_id: user.id,
+          event_type: 'account_deleted',
+          entity_type: 'account',
+          entity_id: contactId,
+          entity_name: contact.name,
+          details: { type: contact.type, balance: contact.balance },
+          status: 'deleted',
+        } as any);
+      }
+      deleteContact(contactId);
+    }
+  };
+
+  // Filter modal handlers
+  const [tempSelectedCustomTypes, setTempSelectedCustomTypes] = useState<Set<string>>(new Set());
+  const openFilterModal = () => {
+    setTempSelectedTypes(new Set(selectedTypes));
+    setTempSelectedCustomTypes(new Set(selectedCustomTypes));
+    setShowFilterModal(true);
+  };
+
+  const handleToggleType = (type: ContactType) => {
+    setTempSelectedTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => { setTempSelectedTypes(new Set(availableTypes)); setTempSelectedCustomTypes(new Set(customTypeNames)); };
+  const handleClearAll = () => { setTempSelectedTypes(new Set()); setTempSelectedCustomTypes(new Set()); };
+  const handleApplyFilter = () => {
+    setSelectedTypes(new Set(tempSelectedTypes));
+    setSelectedCustomTypes(new Set(tempSelectedCustomTypes));
+    setShowFilterModal(false);
+  };
+
+  const fetchContactTransactions = async (contactId: string): Promise<Transaction[]> => {
+    if (!user) return [];
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('id, type, category, amount, description, date, fund_id, contact_id, project_id, notes, created_at')
+      .eq('contact_id', contactId)
+      .order('date', { ascending: true });
+    
+    if (error) { console.error('Error fetching contact transactions:', error); return []; }
+    return (data || []).map(t => ({
+      id: t.id, type: t.type as any, category: t.category as any, amount: Number(t.amount),
+      description: t.description || '', date: t.date, fundId: t.fund_id || '',
+      contactId: t.contact_id || undefined, projectId: t.project_id || undefined,
+      notes: t.notes || undefined, createdAt: new Date(t.created_at),
+    }));
+  };
+
+  const handleHDPreview = async (contact: Contact) => {
+    setLoadingStatement(true);
+    setStatementContact(contact);
+    const txs = await fetchContactTransactions(contact.id);
+    setStatementTxs(txs);
+    setLoadingStatement(false);
+  };
+
+  const handleExportStatementPDF = async (contact: Contact) => {
+    const contactTxs = await fetchContactTransactions(contact.id);
+    exportAccountStatement({
+      entityName: contact.name, entityType: contact.type === 'other' && contact.customType ? contact.customType : CONTACT_TYPE_LABELS[contact.type],
+      balance: contact.balance, totalDebit: contact.totalDebit, totalCredit: contact.totalCredit,
+      phone: contact.phone || undefined, email: contact.email || undefined, company: contact.company || undefined,
+      transactions: contactTxs,
+    });
+    toast.success('تم تصدير كشف الحساب PDF');
+  };
+
+  const handleExportStatementExcel = async (contact: Contact) => {
+    const contactTxs = await fetchContactTransactions(contact.id);
+    const header = 'التاريخ,البيان,التصنيف,مدين,دائن,الرصيد\n';
+    let running = 0;
+    const rows = contactTxs.map(t => {
+      if (t.type === 'in') running += t.amount; else running -= t.amount;
+      return `${formatDateGregorian(t.date)},${(t.description || '').replace(/,/g, ' ')},${CATEGORY_LABELS[t.category] || t.category},${t.type === 'in' ? formatAmount(t.amount) : ''},${t.type === 'out' ? formatAmount(t.amount) : ''},${formatAmount(running)}`;
+    }).join('\n');
+    const csv = '\uFEFF' + header + rows;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `كشف_حساب_${contact.name}_${Date.now()}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    toast.success('تم تصدير كشف الحساب Excel/CSV');
+  };
+
+  const handleDownloadHDPDF = async () => {
+    if (!statementRef.current || !statementContact) return;
+    try {
+      await generateHDPreviewPDF(statementRef.current, `كشف_حساب_HD_${statementContact.name}.pdf`);
+      toast.success('تم تصدير كشف الحساب HD');
+    } catch { toast.error('خطأ في التصدير'); }
+  };
+
+  const handleWhatsAppClick = (e: React.MouseEvent, phone: string) => {
+    e.stopPropagation();
+    window.open(`https://wa.me/${phone.replace(/[^0-9+]/g, '')}`, '_blank');
+  };
+
+  const handleCallClick = (e: React.MouseEvent, phone: string) => {
+    e.stopPropagation();
+    window.open(`tel:${phone}`, '_self');
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold flex items-center gap-2">
+          <BookOpen className="h-4 w-4 text-primary" />
+          الحسابات الدفترية
+        </h2>
+        <div className="flex items-center gap-1">
+          <Button size="sm" variant="outline" className="gap-1 h-8 text-xs px-2" onClick={handleSyncBalances} disabled={isSyncing}>
+            <RefreshCw className={cn("h-3.5 w-3.5", isSyncing && "animate-spin")} />
+            تحديث الأرصدة
+          </Button>
+          {canCreate && (
+            <Button size="sm" className="gap-1 h-8 text-xs px-2" onClick={handleAddAccount}>
+              <Plus className="h-3.5 w-3.5" />
+              حساب جديد
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* إحصائيات العمليات */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl border border-primary/20 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Receipt className="h-4 w-4 text-primary" />
+          <span className="text-xs font-bold">إحصائيات العمليات المالية</span>
+        </div>
+        <div className="grid grid-cols-4 gap-2">
+          <div className="bg-card/80 rounded-lg p-2 text-center">
+            <div className="flex items-center justify-center gap-1 mb-0.5"><ArrowRightLeft className="h-3 w-3 text-primary" /></div>
+            <p className="text-sm font-bold text-primary">{formatNumber(ledgerTransactionStats.totalTransactions)}</p>
+            <p className="text-[9px] text-muted-foreground">العمليات</p>
+          </div>
+          <div className="bg-green-500/10 rounded-lg p-2 text-center">
+            <div className="flex items-center justify-center gap-1 mb-0.5"><TrendingUp className="h-3 w-3 text-green-600" /></div>
+            <p className="text-sm font-bold text-green-600">${formatNumber(ledgerTransactionStats.totalIncome)}</p>
+            <p className="text-[9px] text-green-600">مدين</p>
+          </div>
+          <div className="bg-red-500/10 rounded-lg p-2 text-center">
+            <div className="flex items-center justify-center gap-1 mb-0.5"><TrendingDown className="h-3 w-3 text-red-600" /></div>
+            <p className="text-sm font-bold text-red-600">${formatNumber(ledgerTransactionStats.totalExpenses)}</p>
+            <p className="text-[9px] text-red-600">دائن</p>
+          </div>
+          <div className={cn("rounded-lg p-2 text-center", ledgerTransactionStats.netBalance >= 0 ? "bg-green-500/10" : "bg-red-500/10")}>
+            <p className={cn("text-sm font-bold", ledgerTransactionStats.netBalance >= 0 ? "text-green-600" : "text-red-600")}>
+              ${formatNumber(Math.abs(ledgerTransactionStats.netBalance))}
+            </p>
+            <p className="text-[9px] text-muted-foreground">الصافي</p>
+          </div>
+        </div>
+      </motion.div>
+
+
+      {/* Search + Filter Icon + View Switcher */}
+      <div className="flex items-center gap-1.5">
+        <div className="relative flex-1">
+          <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="بحث بالاسم، الهاتف، البريد..." className="pr-8 text-right h-8 text-xs" />
+        </div>
+        <Button
+          variant={selectedTypes.size > 0 ? "default" : "outline"}
+          size="icon"
+          className="h-8 w-8 shrink-0 relative"
+          onClick={openFilterModal}
+        >
+          <Filter className="h-3.5 w-3.5" />
+          {selectedTypes.size > 0 && (
+            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[9px] flex items-center justify-center font-bold">
+              {selectedTypes.size}
+            </span>
+          )}
+        </Button>
+        <div className="flex h-8 rounded-md border border-border overflow-hidden shrink-0">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={cn("px-2 flex items-center justify-center transition-colors", viewMode === 'grid' ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={cn("px-2 flex items-center justify-center transition-colors border-r border-border", viewMode === 'list' ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}
+          >
+            <List className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Active filter badges */}
+      {(selectedTypes.size > 0 || selectedCustomTypes.size > 0) && (
+        <div className="flex items-center gap-1 flex-wrap">
+          {Array.from(selectedTypes).filter(t => t !== 'other').map(type => (
+            <Badge key={type} variant="secondary" className="text-[10px] h-5 gap-1 cursor-pointer" onClick={() => {
+              setSelectedTypes(prev => { const next = new Set(prev); next.delete(type); return next; });
+            }}>
+              {CONTACT_TYPE_LABELS[type]}
+              <X className="h-2.5 w-2.5" />
+            </Badge>
+          ))}
+          {Array.from(selectedCustomTypes).map(cName => (
+            <Badge key={`ct-${cName}`} variant="secondary" className="text-[10px] h-5 gap-1 cursor-pointer" onClick={() => {
+              setSelectedCustomTypes(prev => { const next = new Set(prev); next.delete(cName); return next; });
+            }}>
+              {cName}
+              <X className="h-2.5 w-2.5" />
+            </Badge>
+          ))}
+          <button className="text-[10px] text-destructive hover:underline" onClick={() => { setSelectedTypes(new Set()); setSelectedCustomTypes(new Set()); }}>
+            مسح الكل
+          </button>
+        </div>
+      )}
+
+      {/* Accounts List */}
+      <div className={cn(viewMode === 'list' ? "space-y-0.5" : "space-y-2")}>
+        {filteredContacts.length === 0 ? (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl bg-card p-6 shadow-sm border border-border text-center">
+            <div className="flex justify-center mb-3">
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                <BookOpen className="h-6 w-6 text-muted-foreground opacity-50" />
+              </div>
+            </div>
+            <h3 className="text-xs font-medium mb-1">{searchQuery ? 'لا توجد نتائج' : 'لا توجد حسابات دفترية'}</h3>
+            <p className="text-[11px] text-muted-foreground mb-3">{searchQuery ? 'جرب كلمات بحث مختلفة' : 'أضف أول حساب دفتري للبدء'}</p>
+            {!searchQuery && canCreate && (
+              <Button size="sm" onClick={handleAddAccount} className="text-xs">
+                <Plus className="h-3.5 w-3.5 ml-1" />
+                إضافة حساب دفتري
+              </Button>
+            )}
+          </motion.div>
+        ) : (
+          <AnimatePresence mode="popLayout">
+            {filteredContacts.map(contact => {
+              const TypeIcon = TypeIcons[contact.type] || User;
+              const typeColor = CONTACT_TYPE_COLORS[contact.type];
+              
+              if (viewMode === 'list') {
+                return (
+                  <motion.div
+                    key={contact.id}
+                    initial={{ opacity: 0, x: -5 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 5 }}
+                    onClick={() => handleViewAccount(contact)}
+                    className="bg-card border-b border-border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors flex items-center gap-2"
+                  >
+                    <div className={cn("h-7 w-7 rounded-full flex items-center justify-center shrink-0 border text-[10px]", typeColor)}>
+                      <TypeIcon className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-xs truncate">{contact.name}</h3>
+                      <span className="text-[10px] text-muted-foreground">{contact.type === 'other' && contact.customType ? contact.customType : CONTACT_TYPE_LABELS[contact.type]}</span>
+                    </div>
+                    <div className={cn(
+                      "text-xs font-bold shrink-0",
+                      contact.balance > 0 ? 'text-destructive' : 
+                      contact.balance < 0 ? 'text-emerald-600' : 
+                      'text-muted-foreground'
+                    )}>
+                      {contact.balance > 0 ? '-' : contact.balance < 0 ? '+' : ''}${formatNumber(Math.abs(contact.balance))}
+                    </div>
+                    <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  </motion.div>
+                );
+              }
+
+              return (
+                <motion.div
+                  key={contact.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  whileTap={{ scale: 0.99 }}
+                  onClick={() => handleViewAccount(contact)}
+                  className="bg-card rounded-xl border border-border p-3 shadow-sm cursor-pointer hover:border-primary/30 transition-all"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={cn("h-11 w-11 rounded-full flex items-center justify-center shrink-0 border", typeColor)}>
+                      <TypeIcon className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-sm truncate">{contact.name}</h3>
+                          {contact.company && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <Building2 className="h-3 w-3" />{contact.company}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {contact.phone && (
+                            <>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:bg-green-500/10" onClick={(e) => handleWhatsAppClick(e, contact.phone!)}>
+                                <MessageCircle className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-500/10" onClick={(e) => handleCallClick(e, contact.phone!)}>
+                                <Phone className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={(e) => { e.stopPropagation(); handleHDPreview(contact); }}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {canEdit && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAccount(contact); }}>تعديل</DropdownMenuItem>}
+                              {canDelete && <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteAccount(contact.id); }}>حذف</DropdownMenuItem>}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <Badge variant="outline" className={cn("text-[10px] h-5", typeColor)}>
+                          {contact.type === 'other' && contact.customType ? contact.customType : CONTACT_TYPE_LABELS[contact.type]}
+                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <div className={cn(
+                            "px-2.5 py-1 rounded-lg text-xs font-bold",
+                            contact.balance > 0 ? 'bg-destructive/10 text-destructive' : 
+                            contact.balance < 0 ? 'bg-emerald-500/10 text-emerald-600' : 
+                            'bg-muted text-muted-foreground'
+                          )}>
+                            {contact.balance > 0 ? '-' : contact.balance < 0 ? '+' : ''}${formatNumber(Math.abs(contact.balance))}
+                          </div>
+                          <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        )}
+      </div>
+
+      {/* Filter Modal */}
+      <Dialog open={showFilterModal} onOpenChange={setShowFilterModal}>
+        <DialogContent className="max-w-xs p-4">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-sm flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              تصفية حسب التصنيف
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {/* Select All / Clear */}
+            <div className="flex items-center justify-between">
+              <button className="text-xs text-primary hover:underline flex items-center gap-1" onClick={handleSelectAll}>
+                <CheckSquare className="h-3 w-3" />
+                تحديد الكل
+              </button>
+              <button className="text-xs text-muted-foreground hover:underline" onClick={handleClearAll}>
+                مسح الكل
+              </button>
+            </div>
+            {/* Category checkboxes */}
+            <div className="space-y-2">
+              {availableTypes.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-2">لا توجد تصنيفات</p>
+              ) : (
+                availableTypes.map(type => {
+                  const TypeIcon = TypeIcons[type] || User;
+                  if (type === 'other' && customTypeNames.length > 0) {
+                    // Show each unique custom type as separate filterable entry
+                    return customTypeNames.map(cName => {
+                      const count = contacts.filter(c => c.type === 'other' && c.customType === cName).length;
+                      return (
+                        <label key={`other-${cName}`} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors">
+                          <Checkbox
+                            checked={tempSelectedCustomTypes.has(cName)}
+                            onCheckedChange={() => {
+                              setTempSelectedCustomTypes(prev => {
+                                const next = new Set(prev);
+                                if (next.has(cName)) next.delete(cName); else next.add(cName);
+                                return next;
+                              });
+                            }}
+                          />
+                          <div className={cn("h-6 w-6 rounded-full flex items-center justify-center shrink-0 border", CONTACT_TYPE_COLORS[type])}>
+                            <TypeIcon className="h-3 w-3" />
+                          </div>
+                          <span className="text-xs font-medium flex-1">{cName}</span>
+                          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{formatNumber(count)}</span>
+                        </label>
+                      );
+                    });
+                  }
+                  const count = contacts.filter(c => c.type === type).length;
+                  return (
+                    <label key={type} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors">
+                      <Checkbox
+                        checked={tempSelectedTypes.has(type)}
+                        onCheckedChange={() => handleToggleType(type)}
+                      />
+                      <div className={cn("h-6 w-6 rounded-full flex items-center justify-center shrink-0 border", CONTACT_TYPE_COLORS[type])}>
+                        <TypeIcon className="h-3 w-3" />
+                      </div>
+                      <span className="text-xs font-medium flex-1">
+                        {CONTACT_TYPE_LABELS[type] || type}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{formatNumber(count)}</span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+            {/* Apply button */}
+            <Button size="sm" className="w-full h-9 text-xs" onClick={handleApplyFilter}>
+              تطبيق ({(tempSelectedTypes.size + tempSelectedCustomTypes.size) > 0 ? `${tempSelectedTypes.size + tempSelectedCustomTypes.size} تصنيف` : 'الكل'})
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Account Statement HD Preview Dialog */}
+      <Dialog open={!!statementContact} onOpenChange={(o) => !o && setStatementContact(null)}>
+        <DialogContent className="max-w-lg p-0 max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="p-4 pb-2">
+            <DialogTitle className="text-sm flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              كشف حساب - {statementContact?.name}
+            </DialogTitle>
+          </DialogHeader>
+
+          {statementContact && (
+            <>
+              {loadingStatement ? (
+                <div className="p-8 text-center text-muted-foreground text-xs">جاري تحميل البيانات...</div>
+              ) : (
+                <div ref={statementRef} className="mx-4 bg-white text-black rounded-lg overflow-hidden" style={{ direction: 'rtl' }}>
+                  <div style={{ background: '#194178', color: 'white', padding: '16px', textAlign: 'center' }}>
+                    <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '4px' }}>كشف حساب</h1>
+                    <p style={{ fontSize: '10px', opacity: 0.9 }}>توطين - المساعد المالي</p>
+                    <p style={{ fontSize: '9px', opacity: 0.8, marginTop: '2px' }}>تاريخ الإصدار: {formatDateGregorian(new Date(), 'long')}</p>
+                  </div>
+
+                  <div style={{ padding: '12px 16px', background: '#f5f7fa', textAlign: 'center' }}>
+                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#194178' }}>{statementContact.name}</div>
+                    <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+                      {statementContact.type === 'other' && statementContact.customType ? statementContact.customType : CONTACT_TYPE_LABELS[statementContact.type]}
+                      {statementContact.phone && ` | ${statementContact.phone}`}
+                      {statementContact.company && ` | ${statementContact.company}`}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', padding: '12px 16px' }}>
+                    <div style={{ textAlign: 'center', padding: '8px', background: '#dcfce7', borderRadius: '6px' }}>
+                      <div style={{ fontSize: '9px', color: '#166534' }}>مدين (Debit)</div>
+                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#166534' }}>${formatNumber(statementContact.totalDebit)}</div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: '8px', background: '#fef2f2', borderRadius: '6px' }}>
+                      <div style={{ fontSize: '9px', color: '#991b1b' }}>دائن (Credit)</div>
+                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#991b1b' }}>${formatNumber(statementContact.totalCredit)}</div>
+                    </div>
+                    <div style={{
+                      textAlign: 'center', padding: '8px', borderRadius: '6px',
+                      background: statementContact.balance > 0 ? '#fef2f2' : statementContact.balance < 0 ? '#dcfce7' : '#f5f5f5',
+                    }}>
+                      <div style={{ fontSize: '9px', color: '#666' }}>الرصيد</div>
+                      <div style={{
+                        fontSize: '13px', fontWeight: 'bold',
+                        color: statementContact.balance > 0 ? '#dc2626' : statementContact.balance < 0 ? '#16a34a' : '#666',
+                      }}>
+                        ${formatNumber(Math.abs(statementContact.balance))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '0 16px 12px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#194178', marginBottom: '8px', textAlign: 'center' }}>
+                      سجل العمليات ({formatNumber(statementTxs.length)})
+                    </div>
+                    {statementTxs.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '20px', color: '#999', fontSize: '11px' }}>لا توجد عمليات مسجلة</div>
+                    ) : (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+                        <thead>
+                          <tr style={{ background: '#194178', color: 'white' }}>
+                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>التاريخ</th>
+                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>البيان</th>
+                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>مدين</th>
+                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>دائن</th>
+                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>الرصيد</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(() => {
+                            let running = 0;
+                            return statementTxs.map((t, i) => {
+                              if (t.type === 'in') running += t.amount; else running -= t.amount;
+                              return (
+                                <tr key={t.id} style={{ background: i % 2 === 0 ? '#fff' : '#f5f7fa', borderBottom: '1px solid #eee' }}>
+                                  <td style={{ padding: '5px 4px', textAlign: 'center' }}>{formatDateShort(t.date)}</td>
+                                  <td style={{ padding: '5px 4px', textAlign: 'center', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {t.description || '-'}
+                                  </td>
+                                  <td style={{ padding: '5px 4px', textAlign: 'center', color: '#16a34a', fontWeight: t.type === 'in' ? 'bold' : 'normal' }}>
+                                    {t.type === 'in' ? `$${formatAmount(t.amount)}` : '-'}
+                                  </td>
+                                  <td style={{ padding: '5px 4px', textAlign: 'center', color: '#dc2626', fontWeight: t.type === 'out' ? 'bold' : 'normal' }}>
+                                    {t.type === 'out' ? `$${formatAmount(t.amount)}` : '-'}
+                                  </td>
+                                  <td style={{ padding: '5px 4px', textAlign: 'center', fontWeight: 'bold' }}>
+                                    ${formatAmount(Math.abs(running))}
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+
+                  <div style={{ margin: '0 16px 8px', padding: '8px 12px', background: '#fafafa', borderRadius: '4px', border: '1px solid #eee' }}>
+                    <p style={{ fontSize: '7px', color: '#888', textAlign: 'center', lineHeight: '1.6' }}>{LEGAL_DISCLAIMER}</p>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: '8px', fontSize: '8px', color: '#999', borderTop: '1px solid #eee' }}>
+                    توطين © {new Date().getFullYear()} - جميع الحقوق محفوظة
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 p-4 pt-2">
+                <Button size="sm" className="flex-1 gap-1 h-9 text-xs" onClick={handleDownloadHDPDF} disabled={loadingStatement}>
+                  <Download className="h-3.5 w-3.5" /> تحميل HD PDF
+                </Button>
+                <Button size="sm" variant="outline" className="flex-1 gap-1 h-9 text-xs" onClick={() => { handleExportStatementPDF(statementContact); setStatementContact(null); }}>
+                  <FileText className="h-3.5 w-3.5" /> PDF
+                </Button>
+                <Button size="sm" variant="outline" className="flex-1 gap-1 h-9 text-xs" onClick={() => { handleExportStatementExcel(statementContact); setStatementContact(null); }}>
+                  <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

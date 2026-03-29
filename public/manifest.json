@@ -1,0 +1,46 @@
+{
+  "name": "توطين - المساعد المالي",
+  "short_name": "توطين",
+  "description": "المساعد المالي المتكامل لإدارة الحسابات والمشاريع والشحن",
+  "start_url": "/?v=2.6.5",
+  "id": "tawdeen-money-v2",
+  "version": "2.6.5",
+  "display": "standalone",
+  "background_color": "#1a3a5c",
+  "theme_color": "#1a3a5c",
+  "orientation": "portrait-primary",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["business", "finance"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "إضافة عملية",
+      "short_name": "عملية جديدة",
+      "description": "إضافة عملية مالية جديدة",
+      "url": "/?page=home",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "الصناديق",
+      "short_name": "الصناديق",
+      "description": "إدارة الصناديق المالية",
+      "url": "/?page=funds",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

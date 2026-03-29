@@ -1,0 +1,329 @@
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Ship, Package, ChevronDown, ChevronUp, Edit, Trash2, Plus,
+  MapPin, DollarSign, Lock, Unlock, Paperclip, User
+} from 'lucide-react';
+import { DocumentAttachment } from '@/components/shared/DocumentAttachment';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Container, Shipment } from '@/types/finance';
+import { ShipmentCard } from './ShipmentCard';
+import { VisualContainerLoader } from './VisualContainerLoader';
+import { StatusTimeline } from './StatusTimeline';
+
+interface ContainerCardProps {
+  container: Container;
+  shipments: Shipment[];
+  onEdit: (container: Container) => void;
+  onDelete: (containerId: string) => void;
+  onAddShipment: (containerId: string) => void;
+  onEditShipment: (shipment: Shipment) => void;
+  onDeleteShipment: (shipmentId: string) => void;
+  onAddPayment: (shipmentId: string) => void;
+  onToggleClosed?: (containerId: string, isClosed: boolean) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
+}
+
+const statusLabels: Record<string, { label: string; color: string }> = {
+  loading: { label: 'قيد التحميل', color: 'bg-yellow-500' },
+  shipped: { label: 'تم الشحن', color: 'bg-blue-500' },
+  arrived: { label: 'وصلت', color: 'bg-purple-500' },
+  delivered: { label: 'تم التسليم', color: 'bg-income' },
+};
+
+export function ContainerCard({
+  container,
+  shipments,
+  onEdit,
+  onDelete,
+  onAddShipment,
+  onEditShipment,
+  onDeleteShipment,
+  onAddPayment,
+  onToggleClosed,
+  canEdit = true,
+  canDelete = true,
+}: ContainerCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const isOverCapacity = container.usedCapacity > container.capacity;
+  const isClosed = container.isManullyClosed;
+  const canAddShipment = container.status === 'loading' && !isClosed;
+  const status = statusLabels[container.status] || statusLabels.loading;
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`bg-card rounded-xl border shadow-sm overflow-hidden ${isClosed ? 'border-destructive/40' : 'border-border'}`}
+      dir="rtl"
+    >
+      {/* Header */}
+      <div 
+        className="p-3 cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+              isClosed ? 'bg-destructive/10' : isOverCapacity ? 'bg-destructive/10' : 'bg-primary/10'
+            }`}>
+              {isClosed ? (
+                <Lock className="h-5 w-5 text-destructive" />
+              ) : (
+                <Ship className={`h-5 w-5 ${isOverCapacity ? 'text-destructive' : 'text-primary'}`} />
+              )}
+            </div>
+            <div>
+              <h3 className="font-bold text-sm">
+                {container.containerNumber}
+                {container.attachments && container.attachments.length > 0 && (
+                  <Paperclip className="h-3 w-3 text-primary inline mr-1" />
+                )}
+              </h3>
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
+                  {container.type}
+                </Badge>
+                <span className="flex items-center gap-0.5">
+                  <MapPin className="h-2.5 w-2.5" />
+                  {container.route}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-1.5">
+            {isClosed && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5">
+                مغلقة
+              </Badge>
+            )}
+            <Badge className={`${status.color} text-white text-[10px] px-1.5 py-0.5`}>
+              {status.label}
+            </Badge>
+            {isExpanded ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
+        </div>
+
+        <VisualContainerLoader container={container} compact />
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-border">
+          <div className="text-center">
+            <p className="text-[10px] text-muted-foreground">الشحنات</p>
+            <p className="font-bold text-xs">{shipments.length}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-[10px] text-muted-foreground">الإيرادات</p>
+            <p className="font-bold text-xs text-income">{container.totalRevenue.toLocaleString('ar-SA')}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-[10px] text-muted-foreground">الربح</p>
+            <p className={`font-bold text-xs ${container.profit >= 0 ? 'text-income' : 'text-destructive'}`}>
+              {container.profit.toLocaleString('ar-SA')}
+            </p>
+          </div>
+        </div>
+        {container.createdByName && (
+          <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+            <User className="h-2.5 w-2.5" />
+            <span>بواسطة: <span className="text-primary font-medium">{container.createdByName}</span></span>
+          </div>
+        )}
+      </div>
+
+      {/* Expanded Content */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-3 pb-3 space-y-3">
+              {/* إقفال يدوي */}
+              {onToggleClosed && (
+                <div 
+                  className={`flex items-center justify-between rounded-lg p-3 transition-all cursor-pointer border ${
+                    isClosed 
+                      ? 'bg-destructive/5 border-destructive/20 hover:bg-destructive/10' 
+                      : 'bg-income/5 border-income/20 hover:bg-income/10'
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleClosed(container.id, !isClosed);
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`h-9 w-9 rounded-full flex items-center justify-center transition-colors ${
+                      isClosed ? 'bg-destructive/15' : 'bg-income/15'
+                    }`}>
+                      {isClosed ? <Lock className="h-4 w-4 text-destructive" /> : <Unlock className="h-4 w-4 text-income" />}
+                    </div>
+                    <div>
+                      <p className={`text-xs font-bold ${isClosed ? 'text-destructive' : 'text-income'}`}>
+                        {isClosed ? '🔒 الحاوية مغلقة' : '🔓 الحاوية مفتوحة'}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {isClosed ? 'اضغط لفتح الحاوية وإتاحة إضافة شحنات' : 'اضغط لإغلاق الحاوية ومنع إضافة شحنات'}
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={isClosed}
+                    onCheckedChange={(checked) => {
+                      onToggleClosed(container.id, checked);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className={isClosed ? 'data-[state=checked]:bg-destructive' : ''}
+                  />
+                </div>
+              )}
+
+              <StatusTimeline 
+                currentStatus={container.status} 
+                departureDate={container.departureDate}
+                arrivalDate={container.arrivalDate}
+              />
+
+              {/* التكاليف */}
+              <div className="bg-muted/50 rounded-lg p-2.5 space-y-1.5">
+                <h4 className="text-xs font-semibold flex items-center gap-1.5">
+                  <DollarSign className="h-3.5 w-3.5" />
+                  تفاصيل التكاليف
+                </h4>
+                <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">الشحن:</span>
+                    <span>{container.shippingCost.toLocaleString('ar-SA')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">الجمارك:</span>
+                    <span>{container.customsCost.toLocaleString('ar-SA')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">الميناء:</span>
+                    <span>{container.portCost.toLocaleString('ar-SA')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">أخرى:</span>
+                    <span>{container.otherCosts.toLocaleString('ar-SA')}</span>
+                  </div>
+                </div>
+                <div className="flex justify-between pt-1.5 border-t border-border font-bold text-xs">
+                  <span>الإجمالي:</span>
+                  <span className="text-destructive">${container.totalCost.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* الشحنات */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-semibold flex items-center gap-1.5">
+                    <Package className="h-3.5 w-3.5" />
+                    الشحنات ({shipments.length})
+                  </h4>
+                  {canAddShipment && canEdit && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="h-6 text-[10px] gap-1 px-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddShipment(container.id);
+                      }}
+                    >
+                      <Plus className="h-3 w-3" />
+                      إضافة
+                    </Button>
+                  )}
+                </div>
+
+                {shipments.length === 0 ? (
+                  <div className="text-center py-3 text-xs text-muted-foreground">
+                    لا توجد شحنات في هذه الحاوية
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {shipments.map(shipment => (
+                      <ShipmentCard
+                        key={shipment.id}
+                        shipment={shipment}
+                        onEdit={() => onEditShipment(shipment)}
+                        onDelete={() => onDeleteShipment(shipment.id)}
+                        onAddPayment={() => onAddPayment(shipment.id)}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Attachments */}
+              {container.attachments && container.attachments.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold flex items-center gap-1.5 mb-1">
+                    <Paperclip className="h-3.5 w-3.5" />
+                    المرفقات ({container.attachments.length})
+                  </h4>
+                  <DocumentAttachment
+                    attachments={container.attachments}
+                    onAttachmentsChange={() => {}}
+                    compact
+                    readOnly
+                  />
+                </div>
+              )}
+
+              {/* Actions */}
+              {(canEdit || canDelete) && (
+                <div className="flex gap-2 pt-2 border-t border-border">
+                  {canEdit && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="flex-1 gap-1 h-8 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit(container);
+                      }}
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                      تعديل
+                    </Button>
+                  )}
+                  {canDelete && (
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
+                      className="gap-1 h-8 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(container.id);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      حذف
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
