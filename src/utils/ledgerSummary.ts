@@ -1,6 +1,7 @@
-import { Transaction } from '@/types/finance';
-
-type LedgerTransactionLike = Pick<Transaction, 'type' | 'amount'>;
+type LedgerTransactionLike = {
+  type?: string | null;
+  amount: number;
+};
 
 export interface LedgerSummary {
   totalDebit: number;
