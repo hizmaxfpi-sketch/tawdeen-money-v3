@@ -21,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePersistedFilter } from '@/hooks/usePersistedFilters';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { calculateLedgerSummary, EMPTY_LEDGER_SUMMARY } from '@/utils/ledgerSummary';
 
 const LEGAL_DISCLAIMER = 'هذا المستند تم إنشاؤه آلياً من النظام وهو معتمد بدون توقيع أو ختم. تخلي المؤسسة مسؤوليتها عن أي كشط، شطب، أو تعديل يدوي يطرأ على هذه الورقة.';
 
@@ -77,14 +78,39 @@ export function LedgerAccountsPage() {
   // Custom type filter: track selected custom type names separately
   const [selectedCustomTypes, setSelectedCustomTypes] = usePersistedFilter<Set<string>>('ledger-custom-types', new Set());
 
+  const contactLedgerSummaries = useMemo(() => {
+    const grouped = new Map<string, Transaction[]>();
+
+    transactions.forEach((transaction) => {
+      if (!transaction.contactId) return;
+      const current = grouped.get(transaction.contactId) || [];
+      current.push(transaction);
+      grouped.set(transaction.contactId, current);
+    });
+
+    const summaries = new Map<string, ReturnType<typeof calculateLedgerSummary>>();
+    grouped.forEach((contactTransactions, contactId) => {
+      summaries.set(contactId, calculateLedgerSummary(contactTransactions));
+    });
+
+    return summaries;
+  }, [transactions]);
+
   const ledgerTransactionStats = useMemo(() => {
     const activeContacts = contacts.filter(c => c.status === 'active');
-    const totalTransactions = activeContacts.reduce((sum, c) => sum + c.totalTransactions, 0);
-    const totalDebit = activeContacts.reduce((sum, c) => sum + c.totalDebit, 0);
-    const totalCredit = activeContacts.reduce((sum, c) => sum + c.totalCredit, 0);
+    const totals = activeContacts.reduce((summary, contact) => {
+      const contactSummary = contactLedgerSummaries.get(contact.id) || EMPTY_LEDGER_SUMMARY;
+      summary.totalTransactions += contactSummary.transactionCount;
+      summary.totalDebit += contactSummary.totalDebit;
+      summary.totalCredit += contactSummary.totalCredit;
+      return summary;
+    }, { totalTransactions: 0, totalDebit: 0, totalCredit: 0 });
+    const totalTransactions = totals.totalTransactions;
+    const totalDebit = totals.totalDebit;
+    const totalCredit = totals.totalCredit;
     const netBalance = totalDebit - totalCredit;
     return { totalTransactions, totalIncome: totalDebit, totalExpenses: totalCredit, netBalance };
-  }, [contacts]);
+  }, [contacts, contactLedgerSummaries]);
 
   const handleSyncBalances = async () => {
     setIsSyncing(true);
@@ -207,9 +233,10 @@ export function LedgerAccountsPage() {
 
   const handleExportStatementPDF = async (contact: Contact) => {
     const contactTxs = await fetchContactTransactions(contact.id);
+    const ledgerSummary = calculateLedgerSummary(contactTxs);
     exportAccountStatement({
       entityName: contact.name, entityType: contact.type === 'other' && contact.customType ? contact.customType : CONTACT_TYPE_LABELS[contact.type],
-      balance: contact.balance, totalDebit: contact.totalDebit, totalCredit: contact.totalCredit,
+      balance: ledgerSummary.balance, totalDebit: ledgerSummary.totalDebit, totalCredit: ledgerSummary.totalCredit,
       phone: contact.phone || undefined, email: contact.email || undefined, company: contact.company || undefined,
       transactions: contactTxs,
     });
@@ -250,6 +277,8 @@ export function LedgerAccountsPage() {
     e.stopPropagation();
     window.open(`tel:${phone}`, '_self');
   };
+
+  const statementSummary = useMemo(() => calculateLedgerSummary(statementTxs), [statementTxs]);
 
   return (
     <div className="space-y-3">
@@ -388,6 +417,7 @@ export function LedgerAccountsPage() {
             {filteredContacts.map(contact => {
               const TypeIcon = TypeIcons[contact.type] || User;
               const typeColor = CONTACT_TYPE_COLORS[contact.type];
+              const ledgerSummary = contactLedgerSummaries.get(contact.id) || EMPTY_LEDGER_SUMMARY;
               
               if (viewMode === 'list') {
                 return (
@@ -408,11 +438,11 @@ export function LedgerAccountsPage() {
                     </div>
                     <div className={cn(
                       "text-xs font-bold shrink-0",
-                      contact.balance > 0 ? 'text-destructive' : 
-                      contact.balance < 0 ? 'text-emerald-600' : 
+                      ledgerSummary.balance > 0 ? 'text-income' : 
+                      ledgerSummary.balance < 0 ? 'text-expense' : 
                       'text-muted-foreground'
                     )}>
-                      {contact.balance > 0 ? '-' : contact.balance < 0 ? '+' : ''}${formatNumber(Math.abs(contact.balance))}
+                      {ledgerSummary.balance > 0 ? '+' : ledgerSummary.balance < 0 ? '-' : ''}${formatNumber(Math.abs(ledgerSummary.balance))}
                     </div>
                     <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   </motion.div>
@@ -477,11 +507,11 @@ export function LedgerAccountsPage() {
                         <div className="flex items-center gap-2">
                           <div className={cn(
                             "px-2.5 py-1 rounded-lg text-xs font-bold",
-                            contact.balance > 0 ? 'bg-destructive/10 text-destructive' : 
-                            contact.balance < 0 ? 'bg-emerald-500/10 text-emerald-600' : 
+                            ledgerSummary.balance > 0 ? 'bg-income/10 text-income' : 
+                            ledgerSummary.balance < 0 ? 'bg-expense/10 text-expense' : 
                             'bg-muted text-muted-foreground'
                           )}>
-                            {contact.balance > 0 ? '-' : contact.balance < 0 ? '+' : ''}${formatNumber(Math.abs(contact.balance))}
+                            {ledgerSummary.balance > 0 ? '+' : ledgerSummary.balance < 0 ? '-' : ''}${formatNumber(Math.abs(ledgerSummary.balance))}
                           </div>
                           <ChevronLeft className="h-4 w-4 text-muted-foreground" />
                         </div>
@@ -608,22 +638,22 @@ export function LedgerAccountsPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', padding: '12px 16px' }}>
                     <div style={{ textAlign: 'center', padding: '8px', background: '#dcfce7', borderRadius: '6px' }}>
                       <div style={{ fontSize: '9px', color: '#166534' }}>مدين (Debit)</div>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#166534' }}>${formatNumber(statementContact.totalDebit)}</div>
+                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#166534' }}>${formatNumber(statementSummary.totalDebit)}</div>
                     </div>
                     <div style={{ textAlign: 'center', padding: '8px', background: '#fef2f2', borderRadius: '6px' }}>
                       <div style={{ fontSize: '9px', color: '#991b1b' }}>دائن (Credit)</div>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#991b1b' }}>${formatNumber(statementContact.totalCredit)}</div>
+                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#991b1b' }}>${formatNumber(statementSummary.totalCredit)}</div>
                     </div>
                     <div style={{
                       textAlign: 'center', padding: '8px', borderRadius: '6px',
-                      background: statementContact.balance > 0 ? '#fef2f2' : statementContact.balance < 0 ? '#dcfce7' : '#f5f5f5',
+                      background: statementSummary.balance > 0 ? '#dcfce7' : statementSummary.balance < 0 ? '#fef2f2' : '#f5f5f5',
                     }}>
                       <div style={{ fontSize: '9px', color: '#666' }}>الرصيد</div>
                       <div style={{
                         fontSize: '13px', fontWeight: 'bold',
-                        color: statementContact.balance > 0 ? '#dc2626' : statementContact.balance < 0 ? '#16a34a' : '#666',
+                        color: statementSummary.balance > 0 ? '#16a34a' : statementSummary.balance < 0 ? '#dc2626' : '#666',
                       }}>
-                        ${formatNumber(Math.abs(statementContact.balance))}
+                        ${formatNumber(Math.abs(statementSummary.balance))}
                       </div>
                     </div>
                   </div>

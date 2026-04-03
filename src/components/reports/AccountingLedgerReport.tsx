@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { generateHDPreviewPDF, printHDPreview } from '@/utils/hdPreview';
 import { formatDateGregorian, formatAmount as fmtAmt } from '@/utils/formatUtils';
+import { calculateLedgerSummary, EMPTY_LEDGER_SUMMARY } from '@/utils/ledgerSummary';
 
 interface ContactRow {
   id: string;
@@ -115,6 +116,43 @@ export function AccountingLedgerReport() {
     enabled: !!selectedContact,
   });
 
+  const { data: allContactTransactions = [] } = useQuery({
+    queryKey: ['ledger-report-all-transactions', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('id, type, category, amount, description, date, fund_id, contact_id, project_id, shipment_id, source_type, notes, created_at, currency_code')
+        .not('contact_id', 'is', null);
+      if (error) throw error;
+      return (data || []) as TransactionRow[];
+    },
+    enabled: !!user,
+  });
+
+  const contactSummaries = useMemo(() => {
+    const grouped = new Map<string, TransactionRow[]>();
+
+    allContactTransactions.forEach((transaction) => {
+      if (!transaction.contact_id) return;
+      const current = grouped.get(transaction.contact_id) || [];
+      current.push(transaction);
+      grouped.set(transaction.contact_id, current);
+    });
+
+    const summaries = new Map<string, ReturnType<typeof calculateLedgerSummary>>();
+    grouped.forEach((transactions, contactId) => {
+      summaries.set(contactId, calculateLedgerSummary(transactions));
+    });
+
+    return summaries;
+  }, [allContactTransactions]);
+
+  const selectedContactSummary = useMemo(
+    () => calculateLedgerSummary(contactTransactions),
+    [contactTransactions]
+  );
+
   const availableTypes = useMemo(() => {
     const types = new Set<string>();
     contacts.forEach(c => {
@@ -140,11 +178,17 @@ export function AccountingLedgerReport() {
 
   const stats = useMemo(() => {
     const totalAccounts = filteredContacts.length;
-    const totalDebit = filteredContacts.reduce((s, c) => s + c.total_debit, 0);
-    const totalCredit = filteredContacts.reduce((s, c) => s + c.total_credit, 0);
+    const totals = filteredContacts.reduce((summary, contact) => {
+      const contactSummary = contactSummaries.get(contact.id) || EMPTY_LEDGER_SUMMARY;
+      summary.totalDebit += contactSummary.totalDebit;
+      summary.totalCredit += contactSummary.totalCredit;
+      return summary;
+    }, { totalDebit: 0, totalCredit: 0 });
+    const totalDebit = totals.totalDebit;
+    const totalCredit = totals.totalCredit;
     const netBalance = totalDebit - totalCredit;
     return { totalAccounts, totalDebit, totalCredit, netBalance };
-  }, [filteredContacts]);
+  }, [filteredContacts, contactSummaries]);
 
   const openDetail = useCallback((contact: ContactRow) => {
     setSelectedContact(contact);
@@ -193,7 +237,19 @@ export function AccountingLedgerReport() {
       (doc as any).autoTable({
         startY: y,
         head: [['الاسم', 'النوع', 'الهاتف', 'البريد', 'مدين', 'دائن', 'الرصيد', 'العمليات']],
-        body: filteredContacts.map(c => [c.name, c.custom_type || TYPE_LABELS[c.type] || c.type, c.phone || '-', c.email || '-', `$${formatAmount(c.total_debit)}`, `$${formatAmount(c.total_credit)}`, `$${formatAmount(c.balance)}`, c.total_transactions.toString()]),
+        body: filteredContacts.map(c => {
+          const summary = contactSummaries.get(c.id) || EMPTY_LEDGER_SUMMARY;
+          return [
+            c.name,
+            c.custom_type || TYPE_LABELS[c.type] || c.type,
+            c.phone || '-',
+            c.email || '-',
+            `$${formatAmount(summary.totalDebit)}`,
+            `$${formatAmount(summary.totalCredit)}`,
+            `$${formatAmount(summary.balance)}`,
+            summary.transactionCount.toString(),
+          ];
+        }),
         styles: { font: 'Helvetica', fontSize: 8, halign: 'center' },
         headStyles: { fillColor: [25, 65, 120], textColor: 255 },
         alternateRowStyles: { fillColor: [245, 247, 250] },
@@ -232,7 +288,7 @@ export function AccountingLedgerReport() {
     await exportAccountStatement({
       entityName: selectedContact.name,
       entityType: selectedContact.custom_type || TYPE_LABELS[selectedContact.type] || selectedContact.type,
-      balance: selectedContact.balance, totalDebit: selectedContact.total_debit, totalCredit: selectedContact.total_credit,
+      balance: selectedContactSummary.balance, totalDebit: selectedContactSummary.totalDebit, totalCredit: selectedContactSummary.totalCredit,
       phone: selectedContact.phone || undefined, email: selectedContact.email || undefined, company: selectedContact.company || undefined,
       transactions: contactTransactions.map(t => ({ id: t.id, type: t.type as 'in' | 'out', category: t.category as any, amount: t.amount, description: t.description || '', date: t.date, fundId: t.fund_id || '', createdAt: new Date(t.created_at) })),
     });
@@ -259,8 +315,8 @@ export function AccountingLedgerReport() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px', padding: '16px' }}>
         {[
           { label: 'إجمالي الحسابات', value: stats.totalAccounts.toString(), bg: '#eff6ff' },
-          { label: 'إجمالي المسحوبات', value: `$${formatAmount(stats.totalDebit)}`, bg: '#fef2f2' },
-          { label: 'إجمالي المدفوعات', value: `$${formatAmount(stats.totalCredit)}`, bg: '#dcfce7' },
+          { label: 'إجمالي المدين', value: `$${formatAmount(stats.totalDebit)}`, bg: '#dcfce7' },
+          { label: 'إجمالي الدائن', value: `$${formatAmount(stats.totalCredit)}`, bg: '#fef2f2' },
           { label: 'صافي الرصيد', value: `$${formatAmount(Math.abs(stats.netBalance))}`, bg: stats.netBalance >= 0 ? '#dcfce7' : '#fef2f2' },
         ].map((s, i) => (
           <div key={i} style={{ background: s.bg, padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
@@ -281,18 +337,23 @@ export function AccountingLedgerReport() {
           </thead>
           <tbody>
             {filteredContacts.map((c, idx) => (
-              <tr key={c.id} style={{ background: idx % 2 === 0 ? '#fff' : '#f5f7fa', borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: '6px', textAlign: 'center' }}>{idx + 1}</td>
-                <td style={{ padding: '6px', fontWeight: 'bold' }}>{c.name}</td>
-                <td style={{ padding: '6px', textAlign: 'center' }}>{c.custom_type || TYPE_LABELS[c.type] || c.type}</td>
-                <td style={{ padding: '6px', textAlign: 'center' }}>{c.phone || '-'}</td>
-                <td style={{ padding: '6px', textAlign: 'center', color: '#991b1b' }}>${formatAmount(c.total_debit)}</td>
-                <td style={{ padding: '6px', textAlign: 'center', color: '#166534' }}>${formatAmount(c.total_credit)}</td>
-                <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', color: c.balance > 0 ? '#991b1b' : c.balance < 0 ? '#166534' : '#666' }}>
-                  ${formatAmount(Math.abs(c.balance))} {c.balance > 0 ? '(مدين)' : c.balance < 0 ? '(دائن)' : ''}
-                </td>
-                <td style={{ padding: '6px', textAlign: 'center' }}>{c.total_transactions}</td>
-              </tr>
+              (() => {
+                const summary = contactSummaries.get(c.id) || EMPTY_LEDGER_SUMMARY;
+                return (
+                  <tr key={c.id} style={{ background: idx % 2 === 0 ? '#fff' : '#f5f7fa', borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '6px', textAlign: 'center' }}>{idx + 1}</td>
+                    <td style={{ padding: '6px', fontWeight: 'bold' }}>{c.name}</td>
+                    <td style={{ padding: '6px', textAlign: 'center' }}>{c.custom_type || TYPE_LABELS[c.type] || c.type}</td>
+                    <td style={{ padding: '6px', textAlign: 'center' }}>{c.phone || '-'}</td>
+                    <td style={{ padding: '6px', textAlign: 'center', color: '#166534' }}>${formatAmount(summary.totalDebit)}</td>
+                    <td style={{ padding: '6px', textAlign: 'center', color: '#991b1b' }}>${formatAmount(summary.totalCredit)}</td>
+                    <td style={{ padding: '6px', textAlign: 'center', fontWeight: 'bold', color: summary.balance > 0 ? '#166534' : summary.balance < 0 ? '#991b1b' : '#666' }}>
+                      ${formatAmount(Math.abs(summary.balance))} {summary.balance > 0 ? '(مدين)' : summary.balance < 0 ? '(دائن)' : ''}
+                    </td>
+                    <td style={{ padding: '6px', textAlign: 'center' }}>{summary.transactionCount}</td>
+                  </tr>
+                );
+              })()
             ))}
           </tbody>
           <tfoot>
@@ -339,17 +400,17 @@ export function AccountingLedgerReport() {
         </div>
         {/* Balance summary */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', padding: '0 16px 16px' }}>
-          <div style={{ background: '#fef2f2', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
-            <div style={{ fontSize: '10px', color: '#666' }}>مدين</div>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#991b1b' }}>${formatAmount(selectedContact.total_debit)}</div>
-          </div>
           <div style={{ background: '#dcfce7', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
-            <div style={{ fontSize: '10px', color: '#666' }}>دائن</div>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#166534' }}>${formatAmount(selectedContact.total_credit)}</div>
+            <div style={{ fontSize: '10px', color: '#666' }}>مدين</div>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#166534' }}>${formatAmount(selectedContactSummary.totalDebit)}</div>
           </div>
-          <div style={{ background: selectedContact.balance > 0 ? '#fef2f2' : '#dcfce7', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
+          <div style={{ background: '#fef2f2', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ fontSize: '10px', color: '#666' }}>دائن</div>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#991b1b' }}>${formatAmount(selectedContactSummary.totalCredit)}</div>
+          </div>
+          <div style={{ background: selectedContactSummary.balance > 0 ? '#dcfce7' : '#fef2f2', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
             <div style={{ fontSize: '10px', color: '#666' }}>الرصيد</div>
-            <div style={{ fontSize: '14px', fontWeight: 'bold', color: selectedContact.balance > 0 ? '#991b1b' : '#166534' }}>${formatAmount(Math.abs(selectedContact.balance))}</div>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', color: selectedContactSummary.balance > 0 ? '#166534' : selectedContactSummary.balance < 0 ? '#991b1b' : '#666' }}>${formatAmount(Math.abs(selectedContactSummary.balance))}</div>
           </div>
         </div>
         {/* Transactions */}
@@ -364,17 +425,17 @@ export function AccountingLedgerReport() {
             </thead>
             <tbody>
               {contactTransactions.map((t, idx) => {
-                if (t.type === 'out') runningBalance += t.amount;
+                if (t.type === 'in') runningBalance += t.amount;
                 else runningBalance -= t.amount;
                 return (
                   <tr key={t.id} style={{ background: idx % 2 === 0 ? '#fff' : '#f5f7fa', borderBottom: '1px solid #eee' }}>
                     <td style={{ padding: '5px', textAlign: 'center' }}>{idx + 1}</td>
                     <td style={{ padding: '5px', textAlign: 'center' }}>{formatDateGregorian(t.date)}</td>
                     <td style={{ padding: '5px', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description || '-'}</td>
-                    <td style={{ padding: '5px', textAlign: 'center' }}>{CATEGORY_LABELS[t.category] || t.category}</td>
-                    <td style={{ padding: '5px', textAlign: 'center', color: '#991b1b' }}>{t.type === 'out' ? `$${formatAmount(t.amount)}` : '-'}</td>
+                    <td style={{ padding: '5px', textAlign: 'center' }}>{t.type === 'in' ? 'مدين' : 'دائن'}</td>
                     <td style={{ padding: '5px', textAlign: 'center', color: '#166534' }}>{t.type === 'in' ? `$${formatAmount(t.amount)}` : '-'}</td>
-                    <td style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold', color: runningBalance > 0 ? '#991b1b' : '#166534' }}>${formatAmount(Math.abs(runningBalance))}</td>
+                    <td style={{ padding: '5px', textAlign: 'center', color: '#991b1b' }}>{t.type === 'out' ? `$${formatAmount(t.amount)}` : '-'}</td>
+                    <td style={{ padding: '5px', textAlign: 'center', fontWeight: 'bold', color: runningBalance > 0 ? '#166534' : runningBalance < 0 ? '#991b1b' : '#666' }}>${formatAmount(Math.abs(runningBalance))}</td>
                   </tr>
                 );
               })}
@@ -463,6 +524,9 @@ export function AccountingLedgerReport() {
           <div className="text-center py-8 text-muted-foreground text-xs">لا توجد حسابات مطابقة للبحث</div>
         ) : (
           filteredContacts.map(contact => (
+            (() => {
+              const summary = contactSummaries.get(contact.id) || EMPTY_LEDGER_SUMMARY;
+              return (
             <motion.div key={contact.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               className="rounded-xl bg-card p-3 shadow-sm border border-border cursor-pointer hover:bg-accent/50 transition-colors"
               onClick={() => openDetail(contact)}
@@ -478,28 +542,30 @@ export function AccountingLedgerReport() {
                   </div>
                 </div>
                 <div className="text-left">
-                  <p className={cn("text-sm font-bold", contact.balance > 0 ? 'text-expense' : contact.balance < 0 ? 'text-income' : 'text-muted-foreground')}>
-                    ${formatAmount(Math.abs(contact.balance))}
+                  <p className={cn("text-sm font-bold", summary.balance > 0 ? 'text-income' : summary.balance < 0 ? 'text-expense' : 'text-muted-foreground')}>
+                    ${formatAmount(Math.abs(summary.balance))}
                   </p>
-                  <p className="text-[8px] text-muted-foreground">{contact.balance > 0 ? 'مدين' : contact.balance < 0 ? 'دائن' : 'مسوّى'}</p>
+                  <p className="text-[8px] text-muted-foreground">{summary.balance > 0 ? 'مدين' : summary.balance < 0 ? 'دائن' : 'مسوّى'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 text-[9px] text-muted-foreground">
                 {contact.phone && <span className="flex items-center gap-0.5"><Phone className="h-2.5 w-2.5" />{contact.phone}</span>}
                 {contact.email && <span className="flex items-center gap-0.5"><Mail className="h-2.5 w-2.5" />{contact.email}</span>}
-                <span className="mr-auto">{contact.total_transactions} عملية</span>
+                <span className="mr-auto">{summary.transactionCount} عملية</span>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-2 text-[9px]">
-                <div className="bg-expense/10 rounded-lg px-2 py-1 text-center">
-                  <span className="text-muted-foreground">مدين: </span>
-                  <span className="font-bold text-expense">${formatAmount(contact.total_debit)}</span>
-                </div>
                 <div className="bg-income/10 rounded-lg px-2 py-1 text-center">
+                  <span className="text-muted-foreground">مدين: </span>
+                  <span className="font-bold text-income">${formatAmount(summary.totalDebit)}</span>
+                </div>
+                <div className="bg-expense/10 rounded-lg px-2 py-1 text-center">
                   <span className="text-muted-foreground">دائن: </span>
-                  <span className="font-bold text-income">${formatAmount(contact.total_credit)}</span>
+                  <span className="font-bold text-expense">${formatAmount(summary.totalCredit)}</span>
                 </div>
               </div>
             </motion.div>
+              );
+            })()
           ))
         )}
       </div>
@@ -523,9 +589,9 @@ export function AccountingLedgerReport() {
                 {selectedContact.company && <div className="flex justify-between"><span className="text-muted-foreground">الشركة</span><span>{selectedContact.company}</span></div>}
               </div>
               <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
-                <div className="bg-expense/10 rounded-lg p-2"><p className="text-muted-foreground">مدين</p><p className="font-bold text-expense">${formatAmount(selectedContact.total_debit)}</p></div>
-                <div className="bg-income/10 rounded-lg p-2"><p className="text-muted-foreground">دائن</p><p className="font-bold text-income">${formatAmount(selectedContact.total_credit)}</p></div>
-                <div className={cn("rounded-lg p-2", selectedContact.balance > 0 ? 'bg-expense/10' : 'bg-income/10')}><p className="text-muted-foreground">الرصيد</p><p className={cn("font-bold", selectedContact.balance > 0 ? 'text-expense' : 'text-income')}>${formatAmount(Math.abs(selectedContact.balance))}</p></div>
+                <div className="bg-income/10 rounded-lg p-2"><p className="text-muted-foreground">مدين</p><p className="font-bold text-income">${formatAmount(selectedContactSummary.totalDebit)}</p></div>
+                <div className="bg-expense/10 rounded-lg p-2"><p className="text-muted-foreground">دائن</p><p className="font-bold text-expense">${formatAmount(selectedContactSummary.totalCredit)}</p></div>
+                <div className={cn("rounded-lg p-2", selectedContactSummary.balance > 0 ? 'bg-income/10' : selectedContactSummary.balance < 0 ? 'bg-expense/10' : 'bg-muted')}><p className="text-muted-foreground">الرصيد</p><p className={cn("font-bold", selectedContactSummary.balance > 0 ? 'text-income' : selectedContactSummary.balance < 0 ? 'text-expense' : 'text-muted-foreground')}>${formatAmount(Math.abs(selectedContactSummary.balance))}</p></div>
               </div>
               {/* Preview + Export buttons for individual */}
               <div className="grid grid-cols-2 gap-2">
@@ -557,9 +623,9 @@ export function AccountingLedgerReport() {
                         <TableRow key={t.id} className="text-[9px]">
                           <TableCell className="px-2 py-1.5">{formatDate(t.date)}</TableCell>
                           <TableCell className="px-2 py-1.5 max-w-[120px] truncate">{t.description || '-'}</TableCell>
-                          <TableCell className="px-2 py-1.5"><Badge variant="secondary" className="text-[7px] h-3.5">{CATEGORY_LABELS[t.category] || t.category}</Badge></TableCell>
-                          <TableCell className="px-2 py-1.5 text-expense font-medium">{t.type === 'out' ? `$${formatAmount(t.amount)}` : '-'}</TableCell>
+                          <TableCell className="px-2 py-1.5"><Badge variant="secondary" className="text-[7px] h-3.5">{t.type === 'in' ? 'مدين' : 'دائن'}</Badge></TableCell>
                           <TableCell className="px-2 py-1.5 text-income font-medium">{t.type === 'in' ? `$${formatAmount(t.amount)}` : '-'}</TableCell>
+                          <TableCell className="px-2 py-1.5 text-expense font-medium">{t.type === 'out' ? `$${formatAmount(t.amount)}` : '-'}</TableCell>
                           <TableCell className="px-2 py-1.5">
                             <Badge variant={t.source_type === 'manual' ? 'outline' : 'secondary'} className="text-[7px] h-3.5">
                               {t.source_type === 'manual' ? 'يدوي' : t.source_type === 'shipment_invoice' ? 'شحنة' : t.source_type === 'project_client' ? 'مشروع' : t.source_type || 'يدوي'}
