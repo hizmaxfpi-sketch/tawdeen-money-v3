@@ -383,8 +383,8 @@ export function ContactDetails() {
       <Dialog open={showTransactionForm} onOpenChange={setShowTransactionForm}>
         <DialogContent className="max-w-sm z-[100]">
           <DialogHeader>
-            <DialogTitle className={transactionType === 'credit' ? 'text-green-600' : 'text-rose-600'}>
-              {transactionType === 'credit' ? 'إضافة قيد مدين (Debit)' : 'إضافة قيد دائن (Credit)'}
+            <DialogTitle className={transactionType === 'debit' ? 'text-emerald-600' : 'text-rose-600'}>
+              {transactionType === 'debit' ? 'إضافة قيد مدين (Debit)' : 'إضافة قيد دائن (Credit)'}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
