@@ -302,7 +302,7 @@ export function ContactDetails() {
             <div className="flex justify-center mb-2">
               <TrendingUp className="h-4 w-4 text-income" />
             </div>
-            <p className="text-base font-bold text-income">${stats.totalCredit.toLocaleString()}</p>
+            <p className="text-base font-bold text-income">${stats.totalDebit.toLocaleString()}</p>
             <p className="text-[11px] text-muted-foreground">مدين (Debit)</p>
           </motion.div>
           
