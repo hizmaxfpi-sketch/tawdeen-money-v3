@@ -302,7 +302,7 @@ export function ContactDetails() {
             <div className="flex justify-center mb-2">
               <TrendingUp className="h-4 w-4 text-income" />
             </div>
-            <p className="text-base font-bold text-income">${stats.totalCredit.toLocaleString()}</p>
+            <p className="text-base font-bold text-income">${stats.totalDebit.toLocaleString()}</p>
             <p className="text-[11px] text-muted-foreground">مدين (Debit)</p>
           </motion.div>
           
@@ -315,7 +315,7 @@ export function ContactDetails() {
             <div className="flex justify-center mb-2">
               <TrendingDown className="h-4 w-4 text-expense" />
             </div>
-            <p className="text-base font-bold text-expense">${stats.totalDebit.toLocaleString()}</p>
+            <p className="text-base font-bold text-expense">${stats.totalCredit.toLocaleString()}</p>
             <p className="text-[11px] text-muted-foreground">دائن (Credit)</p>
           </motion.div>
           
@@ -364,7 +364,7 @@ export function ContactDetails() {
             displayCurrencyCode={displayCurrency}
             onDisplayCurrencyChange={setDisplayCurrency}
             onEditTransaction={(tx) => {
-              setTransactionType(tx.type === 'in' ? 'credit' : 'debit');
+              setTransactionType(tx.type === 'in' ? 'debit' : 'credit');
               setTxAmount(tx.amount.toString());
               setTxDate(tx.date);
               setTxDescription(tx.description);
@@ -383,8 +383,8 @@ export function ContactDetails() {
       <Dialog open={showTransactionForm} onOpenChange={setShowTransactionForm}>
         <DialogContent className="max-w-sm z-[100]">
           <DialogHeader>
-            <DialogTitle className={transactionType === 'credit' ? 'text-green-600' : 'text-rose-600'}>
-              {transactionType === 'credit' ? 'إضافة قيد مدين (Debit)' : 'إضافة قيد دائن (Credit)'}
+            <DialogTitle className={transactionType === 'debit' ? 'text-emerald-600' : 'text-rose-600'}>
+              {transactionType === 'debit' ? 'إضافة قيد مدين (Debit)' : 'إضافة قيد دائن (Credit)'}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
