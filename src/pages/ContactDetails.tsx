@@ -364,7 +364,7 @@ export function ContactDetails() {
             displayCurrencyCode={displayCurrency}
             onDisplayCurrencyChange={setDisplayCurrency}
             onEditTransaction={(tx) => {
-              setTransactionType(tx.type === 'in' ? 'credit' : 'debit');
+              setTransactionType(tx.type === 'in' ? 'debit' : 'credit');
               setTxAmount(tx.amount.toString());
               setTxDate(tx.date);
               setTxDescription(tx.description);
