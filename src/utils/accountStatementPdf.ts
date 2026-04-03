@@ -1,6 +1,7 @@
 import { Transaction } from '@/types/finance';
 import { translateLegacyText } from '@/i18n/translations';
 import { formatCurrencyAmount, formatDateGregorian, getCategoryLabel } from '@/utils/formatUtils';
+import { calculateLedgerSummary } from '@/utils/ledgerSummary';
 
 interface AccountStatementData {
   entityName: string;
@@ -21,6 +22,11 @@ export async function exportAccountStatement(data: AccountStatementData) {
     import('jspdf'),
     import('jspdf-autotable'),
   ]);
+
+  const sortedTransactions = [...data.transactions].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+  const ledgerSummary = calculateLedgerSummary(sortedTransactions);
 
   const doc = new jsPDF('p', 'mm', 'a4');
   const pw = doc.internal.pageSize.getWidth();
@@ -55,20 +61,20 @@ export async function exportAccountStatement(data: AccountStatementData) {
 
   // Balance highlight
   y += 40;
-  const balanceColor = data.balance > 0 ? [220, 53, 69] : data.balance < 0 ? [34, 139, 34] : [100, 100, 100];
+  const balanceColor = ledgerSummary.balance > 0 ? [34, 139, 34] : ledgerSummary.balance < 0 ? [220, 53, 69] : [100, 100, 100];
   doc.setFillColor(balanceColor[0], balanceColor[1], balanceColor[2]);
   doc.roundedRect(pw / 2 - 35, y - 3, 70, 16, 3, 3, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(12);
-  const balanceLabel = data.balance > 0 ? translateLegacyText('مدين') : data.balance < 0 ? translateLegacyText('دائن') : translateLegacyText('مسوّى');
-  doc.text(`${balanceLabel}: ${formatCurrencyAmount(Math.abs(data.balance))}`, pw / 2, y + 7, { align: 'center' });
+  const balanceLabel = ledgerSummary.balance > 0 ? translateLegacyText('مدين') : ledgerSummary.balance < 0 ? translateLegacyText('دائن') : translateLegacyText('مسوّى');
+  doc.text(`${balanceLabel}: ${formatCurrencyAmount(Math.abs(ledgerSummary.balance))}`, pw / 2, y + 7, { align: 'center' });
 
   // Stats row
   y += 22;
   const stats = [
-    [translateLegacyText('مدين (Debit)'), formatCurrencyAmount(data.totalDebit)],
-    [translateLegacyText('دائن (Credit)'), formatCurrencyAmount(data.totalCredit)],
-    [translateLegacyText('عدد العمليات'), data.transactions.length.toString()],
+    [translateLegacyText('مدين (Debit)'), formatCurrencyAmount(ledgerSummary.totalDebit)],
+    [translateLegacyText('دائن (Credit)'), formatCurrencyAmount(ledgerSummary.totalCredit)],
+    [translateLegacyText('عدد العمليات'), ledgerSummary.transactionCount.toString()],
   ];
   (doc as any).autoTable({
     startY: y,
@@ -86,11 +92,9 @@ export async function exportAccountStatement(data: AccountStatementData) {
   doc.text(translateLegacyText('سجل العمليات المالية'), pw / 2, y, { align: 'center' });
   y += 6;
 
-  if (data.transactions.length > 0) {
+  if (sortedTransactions.length > 0) {
     let runningBalance = 0;
-    const rows = data.transactions
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .map(t => {
+    const rows = sortedTransactions.map(t => {
         if (t.type === 'in') runningBalance += t.amount;
         else runningBalance -= t.amount;
         let desc = t.description || '';

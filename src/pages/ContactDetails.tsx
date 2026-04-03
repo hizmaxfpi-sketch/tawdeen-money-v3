@@ -22,7 +22,7 @@ import { useSupabaseFinance } from '@/hooks/useSupabaseFinance';
 import { Contact, ContactType, CONTACT_TYPE_LABELS, CONTACT_TYPE_COLORS } from '@/types/contacts';
 import { Transaction } from '@/types/finance';
 import { useCurrencies, CURRENCY_FLAGS, DEFAULT_APP_CURRENCY } from '@/hooks/useCurrencies';
-import { exportAccountStatement } from '@/utils/accountStatementPdf';
+import { calculateLedgerSummary } from '@/utils/ledgerSummary';
 import {
   Dialog,
   DialogContent,
@@ -105,16 +105,10 @@ export function ContactDetails() {
         setTxLoading(false);
       });
   }, [contact, user]);
-  // الإحصائيات - نستخدم رصيد قاعدة البيانات كمصدر حقيقة وحيد
+  // الإحصائيات - المصدر الوحيد هو سجل العمليات المالية نفسه
   const stats = useMemo(() => {
-    if (!contact) return { totalCredit: 0, totalDebit: 0, transactionCount: 0, balance: 0 };
-    return {
-      totalCredit: contact.totalCredit,
-      totalDebit: contact.totalDebit,
-      transactionCount: contact.totalTransactions,
-      balance: contact.balance
-    };
-  }, [contact]);
+    return calculateLedgerSummary(contactTransactions);
+  }, [contactTransactions]);
   // حساب معامل الصرف الفعلي
   const centralizedRate = useMemo(() => {
     if (txCurrencyCode === 'USD') return 1;
@@ -249,8 +243,11 @@ export function ContactDetails() {
           {/* Balance Display */}
           <div className="text-center py-4 border-y border-border">
             <p className="text-xs text-muted-foreground mb-1">الرصيد الحالي</p>
-            <p className={cn("text-2xl font-bold", contact.balance <= 0 ? "text-emerald-600" : "text-rose-600")}>
-              {contact.balance > 0 ? '-' : contact.balance < 0 ? '+' : ''}${Math.abs(contact.balance).toLocaleString()}
+            <p className={cn(
+              "text-2xl font-bold",
+              stats.balance > 0 ? "text-income" : stats.balance < 0 ? "text-expense" : "text-foreground"
+            )}>
+              {stats.balance > 0 ? '+' : stats.balance < 0 ? '-' : ''}${Math.abs(stats.balance).toLocaleString()}
             </p>
           </div>
 
@@ -500,7 +497,7 @@ export function ContactDetails() {
             <Button 
               onClick={handleAddTransaction}
               disabled={!txAmount || parseFloat(txAmount) <= 0 || !txDescription.trim()}
-              className={transactionType === 'credit' ? 'bg-green-600 hover:bg-green-700' : 'bg-rose-600 hover:bg-rose-700'}
+              className={transactionType === 'debit' ? 'bg-green-600 hover:bg-green-700' : 'bg-rose-600 hover:bg-rose-700'}
             >
               إضافة العملية
             </Button>
