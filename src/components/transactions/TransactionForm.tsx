@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Camera, Mic, DollarSign, Calendar, FileText, StickyNote, BookOpen, Coins } from 'lucide-react';
+import { X, Camera, Mic, DollarSign, Calendar, FileText, StickyNote, BookOpen, Coins, Plus } from 'lucide-react';
 import { Transaction, FundOption, AccountOption, TransactionCategory, TransactionType } from '@/types/finance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import confetti from 'canvas-confetti';
 import { OCRScanner } from '@/components/smart-entry/OCRScanner';
 import { VoiceInput } from '@/components/smart-entry/VoiceInput';
+import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
 import { Currency, CURRENCY_FLAGS } from '@/hooks/useCurrencies';
 import { DocumentAttachment } from '@/components/shared/DocumentAttachment';
@@ -49,6 +50,10 @@ export function TransactionForm({
   const [currencyCode, setCurrencyCode] = useState('USD');
   const [manualExchangeRate, setManualExchangeRate] = useState<string>('');
 
+  // Bulk entry state
+  const [isBulkEntry, setIsBulkEntry] = useState(false);
+  const [items, setItems] = useState<Array<{ id: string; description: string; amount: string; contactId: string }>>([]);
+
   const activeContacts = contacts.filter(c => c.status === 'active');
 
   const centralizedRate = useMemo(() => {
@@ -76,20 +81,71 @@ export function TransactionForm({
     setCategory(newType === 'in' ? 'client_collection' : 'vendor_payment');
   };
 
+  const addItem = () => {
+    setItems([...items, { id: Math.random().toString(36).substr(2, 9), description: '', amount: '', contactId: 'none' }]);
+  };
+
+  const removeItem = (id: string) => {
+    const newItems = items.filter(item => item.id !== id);
+    setItems(newItems);
+    updateTotalFromItems(newItems);
+  };
+
+  const updateItem = (id: string, field: string, value: string) => {
+    const newItems = items.map(item => item.id === id ? { ...item, [field]: value } : item);
+    setItems(newItems);
+    if (field === 'amount') {
+      updateTotalFromItems(newItems);
+    }
+  };
+
+  const updateTotalFromItems = (currentItems: typeof items) => {
+    const total = currentItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    setAmount(total > 0 ? total.toString() : '');
+  };
+
   const handleSubmit = async () => {
     if (!amount || !description || !fundId) return;
     const parsedAmount = parseFloat(amount);
     const finalAmount = currencyCode === 'USD' ? parsedAmount : parsedAmount / effectiveRate;
 
-    await onSubmit({
-      type, category,
-      amount: Number(finalAmount.toFixed(4)),
-      description, date, fundId,
-      contactId: contactId !== 'none' ? contactId : undefined,
-      attachment: attachments.length > 0 ? attachments[0] : undefined,
-      notes: notes || undefined,
-      currencyCode, exchangeRate: effectiveRate,
-    });
+    // Build items payload if bulk entry
+    const itemsPayload = isBulkEntry ? items.map(item => ({
+      description: item.description,
+      amount: currencyCode === 'USD' ? parseFloat(item.amount) : parseFloat(item.amount) / effectiveRate,
+      contact_id: item.contactId !== 'none' ? item.contactId : null
+    })) : [];
+
+    // Use RPC for bulk entry if items exist
+    if (isBulkEntry && itemsPayload.length > 0) {
+      const { data, error } = await supabase.rpc('create_bulk_transaction', {
+        p_type: type,
+        p_category: category,
+        p_amount: Number(finalAmount.toFixed(4)),
+        p_description: description,
+        p_date: date,
+        p_fund_id: fundId,
+        p_items: itemsPayload,
+        p_contact_id: contactId !== 'none' ? contactId : null,
+        p_notes: notes || null,
+        p_currency_code: currencyCode,
+        p_exchange_rate: effectiveRate
+      });
+      if (error) {
+        console.error('Bulk entry error:', error);
+        return;
+      }
+    } else {
+      await onSubmit({
+        type, category,
+        amount: Number(finalAmount.toFixed(4)),
+        description, date, fundId,
+        contactId: contactId !== 'none' ? contactId : undefined,
+        attachment: attachments.length > 0 ? attachments[0] : undefined,
+        notes: notes || undefined,
+        currencyCode, exchangeRate: effectiveRate,
+      });
+    }
 
     confetti({ particleCount: 60, spread: 50, origin: { y: 0.7 }, colors: type === 'in' ? ['#22c55e', '#10b981'] : ['#ef4444', '#f97316'] });
     onClose();
@@ -254,6 +310,77 @@ export function TransactionForm({
               <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('tx.descriptionPlaceholder')} className="h-8 text-xs pr-7" />
             </div>
           </div>
+
+          <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg border border-dashed border-border">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold">عملية مجمعة (Bulk Entry)</span>
+              <span className="text-[9px] text-muted-foreground">إضافة بنود تفصيلية لعملية واحدة</span>
+            </div>
+            <button
+              onClick={() => {
+                setIsBulkEntry(!isBulkEntry);
+                if (!isBulkEntry && items.length === 0) addItem();
+              }}
+              className={cn(
+                "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                isBulkEntry ? "bg-primary" : "bg-muted"
+              )}
+            >
+              <span className={cn(
+                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                isBulkEntry ? "translate-x-4" : "translate-x-0"
+              )} />
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {isBulkEntry && (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="space-y-2 overflow-hidden">
+                <div className="flex justify-between items-center px-1">
+                  <span className="text-[10px] font-medium text-muted-foreground">بنود العملية</span>
+                  <Button variant="ghost" size="sm" onClick={addItem} className="h-6 text-[9px] gap-1 text-primary">
+                    <Plus className="h-3 w-3" /> إضافة بند
+                  </Button>
+                </div>
+                {items.map((item, idx) => (
+                  <div key={item.id} className="p-2 rounded-lg bg-muted/40 border border-border space-y-2 relative group">
+                    <div className="flex gap-2">
+                      <Input
+                        value={item.description}
+                        onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                        placeholder="وصف البند (مثلاً: اسم الموظف)"
+                        className="h-7 text-[10px] flex-1"
+                      />
+                      <Input
+                        type="number"
+                        value={item.amount}
+                        onChange={(e) => updateItem(item.id, 'amount', e.target.value)}
+                        placeholder="المبلغ"
+                        className="h-7 text-[10px] w-20"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeItem(item.id)}
+                        className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <Select value={item.contactId} onValueChange={(val) => updateItem(item.id, 'contactId', val)}>
+                      <SelectTrigger className="h-7 text-[9px]"><SelectValue placeholder="الحساب المتأثر" /></SelectTrigger>
+                      <SelectContent className="bg-popover z-[120]">
+                        <SelectItem value="none" className="text-[9px]">بدون حساب</SelectItem>
+                        {activeContacts.map(c => (
+                          <SelectItem key={c.id} value={c.id} className="text-[9px]">{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <DocumentAttachment attachments={attachments} onAttachmentsChange={setAttachments} maxFiles={3} />
 
