@@ -49,7 +49,8 @@ export function BusinessPage({
   const [showQuickTransaction, setShowQuickTransaction] = useState(false);
   const [assetForm, setAssetForm] = useState({
     name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
-    depreciationRate: '', notes: '', supplierId: 'none', isInstallment: false, totalInstallment: ''
+    depreciationRate: '', notes: '', supplierId: 'none', isInstallment: false, totalInstallment: '',
+    fundId: ''
   });
 
   const [selectedAssetForLedger, setSelectedAssetForLedger] = useState<Asset | null>(null);
@@ -75,7 +76,15 @@ export function BusinessPage({
   });
 
   const handleAddAsset = async () => {
-    if (!assetForm.name || !assetForm.value) return;
+    if (!assetForm.name || !assetForm.value) {
+      toast.error('يرجى ملء جميع الحقول الإجبارية');
+      return;
+    }
+    if (!assetForm.isInstallment && !assetForm.fundId) {
+      toast.error('يرجى اختيار الصندوق المرتبط لخصم القيمة');
+      return;
+    }
+
     await addAsset({
       name: assetForm.name,
       value: Number(assetForm.value),
@@ -85,11 +94,13 @@ export function BusinessPage({
       // @ts-ignore - Added in migration
       supplier_id: assetForm.supplierId !== 'none' ? assetForm.supplierId : null,
       is_installment: assetForm.isInstallment,
-      installment_total_amount: Number(assetForm.totalInstallment) || 0
+      installment_total_amount: Number(assetForm.totalInstallment) || 0,
+      fundId: assetForm.fundId || undefined
     });
     setAssetForm({
       name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
-      depreciationRate: '', notes: '', supplierId: 'none', isInstallment: false, totalInstallment: ''
+      depreciationRate: '', notes: '', supplierId: 'none', isInstallment: false, totalInstallment: '',
+      fundId: ''
     });
     setShowAddAsset(false);
   };
@@ -196,35 +207,35 @@ export function BusinessPage({
                   إضافة أصل
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-md p-5 rounded-xl bg-popover/95 backdrop-blur-md border-border shadow-2xl">
                 <DialogHeader>
                   <DialogTitle>إضافة أصل جديد</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div>
                     <Label>اسم الأصل *</Label>
-                    <Input value={assetForm.name} onChange={e => setAssetForm(f => ({ ...f, name: e.target.value }))} placeholder="مثل: سيارة، معدات..." />
+                    <Input value={assetForm.name} onChange={e => setAssetForm(f => ({ ...f, name: e.target.value }))} placeholder="مثل: سيارة، معدات..." className="w-full h-10 border-slate-200 rounded-md" />
                   </div>
                   <div>
                     <Label>القيمة *</Label>
-                    <Input type="number" value={assetForm.value} onChange={e => setAssetForm(f => ({ ...f, value: e.target.value }))} placeholder="0" />
+                    <Input type="number" value={assetForm.value} onChange={e => setAssetForm(f => ({ ...f, value: e.target.value }))} placeholder="0" className="w-full h-10 border-slate-200 rounded-md" />
                   </div>
                   <div>
                     <Label>تاريخ الشراء</Label>
-                    <Input type="date" value={assetForm.purchaseDate} onChange={e => setAssetForm(f => ({ ...f, purchaseDate: e.target.value }))} />
+                    <Input type="date" value={assetForm.purchaseDate} onChange={e => setAssetForm(f => ({ ...f, purchaseDate: e.target.value }))} className="w-full h-10 border-slate-200 rounded-md" />
                   </div>
                   <div>
                     <Label>نسبة الإهلاك السنوية %</Label>
-                    <Input type="number" value={assetForm.depreciationRate} onChange={e => setAssetForm(f => ({ ...f, depreciationRate: e.target.value }))} placeholder="مثل: 20" />
+                    <Input type="number" value={assetForm.depreciationRate} onChange={e => setAssetForm(f => ({ ...f, depreciationRate: e.target.value }))} placeholder="مثل: 20" className="w-full h-10 border-slate-200 rounded-md" />
                   </div>
                   <div>
                     <Label>المورد / البائع</Label>
                     <Select value={assetForm.supplierId} onValueChange={val => setAssetForm(f => ({ ...f, supplierId: val }))}>
-                      <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="اختر المورد" /></SelectTrigger>
+                      <SelectTrigger className="w-full h-10 border-slate-200 rounded-md"><SelectValue placeholder="اختر المورد" /></SelectTrigger>
                       <SelectContent className="bg-popover">
-                        <SelectItem value="none" className="text-xs">بدون مورد</SelectItem>
+                        <SelectItem value="none">بدون مورد</SelectItem>
                         {suppliers.map(s => (
-                          <SelectItem key={s.id} value={s.id} className="text-xs">{s.name}</SelectItem>
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -242,12 +253,25 @@ export function BusinessPage({
                   {assetForm.isInstallment && (
                     <div>
                       <Label>إجمالي قيمة التقسيط</Label>
-                      <Input type="number" value={assetForm.totalInstallment} onChange={e => setAssetForm(f => ({ ...f, totalInstallment: e.target.value }))} placeholder="0" />
+                      <Input type="number" value={assetForm.totalInstallment} onChange={e => setAssetForm(f => ({ ...f, totalInstallment: e.target.value }))} placeholder="0" className="w-full h-10 border-slate-200 rounded-md" />
+                    </div>
+                  )}
+                  {!assetForm.isInstallment && (
+                    <div>
+                      <Label>الصندوق المرتبط *</Label>
+                      <Select value={assetForm.fundId} onValueChange={val => setAssetForm(f => ({ ...f, fundId: val }))}>
+                        <SelectTrigger className="w-full h-10 border-slate-200 rounded-md"><SelectValue placeholder="اختر الصندوق المرتبط" /></SelectTrigger>
+                        <SelectContent className="bg-popover">
+                          {fundOptions.map(f => (
+                            <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   )}
                   <div>
                     <Label>ملاحظات</Label>
-                    <Textarea value={assetForm.notes} onChange={e => setAssetForm(f => ({ ...f, notes: e.target.value }))} placeholder="ملاحظات..." />
+                    <Textarea value={assetForm.notes} onChange={e => setAssetForm(f => ({ ...f, notes: e.target.value }))} placeholder="ملاحظات..." className="w-full border-slate-200 rounded-md" />
                   </div>
                   <Button className="w-full" onClick={handleAddAsset}>حفظ</Button>
                 </div>
