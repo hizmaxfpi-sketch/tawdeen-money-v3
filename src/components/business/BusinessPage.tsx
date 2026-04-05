@@ -21,7 +21,7 @@ interface BusinessPageProps {
   fundOptions: FundOption[];
   accountOptions: AccountOption[];
   currencies?: Currency[];
-  onAddTransaction?: (data: any) => Promise<void>;
+  onAddTransaction?: (data: any) => Promise<any>;
   onEditTransaction?: (tx: Transaction) => void;
   onDeleteTransaction?: (id: string) => void;
 }
