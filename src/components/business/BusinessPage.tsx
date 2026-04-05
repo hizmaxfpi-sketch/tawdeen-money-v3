@@ -17,6 +17,8 @@ import { useLanguage } from '@/i18n/LanguageContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UnifiedTransactionLog } from '@/components/shared/UnifiedTransactionLog';
 import { Textarea } from '@/components/ui/textarea';
+import { CategoryManagerModal } from '@/components/transactions/CategoryManagerModal';
+import { QuickTransactionModal } from '@/components/transactions/QuickTransactionModal';
 
 interface BusinessPageProps {
   transactions: Transaction[];
@@ -43,6 +45,8 @@ export function BusinessPage({
   const { contacts } = useSupabaseContacts();
 
   const [showAddAsset, setShowAddAsset] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [showQuickTransaction, setShowQuickTransaction] = useState(false);
   const [assetForm, setAssetForm] = useState({
     name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
     depreciationRate: '', notes: '', supplierId: 'none', isInstallment: false, totalInstallment: ''
@@ -59,13 +63,15 @@ export function BusinessPage({
 
   // Filter business transactions (direct revenue + expenses, excluding project/shipping auto-generated)
   const businessTxs = transactions.filter(tx => {
-    if (tx.sourceType && tx.sourceType !== 'manual') return false;
+    if (tx.sourceType && tx.sourceType !== 'manual' && tx.sourceType !== 'general_ledger') return false;
     const cat = tx.category;
     const matchesCategory = filterCategory === 'all' || cat === filterCategory;
     const matchesDate = (!filterDateFrom || tx.date >= filterDateFrom) && (!filterDateTo || tx.date <= filterDateTo);
 
-    return ['direct_revenue', 'asset_revenue', 'expense', 'business_expense', 'asset_depreciation'].includes(cat)
-      && !tx.projectId && matchesCategory && matchesDate;
+    // Business categories include direct, asset revenue, common expenses, and ANY category marked as 'general_ledger'
+    const isBusinessCategory = ['direct_revenue', 'asset_revenue', 'expense', 'business_expense', 'asset_depreciation'].includes(cat) || tx.sourceType === 'general_ledger';
+
+    return isBusinessCategory && !tx.projectId && matchesCategory && matchesDate;
   });
 
   const handleAddAsset = async () => {
@@ -130,6 +136,28 @@ export function BusinessPage({
         </TabsList>
 
         <TabsContent value="transactions" className="space-y-3 mt-3">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-8 gap-1.5 border-primary/20 hover:bg-primary/5"
+              onClick={() => setShowCategoryManager(true)}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              إدارة أنواع العمليات
+            </Button>
+
+            <Button
+              variant="default"
+              size="sm"
+              className="text-xs h-8 gap-1.5 shadow-sm"
+              onClick={() => setShowQuickTransaction(true)}
+            >
+              <DollarSign className="h-3.5 w-3.5" />
+              إضافة عملية سريعة
+            </Button>
+          </div>
+
           <div className="flex gap-2 mb-2 overflow-x-auto pb-1 no-scrollbar">
             <div className="flex-1 min-w-[120px]">
               <Input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="h-8 text-[10px]" />
@@ -289,6 +317,17 @@ export function BusinessPage({
           ))}
         </TabsContent>
       </Tabs>
+
+      <CategoryManagerModal open={showCategoryManager} onOpenChange={setShowCategoryManager} />
+
+      {onAddTransaction && (
+        <QuickTransactionModal
+          open={showQuickTransaction}
+          onOpenChange={setShowQuickTransaction}
+          fundOptions={fundOptions}
+          onAddTransaction={onAddTransaction}
+        />
+      )}
     </div>
   );
 }

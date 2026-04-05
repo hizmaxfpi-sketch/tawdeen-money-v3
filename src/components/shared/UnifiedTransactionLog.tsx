@@ -85,7 +85,11 @@ export function UnifiedTransactionLog({
   const filteredTransactions = transactions
     .filter(t => {
       const matchesType = filter === 'all' || t.type === filter;
-      const matchesSearch = (t.description || '').toLowerCase().includes(search.toLowerCase());
+      const s = search.toLowerCase();
+      const matchesSearch =
+        (t.description || '').toLowerCase().includes(s) ||
+        (t.category || '').toLowerCase().includes(s) ||
+        t.amount.toString().includes(s);
       const matchesDateFrom = !dateFrom || t.date >= dateFrom;
       const matchesDateTo = !dateTo || t.date <= dateTo;
       return matchesType && matchesSearch && matchesDateFrom && matchesDateTo;

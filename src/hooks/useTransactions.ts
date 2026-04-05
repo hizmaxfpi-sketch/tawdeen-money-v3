@@ -129,6 +129,7 @@ export function useTransactions() {
       p_currency_code: transaction.currencyCode || 'USD',
       p_exchange_rate: transaction.exchangeRate || 1,
       p_to_fund_id: transaction.toFundId || null,
+      p_source_type: transaction.sourceType || 'manual',
     });
     
     if (error) { toast.error('خطأ في إضافة العملية'); console.error(error); return; }
