@@ -23,16 +23,46 @@ interface DashboardProps {
   onDeleteTransaction?: (transactionId: string) => void;
   hasMore?: boolean;
   onLoadMore?: () => void;
+  ledgerDebit?: number;
+  ledgerCredit?: number;
+  ledgerNet?: number;
+  projectRevenue?: number;
+  shippingRevenue?: number;
+  directRevenue?: number;
+  assetRevenue?: number;
+  businessExpenses?: number;
+  onExpensesClick?: () => void;
 }
 
-export function Dashboard({ stats, transactions, allTransactions, monthlyTrend, expenseBreakdown, currencies, onUpdateRate, onEditTransaction, onDeleteTransaction, hasMore, onLoadMore }: DashboardProps) {
+export function Dashboard({
+  stats, transactions, allTransactions, monthlyTrend, expenseBreakdown,
+  currencies, onUpdateRate, onEditTransaction, onDeleteTransaction,
+  hasMore, onLoadMore,
+  ledgerDebit = 0, ledgerCredit = 0, ledgerNet = 0,
+  projectRevenue = 0, shippingRevenue = 0, directRevenue = 0,
+  assetRevenue = 0, businessExpenses = 0, onExpensesClick,
+}: DashboardProps) {
   const [chartType, setChartType] = useState<'line' | 'pie'>('line');
   const [displayCurrency, setDisplayCurrency] = useState('USD');
   const { t } = useLanguage();
 
   return (
     <div className="space-y-3 py-3 animate-fade-in">
-      <SummaryCards stats={stats} fundTransactions={transactions} displayCurrency={displayCurrency} currencies={currencies} />
+      <SummaryCards
+        stats={stats}
+        fundTransactions={transactions}
+        displayCurrency={displayCurrency}
+        currencies={currencies}
+        ledgerDebit={ledgerDebit}
+        ledgerCredit={ledgerCredit}
+        ledgerNet={ledgerNet}
+        projectRevenue={projectRevenue}
+        shippingRevenue={shippingRevenue}
+        directRevenue={directRevenue}
+        assetRevenue={assetRevenue}
+        businessExpenses={businessExpenses}
+        onExpensesClick={onExpensesClick}
+      />
 
       {currencies && currencies.length > 1 && onUpdateRate && (
         <MarketRatesWidget currencies={currencies} onUpdateRate={onUpdateRate} />

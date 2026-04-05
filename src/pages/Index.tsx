@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { AnimatePresence } from 'framer-motion';
@@ -12,21 +12,23 @@ import { LedgerAccountsPage } from '@/components/ledger/LedgerAccountsPage';
 import { ReportsPage } from '@/components/reports/ReportsPage';
 import { ShippingPage } from '@/components/shipping/ShippingPage';
 import { ProjectsPage } from '@/components/projects/ProjectsPage';
+import { BusinessPage } from '@/components/business/BusinessPage';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { CoachMarks } from '@/components/onboarding/CoachMarks';
 import { useSupabaseFinance } from '@/hooks/useSupabaseFinance';
 import { useSupabaseShipping } from '@/hooks/useSupabaseShipping';
+import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
 import { useCurrencies } from '@/hooks/useCurrencies';
 import { useScrollToTop } from '@/hooks/useScrollToTop';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { useBusinessTransactions } from '@/hooks/useBusinessTransactions';
 import { TransactionType, Transaction } from '@/types/finance';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 
-type PageType = 'home' | 'funds' | 'accounts' | 'projects' | 'reports' | 'shipping';
+type PageType = 'home' | 'funds' | 'accounts' | 'projects' | 'reports' | 'shipping' | 'business';
 
-// Skeleton loader for stats cards
 function StatsSkeleton() {
   return (
     <div className="space-y-3 py-3">
@@ -40,7 +42,6 @@ function StatsSkeleton() {
   );
 }
 
-// Skeleton for list items
 function ListSkeleton() {
   return (
     <div className="space-y-2 py-2">
@@ -71,51 +72,49 @@ const Index = () => {
 
   useScrollToTop(currentPage);
 
-  // إشعار التحديث
   useEffect(() => {
     if (sessionStorage.getItem('tawdeen-show-update-toast') === 'true') {
       sessionStorage.removeItem('tawdeen-show-update-toast');
       setTimeout(() => {
-        toast.success('تم تحديث توطين للنسخة 2.8 - حماية القيود المحاسبية + حذف عمليات الصندوق + تحسينات شاملة', { duration: 5000 });
+        toast.success('تم تحديث توطين للنسخة 3.0 - قسم الأعمال + الأصول + لوحة تحكم محسّنة', { duration: 5000 });
       }, 1500);
     }
   }, []);
 
   const {
-    funds,
-    fundsLoading,
-    transactions,
-    transactionsLoading,
-    hasMoreTransactions,
-    projects,
-    projectsLoading,
-    projectsHasMore,
-    projectsLoadingMore,
-    loadMoreProjects,
-    addTransaction,
-    updateTransaction,
-    deleteTransaction,
-    loadMoreTransactions,
-    addFund,
-    addProject,
-    updateProject,
-    deleteProject,
-    getStats,
-    getFundOptions,
-    getAccountOptions,
-    getProjectStats,
-    getMonthlyTrend,
-    getExpenseBreakdown,
-    exportData,
-    importData,
-    transferFunds,
-    refreshAll,
+    funds, fundsLoading, transactions, transactionsLoading,
+    hasMoreTransactions, projects, projectsLoading, projectsHasMore,
+    projectsLoadingMore, loadMoreProjects,
+    addTransaction, updateTransaction, deleteTransaction, loadMoreTransactions,
+    addFund, addProject, updateProject, deleteProject,
+    getStats, getFundOptions, getAccountOptions, getProjectStats,
+    getMonthlyTrend, getExpenseBreakdown, exportData, importData, transferFunds, refreshAll,
   } = useSupabaseFinance();
 
   const { currencies, updateExchangeRate } = useCurrencies();
   const { containers, shipments } = useSupabaseShipping();
+  const { contacts } = useSupabaseContacts();
+  const { directRevenue, businessExpenses } = useBusinessTransactions(transactions);
 
   const fundLinkedTransactions = transactions.filter(t => t.fundId && t.fundId !== '');
+
+  // Compute ledger totals from contacts (synced from v_contact_balance)
+  const ledgerTotals = useMemo(() => {
+    let debit = 0, credit = 0;
+    for (const c of contacts) {
+      debit += c.totalDebit || 0;
+      credit += c.totalCredit || 0;
+    }
+    return { debit, credit, net: debit - credit };
+  }, [contacts]);
+
+  // Compute project revenue (sum of contract values for active/completed projects)
+  const projectRevenue = useMemo(() =>
+    projects.reduce((s, p) => s + (p.contractValue || 0), 0), [projects]);
+
+  // Compute shipping revenue (sum of container total_revenue)
+  const shippingRevenue = useMemo(() =>
+    containers.reduce((s, c) => s + (Number((c as any).totalRevenue || (c as any).total_revenue || 0)), 0), [containers]);
 
   const handleOpenForm = (type: TransactionType = 'in') => {
     setDefaultTransactionType(type);
@@ -144,7 +143,6 @@ const Index = () => {
   };
 
   const handleDeleteTransaction = async (transactionId: string) => {
-    // Log deletion to activity log before deleting
     const tx = transactions.find(t => t.id === transactionId);
     if (tx && user) {
       await supabase.from('activity_log').insert({
@@ -177,6 +175,15 @@ const Index = () => {
             onDeleteTransaction={perms.canDelete('transactions') ? handleDeleteTransaction : undefined}
             hasMore={hasMoreTransactions}
             onLoadMore={loadMoreTransactions}
+            ledgerDebit={ledgerTotals.debit}
+            ledgerCredit={ledgerTotals.credit}
+            ledgerNet={ledgerTotals.net}
+            projectRevenue={projectRevenue}
+            shippingRevenue={shippingRevenue}
+            directRevenue={directRevenue}
+            assetRevenue={0}
+            businessExpenses={businessExpenses}
+            onExpensesClick={() => handleNavigate('business')}
           />
         );
       case 'funds':
@@ -184,6 +191,18 @@ const Index = () => {
         return <FundsPage funds={funds} onAddFund={perms.canCreate('funds') ? addFund : undefined} onTransferFunds={perms.canEdit('funds') ? transferFunds : undefined} onRefresh={refreshAll} />;
       case 'accounts':
         return <LedgerAccountsPage />;
+      case 'business':
+        return (
+          <BusinessPage
+            transactions={transactions}
+            fundOptions={fundOptions}
+            accountOptions={accountOptions}
+            currencies={currencies}
+            onAddTransaction={perms.canCreate('transactions') ? addTransaction : undefined}
+            onEditTransaction={perms.canEdit('transactions') ? handleEditTransaction : undefined}
+            onDeleteTransaction={perms.canDelete('transactions') ? handleDeleteTransaction : undefined}
+          />
+        );
       case 'projects':
         if (projectsLoading) return <><StatsSkeleton /><ListSkeleton /></>;
         return (

@@ -1,9 +1,9 @@
-import { Home, Wallet, FileText, Ship, BookOpen, Briefcase } from 'lucide-react';
+import { Home, Wallet, FileText, Ship, BookOpen, Briefcase, Store } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/i18n/LanguageContext';
 
-type PageType = 'home' | 'funds' | 'accounts' | 'projects' | 'shipping' | 'reports';
+type PageType = 'home' | 'funds' | 'accounts' | 'projects' | 'shipping' | 'reports' | 'business';
 
 interface BottomNavProps {
   currentPage: string;
@@ -14,6 +14,7 @@ const navItemKeys: { id: PageType; icon: typeof Home; labelKey: string }[] = [
   { id: 'home', icon: Home, labelKey: 'nav.home' },
   { id: 'funds', icon: Wallet, labelKey: 'nav.funds' },
   { id: 'accounts', icon: BookOpen, labelKey: 'nav.accounts' },
+  { id: 'business', icon: Store, labelKey: 'nav.business' },
   { id: 'projects', icon: Briefcase, labelKey: 'nav.projects' },
   { id: 'shipping', icon: Ship, labelKey: 'nav.shipping' },
   { id: 'reports', icon: FileText, labelKey: 'nav.reports' },
