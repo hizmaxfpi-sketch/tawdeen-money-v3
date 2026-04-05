@@ -50,6 +50,54 @@ export type Database = {
         }
         Relationships: []
       }
+      assets: {
+        Row: {
+          created_at: string
+          current_value: number
+          depreciation_rate: number
+          id: string
+          monthly_depreciation: number
+          name: string
+          notes: string | null
+          purchase_date: string
+          status: string
+          total_depreciation: number
+          updated_at: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          current_value?: number
+          depreciation_rate?: number
+          id?: string
+          monthly_depreciation?: number
+          name: string
+          notes?: string | null
+          purchase_date?: string
+          status?: string
+          total_depreciation?: number
+          updated_at?: string
+          user_id: string
+          value?: number
+        }
+        Update: {
+          created_at?: string
+          current_value?: number
+          depreciation_rate?: number
+          id?: string
+          monthly_depreciation?: number
+          name?: string
+          notes?: string | null
+          purchase_date?: string
+          status?: string
+          total_depreciation?: number
+          updated_at?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           address: string | null
