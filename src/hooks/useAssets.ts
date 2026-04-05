@@ -15,6 +15,9 @@ export interface Asset {
   notes?: string;
   status: string;
   createdAt: string;
+  supplier_id?: string;
+  is_installment?: boolean;
+  installment_total_amount?: number;
 }
 
 export function useAssets() {
@@ -43,6 +46,9 @@ export function useAssets() {
     purchaseDate: string;
     depreciationRate: number;
     notes?: string;
+    supplier_id?: string | null;
+    is_installment?: boolean;
+    installment_total_amount?: number;
   }) => {
     if (!user) return;
     const monthlyDep = (input.value * input.depreciationRate / 100) / 12;
@@ -60,6 +66,9 @@ export function useAssets() {
       total_depreciation: totalDep,
       current_value: currentVal,
       notes: input.notes || null,
+      supplier_id: input.supplier_id,
+      is_installment: input.is_installment,
+      installment_total_amount: input.installment_total_amount
     });
     if (error) { toast.error('فشل إضافة الأصل'); return; }
     toast.success('تم إضافة الأصل');
@@ -93,6 +102,9 @@ function mapAsset(row: any): Asset {
     notes: row.notes,
     status: row.status,
     createdAt: row.created_at,
+    supplier_id: row.supplier_id,
+    is_installment: row.is_installment,
+    installment_total_amount: Number(row.installment_total_amount),
   };
 }
 
