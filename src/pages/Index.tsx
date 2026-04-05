@@ -102,8 +102,8 @@ const Index = () => {
   const ledgerTotals = useMemo(() => {
     let debit = 0, credit = 0;
     for (const c of contacts) {
-      debit += Number((c as any).total_debit || (c as any).totalDebit || 0);
-      credit += Number((c as any).total_credit || (c as any).totalCredit || 0);
+      debit += c.totalDebit || 0;
+      credit += c.totalCredit || 0;
     }
     return { debit, credit, net: debit - credit };
   }, [contacts]);
