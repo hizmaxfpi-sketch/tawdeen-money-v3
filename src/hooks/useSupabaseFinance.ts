@@ -28,20 +28,12 @@ export function useSupabaseFinance() {
 
   const fetchStats = useCallback(async () => {
     if (!user) return;
-
-    // Fetch summary
     const { data, error } = await (supabase.rpc as any)('get_financial_summary');
-
-    // Fetch net profit from new engine
-    const { data: profitData, error: profitError } = await (supabase.rpc as any)('calculate_net_profit');
-
     if (!error && data) {
       const d = data as any;
-      const p = profitData as any;
-
       setDbStats({
         totalLiquidity: Number(d.totalLiquidity) || 0,
-        netCompanyProfit: p ? Number(p.netProfit) : (Number(d.netCompanyProfit) || 0),
+        netCompanyProfit: Number(d.netCompanyProfit) || 0,
         totalExpenses: Number(d.totalExpenses) || 0,
         totalReceivables: Number(d.totalReceivables) || 0,
         totalPayables: Number(d.totalPayables) || 0,

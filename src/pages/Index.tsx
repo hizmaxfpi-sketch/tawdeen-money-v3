@@ -129,17 +129,6 @@ const Index = () => {
     }
   };
 
-  useEffect(() => {
-    if (user) {
-      supabase.rpc('trigger_monthly_depreciation').then(({ data, error }) => {
-        if (!error && (data as any)?.status === 'executed') {
-          toast.success('تم تنفيذ دورة الإهلاك الشهرية بنجاح');
-          refreshAll();
-        }
-      });
-    }
-  }, [user]);
-
   const stats = getStats();
   const fundOptions = getFundOptions();
   const accountOptions = getAccountOptions();

@@ -8,8 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAssets, Asset } from '@/hooks/useAssets';
-import { AssetLedger } from './AssetLedger';
-import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
 import { useBusinessTransactions } from '@/hooks/useBusinessTransactions';
 import { Transaction, FundOption, AccountOption } from '@/types/finance';
 import { Currency } from '@/hooks/useCurrencies';
@@ -17,8 +15,6 @@ import { useLanguage } from '@/i18n/LanguageContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UnifiedTransactionLog } from '@/components/shared/UnifiedTransactionLog';
 import { Textarea } from '@/components/ui/textarea';
-import { CategoryManagerModal } from '@/components/transactions/CategoryManagerModal';
-import { QuickTransactionModal } from '@/components/transactions/QuickTransactionModal';
 
 interface BusinessPageProps {
   transactions: Transaction[];
@@ -42,66 +38,28 @@ export function BusinessPage({
   const { t } = useLanguage();
   const { assets, addAsset, deleteAsset, totalAssetValue, totalDepreciation } = useAssets();
   const { directRevenue, businessExpenses } = useBusinessTransactions(transactions);
-  const { contacts } = useSupabaseContacts();
 
   const [showAddAsset, setShowAddAsset] = useState(false);
-  const [showCategoryManager, setShowCategoryManager] = useState(false);
-  const [showQuickTransaction, setShowQuickTransaction] = useState(false);
-  const [assetForm, setAssetForm] = useState({
-    name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
-    depreciationRate: '', notes: '', supplierId: 'none', isInstallment: false, totalInstallment: '',
-    fundId: ''
-  });
-
-  const [selectedAssetForLedger, setSelectedAssetForLedger] = useState<Asset | null>(null);
-
-  // Advanced Filters State
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
-  const [filterCategory, setFilterCategory] = useState('all');
-
-  const suppliers = contacts.filter(c => c.type === 'vendor' || c.type === 'other');
+  const [assetForm, setAssetForm] = useState({ name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10), depreciationRate: '', notes: '' });
 
   // Filter business transactions (direct revenue + expenses, excluding project/shipping auto-generated)
   const businessTxs = transactions.filter(tx => {
-    if (tx.sourceType && tx.sourceType !== 'manual' && tx.sourceType !== 'general_ledger') return false;
+    if (tx.sourceType && tx.sourceType !== 'manual') return false;
     const cat = tx.category;
-    const matchesCategory = filterCategory === 'all' || cat === filterCategory;
-    const matchesDate = (!filterDateFrom || tx.date >= filterDateFrom) && (!filterDateTo || tx.date <= filterDateTo);
-
-    // Business categories include direct, asset revenue, common expenses, and ANY category marked as 'general_ledger'
-    const isBusinessCategory = ['direct_revenue', 'asset_revenue', 'expense', 'business_expense', 'asset_depreciation'].includes(cat) || tx.sourceType === 'general_ledger';
-
-    return isBusinessCategory && !tx.projectId && matchesCategory && matchesDate;
+    return ['direct_revenue', 'asset_revenue', 'expense', 'business_expense', 'asset_depreciation'].includes(cat)
+      && !tx.projectId;
   });
 
   const handleAddAsset = async () => {
-    if (!assetForm.name || !assetForm.value) {
-      toast.error('يرجى ملء جميع الحقول الإجبارية');
-      return;
-    }
-    if (!assetForm.isInstallment && !assetForm.fundId) {
-      toast.error('يرجى اختيار الصندوق المرتبط لخصم القيمة');
-      return;
-    }
-
+    if (!assetForm.name || !assetForm.value) return;
     await addAsset({
       name: assetForm.name,
       value: Number(assetForm.value),
       purchaseDate: assetForm.purchaseDate,
       depreciationRate: Number(assetForm.depreciationRate) || 0,
       notes: assetForm.notes || undefined,
-      // @ts-ignore - Added in migration
-      supplier_id: assetForm.supplierId !== 'none' ? assetForm.supplierId : null,
-      is_installment: assetForm.isInstallment,
-      installment_total_amount: Number(assetForm.totalInstallment) || 0,
-      fundId: assetForm.fundId || undefined
     });
-    setAssetForm({
-      name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
-      depreciationRate: '', notes: '', supplierId: 'none', isInstallment: false, totalInstallment: '',
-      fundId: ''
-    });
+    setAssetForm({ name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10), depreciationRate: '', notes: '' });
     setShowAddAsset(false);
   };
 
@@ -147,47 +105,6 @@ export function BusinessPage({
         </TabsList>
 
         <TabsContent value="transactions" className="space-y-3 mt-3">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs h-8 gap-1.5 border-primary/20 hover:bg-primary/5"
-              onClick={() => setShowCategoryManager(true)}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              إدارة أنواع العمليات
-            </Button>
-
-            <Button
-              variant="default"
-              size="sm"
-              className="text-xs h-8 gap-1.5 shadow-sm"
-              onClick={() => setShowQuickTransaction(true)}
-            >
-              <DollarSign className="h-3.5 w-3.5" />
-              إضافة عملية سريعة
-            </Button>
-          </div>
-
-          <div className="flex gap-2 mb-2 overflow-x-auto pb-1 no-scrollbar">
-            <div className="flex-1 min-w-[120px]">
-              <Input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="h-8 text-[10px]" />
-            </div>
-            <div className="flex-1 min-w-[120px]">
-              <Input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="h-8 text-[10px]" />
-            </div>
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="h-8 text-[10px] w-[100px]"><SelectValue placeholder="الفئة" /></SelectTrigger>
-              <SelectContent className="bg-popover">
-                <SelectItem value="all" className="text-[10px]">الكل</SelectItem>
-                <SelectItem value="direct_revenue" className="text-[10px]">إيراد مباشر</SelectItem>
-                <SelectItem value="asset_revenue" className="text-[10px]">إيراد أصول</SelectItem>
-                <SelectItem value="expense" className="text-[10px]">مصروف عام</SelectItem>
-                <SelectItem value="business_expense" className="text-[10px]">مصروف عمل</SelectItem>
-                <SelectItem value="asset_depreciation" className="text-[10px]">إهلاك</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <UnifiedTransactionLog
             transactions={businessTxs}
             onEditTransaction={onEditTransaction}
@@ -207,71 +124,30 @@ export function BusinessPage({
                   إضافة أصل
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md p-5 rounded-xl bg-popover/95 backdrop-blur-md border-border shadow-2xl">
+              <DialogContent>
                 <DialogHeader>
                   <DialogTitle>إضافة أصل جديد</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div>
                     <Label>اسم الأصل *</Label>
-                    <Input value={assetForm.name} onChange={e => setAssetForm(f => ({ ...f, name: e.target.value }))} placeholder="مثل: سيارة، معدات..." className="w-full h-10 border-slate-200 rounded-md" />
+                    <Input value={assetForm.name} onChange={e => setAssetForm(f => ({ ...f, name: e.target.value }))} placeholder="مثل: سيارة، معدات..." />
                   </div>
                   <div>
                     <Label>القيمة *</Label>
-                    <Input type="number" value={assetForm.value} onChange={e => setAssetForm(f => ({ ...f, value: e.target.value }))} placeholder="0" className="w-full h-10 border-slate-200 rounded-md" />
+                    <Input type="number" value={assetForm.value} onChange={e => setAssetForm(f => ({ ...f, value: e.target.value }))} placeholder="0" />
                   </div>
                   <div>
                     <Label>تاريخ الشراء</Label>
-                    <Input type="date" value={assetForm.purchaseDate} onChange={e => setAssetForm(f => ({ ...f, purchaseDate: e.target.value }))} className="w-full h-10 border-slate-200 rounded-md" />
+                    <Input type="date" value={assetForm.purchaseDate} onChange={e => setAssetForm(f => ({ ...f, purchaseDate: e.target.value }))} />
                   </div>
                   <div>
                     <Label>نسبة الإهلاك السنوية %</Label>
-                    <Input type="number" value={assetForm.depreciationRate} onChange={e => setAssetForm(f => ({ ...f, depreciationRate: e.target.value }))} placeholder="مثل: 20" className="w-full h-10 border-slate-200 rounded-md" />
+                    <Input type="number" value={assetForm.depreciationRate} onChange={e => setAssetForm(f => ({ ...f, depreciationRate: e.target.value }))} placeholder="مثل: 20" />
                   </div>
-                  <div>
-                    <Label>المورد / البائع</Label>
-                    <Select value={assetForm.supplierId} onValueChange={val => setAssetForm(f => ({ ...f, supplierId: val }))}>
-                      <SelectTrigger className="w-full h-10 border-slate-200 rounded-md"><SelectValue placeholder="اختر المورد" /></SelectTrigger>
-                      <SelectContent className="bg-popover">
-                        <SelectItem value="none">بدون مورد</SelectItem>
-                        {suppliers.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-2 py-1">
-                    <input
-                      type="checkbox"
-                      id="isInstallment"
-                      checked={assetForm.isInstallment}
-                      onChange={e => setAssetForm(f => ({ ...f, isInstallment: e.target.checked }))}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    <Label htmlFor="isInstallment" className="text-xs cursor-pointer">شراء بالتقسيط</Label>
-                  </div>
-                  {assetForm.isInstallment && (
-                    <div>
-                      <Label>إجمالي قيمة التقسيط</Label>
-                      <Input type="number" value={assetForm.totalInstallment} onChange={e => setAssetForm(f => ({ ...f, totalInstallment: e.target.value }))} placeholder="0" className="w-full h-10 border-slate-200 rounded-md" />
-                    </div>
-                  )}
-                  {!assetForm.isInstallment && (
-                    <div>
-                      <Label>الصندوق المرتبط *</Label>
-                      <Select value={assetForm.fundId} onValueChange={val => setAssetForm(f => ({ ...f, fundId: val }))}>
-                        <SelectTrigger className="w-full h-10 border-slate-200 rounded-md"><SelectValue placeholder="اختر الصندوق المرتبط" /></SelectTrigger>
-                        <SelectContent className="bg-popover">
-                          {fundOptions.map(f => (
-                            <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
                   <div>
                     <Label>ملاحظات</Label>
-                    <Textarea value={assetForm.notes} onChange={e => setAssetForm(f => ({ ...f, notes: e.target.value }))} placeholder="ملاحظات..." className="w-full border-slate-200 rounded-md" />
+                    <Textarea value={assetForm.notes} onChange={e => setAssetForm(f => ({ ...f, notes: e.target.value }))} placeholder="ملاحظات..." />
                   </div>
                   <Button className="w-full" onClick={handleAddAsset}>حفظ</Button>
                 </div>
@@ -284,22 +160,11 @@ export function BusinessPage({
           ) : (
             <div className="space-y-2">
               {assets.map(asset => (
-                <AssetCard key={asset.id} asset={asset} onDelete={deleteAsset} onShowLedger={() => setSelectedAssetForLedger(asset)} />
+                <AssetCard key={asset.id} asset={asset} onDelete={deleteAsset} />
               ))}
             </div>
           )}
         </TabsContent>
-
-        <Dialog open={!!selectedAssetForLedger} onOpenChange={(open) => !open && setSelectedAssetForLedger(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>سجل الأصل</DialogTitle>
-            </DialogHeader>
-            {selectedAssetForLedger && (
-              <AssetLedger asset={selectedAssetForLedger} transactions={transactions} />
-            )}
-          </DialogContent>
-        </Dialog>
 
         <TabsContent value="depreciation" className="space-y-3 mt-3">
           <Card>
@@ -341,24 +206,13 @@ export function BusinessPage({
           ))}
         </TabsContent>
       </Tabs>
-
-      <CategoryManagerModal open={showCategoryManager} onOpenChange={setShowCategoryManager} />
-
-      {onAddTransaction && (
-        <QuickTransactionModal
-          open={showQuickTransaction}
-          onOpenChange={setShowQuickTransaction}
-          fundOptions={fundOptions}
-          onAddTransaction={onAddTransaction}
-        />
-      )}
     </div>
   );
 }
 
-function AssetCard({ asset, onDelete, onShowLedger }: { asset: Asset; onDelete: (id: string) => void; onShowLedger: () => void }) {
+function AssetCard({ asset, onDelete }: { asset: Asset; onDelete: (id: string) => void }) {
   return (
-    <Card className="cursor-pointer hover:border-primary/40 transition-colors" onClick={onShowLedger}>
+    <Card>
       <CardContent className="py-3">
         <div className="flex justify-between items-start">
           <div>
@@ -367,7 +221,7 @@ function AssetCard({ asset, onDelete, onShowLedger }: { asset: Asset; onDelete: 
             <p className="text-xs text-muted-foreground">تاريخ الشراء: {asset.purchaseDate} | إهلاك: {asset.depreciationRate}%</p>
             {asset.notes && <p className="text-xs text-muted-foreground mt-1">{asset.notes}</p>}
           </div>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(asset.id); }}>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(asset.id)}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>

@@ -15,10 +15,6 @@ export interface Asset {
   notes?: string;
   status: string;
   createdAt: string;
-  supplier_id?: string;
-  is_installment?: boolean;
-  installment_total_amount?: number;
-  fund_id?: string;
 }
 
 export function useAssets() {
@@ -47,10 +43,6 @@ export function useAssets() {
     purchaseDate: string;
     depreciationRate: number;
     notes?: string;
-    supplier_id?: string | null;
-    is_installment?: boolean;
-    installment_total_amount?: number;
-    fundId?: string;
   }) => {
     if (!user) return;
     const monthlyDep = (input.value * input.depreciationRate / 100) / 12;
@@ -58,7 +50,7 @@ export function useAssets() {
     const totalDep = Math.min(monthlyDep * monthsSincePurchase, input.value);
     const currentVal = Math.max(0, input.value - totalDep);
 
-    const { data, error } = await (supabase.from('assets' as any) as any).insert({
+    const { error } = await (supabase.from('assets' as any) as any).insert({
       user_id: user.id,
       name: input.name,
       value: input.value,
@@ -68,32 +60,8 @@ export function useAssets() {
       total_depreciation: totalDep,
       current_value: currentVal,
       notes: input.notes || null,
-      supplier_id: input.supplier_id,
-      is_installment: input.is_installment,
-      installment_total_amount: input.installment_total_amount,
-      fund_id: input.fundId
-    }).select('id').single();
-
+    });
     if (error) { toast.error('فشل إضافة الأصل'); return; }
-
-    // If not installment and fund is linked, create deduction transaction
-    if (!input.is_installment && input.fundId && data) {
-      const { error: txError } = await supabase.rpc('process_transaction', {
-        p_type: 'out',
-        p_category: 'business_expense',
-        p_amount: input.value,
-        p_description: `شراء أصل: ${input.name}`,
-        p_date: input.purchaseDate,
-        p_fund_id: input.fundId,
-        p_asset_id: data.id,
-        p_source_type: 'general_ledger'
-      });
-      if (txError) {
-        console.error('Failed to create purchase transaction:', txError);
-        toast.error('تم إضافة الأصل ولكن فشل تسجيل العملية المالية');
-      }
-    }
-
     toast.success('تم إضافة الأصل');
     await fetchAssets();
   }, [user, fetchAssets]);
@@ -125,10 +93,6 @@ function mapAsset(row: any): Asset {
     notes: row.notes,
     status: row.status,
     createdAt: row.created_at,
-    supplier_id: row.supplier_id,
-    is_installment: row.is_installment,
-    installment_total_amount: Number(row.installment_total_amount),
-    fund_id: row.fund_id,
   };
 }
 

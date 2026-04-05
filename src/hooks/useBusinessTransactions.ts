@@ -11,10 +11,10 @@ export function useBusinessTransactions(transactions: Transaction[]) {
     let businessExpenses = 0;
 
     for (const tx of transactions) {
-      if (DIRECT_REVENUE_CATEGORIES.includes(tx.category) || (tx.sourceType === 'general_ledger' && tx.type === 'in')) {
+      if (DIRECT_REVENUE_CATEGORIES.includes(tx.category)) {
         directRevenue += tx.amount;
       }
-      if ((BUSINESS_EXPENSE_CATEGORIES.includes(tx.category) || tx.sourceType === 'general_ledger') && tx.type === 'out' && !tx.projectId) {
+      if (BUSINESS_EXPENSE_CATEGORIES.includes(tx.category) && tx.type === 'out' && !tx.projectId) {
         businessExpenses += tx.amount;
       }
     }

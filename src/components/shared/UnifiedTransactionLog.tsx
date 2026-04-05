@@ -35,7 +35,6 @@ import {
 import { toast } from 'sonner';
 import { TransactionHDPreview } from './TransactionHDPreview';
 import { usePersistedFilter } from '@/hooks/usePersistedFilters';
-import { TransactionItemsDialog } from '../transactions/TransactionItemsDialog';
 
 interface UnifiedTransactionLogProps {
   transactions: Transaction[];
@@ -76,7 +75,6 @@ export function UnifiedTransactionLog({
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const [hdPreviewTransaction, setHdPreviewTransaction] = useState<Transaction | null>(null);
   const [showReportPreview, setShowReportPreview] = useState(false);
-  const [viewItemsTransaction, setViewItemsTransaction] = useState<Transaction | null>(null);
   const [dateFrom, setDateFrom] = usePersistedFilter('txlog-datefrom', '');
   const [dateTo, setDateTo] = usePersistedFilter('txlog-dateto', '');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -85,11 +83,7 @@ export function UnifiedTransactionLog({
   const filteredTransactions = transactions
     .filter(t => {
       const matchesType = filter === 'all' || t.type === filter;
-      const s = search.toLowerCase();
-      const matchesSearch =
-        (t.description || '').toLowerCase().includes(s) ||
-        (t.category || '').toLowerCase().includes(s) ||
-        t.amount.toString().includes(s);
+      const matchesSearch = (t.description || '').toLowerCase().includes(search.toLowerCase());
       const matchesDateFrom = !dateFrom || t.date >= dateFrom;
       const matchesDateTo = !dateTo || t.date <= dateTo;
       return matchesType && matchesSearch && matchesDateFrom && matchesDateTo;
@@ -517,20 +511,6 @@ export function UnifiedTransactionLog({
                   </Button>
                 )}
 
-                {/* View Details Button for ALL transactions (may have items even if auto-generated) */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="col-span-2 gap-1 h-8 text-[11px] bg-primary/5 hover:bg-primary/10 border-primary/20"
-                  onClick={() => {
-                    setViewItemsTransaction(editingTransaction);
-                    setEditingTransaction(null);
-                  }}
-                >
-                  <FileText className="h-3 w-3" />
-                  عرض تفاصيل البنود
-                </Button>
-
                 {/* Info for auto-generated entries */}
                 {editingTransaction.sourceType && editingTransaction.sourceType !== 'manual' && (
                   <div className="col-span-2 text-center p-2.5 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
@@ -555,15 +535,6 @@ export function UnifiedTransactionLog({
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Items Details Dialog */}
-      {viewItemsTransaction && (
-        <TransactionItemsDialog
-          transaction={viewItemsTransaction}
-          open={!!viewItemsTransaction}
-          onOpenChange={(open) => !open && setViewItemsTransaction(null)}
-        />
-      )}
 
       {/* HD Preview Dialog */}
       <TransactionHDPreview
