@@ -50,51 +50,160 @@ export type Database = {
         }
         Relationships: []
       }
+      asset_improvements: {
+        Row: {
+          amount: number
+          asset_id: string
+          created_at: string
+          date: string
+          fund_id: string | null
+          id: string
+          name: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          asset_id: string
+          created_at?: string
+          date?: string
+          fund_id?: string | null
+          id?: string
+          name: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          asset_id?: string
+          created_at?: string
+          date?: string
+          fund_id?: string | null
+          id?: string
+          name?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_improvements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_payments: {
+        Row: {
+          amount: number
+          asset_id: string
+          created_at: string
+          due_date: string
+          fund_id: string | null
+          id: string
+          note: string | null
+          paid_date: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          asset_id: string
+          created_at?: string
+          due_date: string
+          fund_id?: string | null
+          id?: string
+          note?: string | null
+          paid_date?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          asset_id?: string
+          created_at?: string
+          due_date?: string
+          fund_id?: string | null
+          id?: string
+          note?: string | null
+          paid_date?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_payments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assets: {
         Row: {
           created_at: string
           current_value: number
+          depreciation_fund_id: string | null
           depreciation_rate: number
+          fund_id: string | null
           id: string
+          installment_count: number
           monthly_depreciation: number
           name: string
           notes: string | null
+          paid_amount: number
+          payment_type: string
           purchase_date: string
           status: string
           total_depreciation: number
           updated_at: string
           user_id: string
           value: number
+          vendor_id: string | null
         }
         Insert: {
           created_at?: string
           current_value?: number
+          depreciation_fund_id?: string | null
           depreciation_rate?: number
+          fund_id?: string | null
           id?: string
+          installment_count?: number
           monthly_depreciation?: number
           name: string
           notes?: string | null
+          paid_amount?: number
+          payment_type?: string
           purchase_date?: string
           status?: string
           total_depreciation?: number
           updated_at?: string
           user_id: string
           value?: number
+          vendor_id?: string | null
         }
         Update: {
           created_at?: string
           current_value?: number
+          depreciation_fund_id?: string | null
           depreciation_rate?: number
+          fund_id?: string | null
           id?: string
+          installment_count?: number
           monthly_depreciation?: number
           name?: string
           notes?: string | null
+          paid_amount?: number
+          payment_type?: string
           purchase_date?: string
           status?: string
           total_depreciation?: number
           updated_at?: string
           user_id?: string
           value?: number
+          vendor_id?: string | null
         }
         Relationships: []
       }

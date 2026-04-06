@@ -1,10 +1,9 @@
 import { motion } from 'framer-motion';
-import { BookOpen, TrendingUp, TrendingDown, Wallet, ArrowDownLeft, ArrowUpRight, Briefcase, DollarSign, Calculator } from 'lucide-react';
+import { BookOpen, TrendingUp, TrendingDown, Wallet, ArrowDownLeft, ArrowUpRight, DollarSign, Calculator } from 'lucide-react';
 import { FinanceStats, Transaction } from '@/types/finance';
 import { Currency } from '@/hooks/useCurrencies';
 import { cn } from '@/lib/utils';
 import { convertForDisplay, getCurrencySymbol } from '@/components/shared/CurrencyDisplaySelector';
-import { useLanguage } from '@/i18n/LanguageContext';
 
 interface SummaryCardsProps {
   stats: FinanceStats;
@@ -15,36 +14,28 @@ interface SummaryCardsProps {
   ledgerDebit?: number;
   ledgerCredit?: number;
   ledgerNet?: number;
-  projectRevenue?: number;
-  shippingRevenue?: number;
-  directRevenue?: number;
+  projectProfit?: number;
+  containerProfit?: number;
   assetRevenue?: number;
   businessExpenses?: number;
   onExpensesClick?: () => void;
 }
 
 export function SummaryCards({
-  stats,
-  fundTransactions,
-  displayCurrency = 'USD',
-  currencies = [],
-  ledgerDebit = 0,
-  ledgerCredit = 0,
-  ledgerNet = 0,
-  projectRevenue = 0,
-  shippingRevenue = 0,
-  directRevenue = 0,
-  assetRevenue = 0,
-  businessExpenses = 0,
+  stats, fundTransactions,
+  displayCurrency = 'USD', currencies = [],
+  ledgerDebit = 0, ledgerCredit = 0, ledgerNet = 0,
+  projectProfit = 0, containerProfit = 0,
+  assetRevenue = 0, businessExpenses = 0,
   onExpensesClick,
 }: SummaryCardsProps) {
-  const { t } = useLanguage();
   const cashTxs = fundTransactions || [];
   const fundIn = cashTxs.reduce((sum, tx) => tx.type === 'in' ? sum + tx.amount : sum, 0);
   const fundOut = cashTxs.reduce((sum, tx) => tx.type === 'out' ? sum + tx.amount : sum, 0);
   const fundRemaining = stats.totalLiquidity;
 
-  const totalRevenue = directRevenue + projectRevenue + shippingRevenue + assetRevenue;
+  // Net Profit = Project Profits + Container Profits + Asset Revenue - Business Expenses
+  const totalRevenue = projectProfit + containerProfit + assetRevenue;
   const netProfit = totalRevenue - businessExpenses;
 
   const conv = (v: number) => convertForDisplay(v, displayCurrency, currencies);
@@ -85,14 +76,14 @@ export function SummaryCards({
           <div className="grid grid-cols-3 gap-2">
             {row.cards.map((card, ci) => {
               const Icon = card.icon;
-              const isClickable = !!card.onClick;
+              const isClickable = !!(card as any).onClick;
               return (
                 <motion.div
                   key={card.key}
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: (ri * 3 + ci) * 0.04 }}
-                  onClick={card.onClick}
+                  onClick={(card as any).onClick}
                   className={cn(
                     "rounded-xl bg-card p-2.5 shadow-sm border border-border",
                     isClickable && "cursor-pointer hover:border-primary/40 transition-colors"
