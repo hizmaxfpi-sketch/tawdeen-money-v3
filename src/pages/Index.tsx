@@ -108,13 +108,13 @@ const Index = () => {
     return { debit, credit, net: debit - credit };
   }, [contacts]);
 
-  // Compute project revenue (sum of contract values for active/completed projects)
-  const projectRevenue = useMemo(() =>
-    projects.reduce((s, p) => s + (p.contractValue || 0), 0), [projects]);
+  // Compute project profit (sum of profit field)
+  const projectProfit = useMemo(() =>
+    projects.reduce((s, p) => s + (p.profit || 0), 0), [projects]);
 
-  // Compute shipping revenue (sum of container total_revenue)
-  const shippingRevenue = useMemo(() =>
-    containers.reduce((s, c) => s + (Number((c as any).totalRevenue || (c as any).total_revenue || 0)), 0), [containers]);
+  // Compute container profit (sum of container profit)
+  const containerProfit = useMemo(() =>
+    containers.reduce((s, c) => s + (Number((c as any).profit || 0)), 0), [containers]);
 
   const handleOpenForm = (type: TransactionType = 'in') => {
     setDefaultTransactionType(type);
@@ -178,9 +178,8 @@ const Index = () => {
             ledgerDebit={ledgerTotals.debit}
             ledgerCredit={ledgerTotals.credit}
             ledgerNet={ledgerTotals.net}
-            projectRevenue={projectRevenue}
-            shippingRevenue={shippingRevenue}
-            directRevenue={directRevenue}
+            projectProfit={projectProfit}
+            containerProfit={containerProfit}
             assetRevenue={0}
             businessExpenses={businessExpenses}
             onExpensesClick={() => handleNavigate('business')}
