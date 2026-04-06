@@ -26,9 +26,8 @@ interface DashboardProps {
   ledgerDebit?: number;
   ledgerCredit?: number;
   ledgerNet?: number;
-  projectRevenue?: number;
-  shippingRevenue?: number;
-  directRevenue?: number;
+  projectProfit?: number;
+  containerProfit?: number;
   assetRevenue?: number;
   businessExpenses?: number;
   onExpensesClick?: () => void;
@@ -39,7 +38,7 @@ export function Dashboard({
   currencies, onUpdateRate, onEditTransaction, onDeleteTransaction,
   hasMore, onLoadMore,
   ledgerDebit = 0, ledgerCredit = 0, ledgerNet = 0,
-  projectRevenue = 0, shippingRevenue = 0, directRevenue = 0,
+  projectProfit = 0, containerProfit = 0,
   assetRevenue = 0, businessExpenses = 0, onExpensesClick,
 }: DashboardProps) {
   const [chartType, setChartType] = useState<'line' | 'pie'>('line');
@@ -56,9 +55,8 @@ export function Dashboard({
         ledgerDebit={ledgerDebit}
         ledgerCredit={ledgerCredit}
         ledgerNet={ledgerNet}
-        projectRevenue={projectRevenue}
-        shippingRevenue={shippingRevenue}
-        directRevenue={directRevenue}
+        projectProfit={projectProfit}
+        containerProfit={containerProfit}
         assetRevenue={assetRevenue}
         businessExpenses={businessExpenses}
         onExpensesClick={onExpensesClick}
