@@ -84,7 +84,6 @@ export function useAssets() {
     const monthsSincePurchase = getMonthsSince(input.purchaseDate);
     const totalDep = Math.min(monthlyDep * monthsSincePurchase, input.value);
     const currentVal = Math.max(0, input.value - totalDep);
-    const firstPayment = input.paymentType === 'full' ? input.value : (input.installmentCount > 0 ? input.value / input.installmentCount : input.value);
 
     const { data, error } = await (supabase.from('assets' as any) as any).insert({
       user_id: user.id,
@@ -100,7 +99,7 @@ export function useAssets() {
       vendor_id: input.vendorId || null,
       payment_type: input.paymentType,
       installment_count: input.installmentCount || 1,
-      paid_amount: input.paymentType === 'full' ? input.value : firstPayment,
+      paid_amount: 0,
       depreciation_fund_id: input.depreciationFundId || null,
     }).select().single();
 
@@ -108,29 +107,78 @@ export function useAssets() {
 
     const assetId = (data as any).id;
 
-    // Deduct from fund if specified (purchase transaction)
+    // 1) Register FULL asset value as DEBIT to vendor (vendor owes us / we owe vendor)
+    if (input.vendorId) {
+      await supabase.rpc('process_transaction', {
+        p_type: 'out', p_category: 'asset_purchase',
+        p_amount: input.value,
+        p_description: 'شراء أصل: ' + input.name,
+        p_date: input.purchaseDate,
+        p_contact_id: input.vendorId,
+        p_notes: 'قيد مدين - قيمة الأصل الكاملة',
+      });
+    }
+
+    // 2) Process payment based on type
     if (input.fundId) {
       if (input.paymentType === 'full') {
+        // Full payment: deduct from fund + credit to vendor
         await supabase.rpc('process_transaction', {
           p_type: 'out', p_category: 'asset_purchase',
-          p_amount: input.value, p_description: 'شراء أصل: ' + input.name,
-          p_date: input.purchaseDate, p_fund_id: input.fundId,
+          p_amount: input.value,
+          p_description: 'سداد أصل: ' + input.name,
+          p_date: input.purchaseDate,
+          p_fund_id: input.fundId,
           p_contact_id: input.vendorId || null,
-          p_notes: 'عملية شراء أصل',
+          p_notes: 'دفعة كاملة - سداد قيمة الأصل',
         });
+        // Credit vendor (payment received)
+        if (input.vendorId) {
+          await supabase.rpc('process_transaction', {
+            p_type: 'in', p_category: 'asset_purchase',
+            p_amount: input.value,
+            p_description: 'سداد للمورد - أصل: ' + input.name,
+            p_date: input.purchaseDate,
+            p_contact_id: input.vendorId,
+            p_notes: 'قيد دائن - سداد كامل',
+          });
+        }
+        // Update paid amount
+        await (supabase.from('assets' as any) as any)
+          .update({ paid_amount: input.value })
+          .eq('id', assetId);
       } else {
-        // First installment
+        // Installment: pay first installment
+        const perInstallment = input.value / input.installmentCount;
+        const firstPayment = Number(perInstallment.toFixed(2));
+
+        // Deduct first installment from fund
         await supabase.rpc('process_transaction', {
           p_type: 'out', p_category: 'asset_purchase',
-          p_amount: firstPayment, p_description: 'دفعة أولى - أصل: ' + input.name,
-          p_date: input.purchaseDate, p_fund_id: input.fundId,
+          p_amount: firstPayment,
+          p_description: 'دفعة أولى - أصل: ' + input.name,
+          p_date: input.purchaseDate,
+          p_fund_id: input.fundId,
           p_contact_id: input.vendorId || null,
           p_notes: 'قسط 1 من ' + input.installmentCount,
         });
+        // Credit vendor for first payment
+        if (input.vendorId) {
+          await supabase.rpc('process_transaction', {
+            p_type: 'in', p_category: 'asset_purchase',
+            p_amount: firstPayment,
+            p_description: 'سداد قسط 1 للمورد - أصل: ' + input.name,
+            p_date: input.purchaseDate,
+            p_contact_id: input.vendorId,
+            p_notes: 'قيد دائن - قسط 1 من ' + input.installmentCount,
+          });
+        }
 
-        // Generate installment schedule
-        const remaining = input.value - firstPayment;
-        const perInstallment = remaining / (input.installmentCount - 1);
+        await (supabase.from('assets' as any) as any)
+          .update({ paid_amount: firstPayment })
+          .eq('id', assetId);
+
+        // Generate remaining installment schedule
         for (let i = 1; i < input.installmentCount; i++) {
           const dueDate = new Date(input.purchaseDate);
           dueDate.setMonth(dueDate.getMonth() + i);
@@ -155,9 +203,9 @@ export function useAssets() {
     const payment = payments.find(p => p.id === paymentId);
     if (!payment || !user) return;
     const asset = assets.find(a => a.id === payment.assetId);
-
     const useFund = fundId || payment.fundId;
 
+    // Deduct from fund
     if (useFund) {
       await supabase.rpc('process_transaction', {
         p_type: 'out', p_category: 'asset_purchase',
@@ -165,7 +213,20 @@ export function useAssets() {
         p_description: 'قسط أصل: ' + (asset?.name || ''),
         p_date: new Date().toISOString().slice(0, 10),
         p_fund_id: useFund,
+        p_contact_id: asset?.vendorId || null,
         p_notes: payment.note || '',
+      });
+    }
+
+    // Credit vendor for this installment payment
+    if (asset?.vendorId) {
+      await supabase.rpc('process_transaction', {
+        p_type: 'in', p_category: 'asset_purchase',
+        p_amount: payment.amount,
+        p_description: 'سداد قسط للمورد - أصل: ' + (asset?.name || ''),
+        p_date: new Date().toISOString().slice(0, 10),
+        p_contact_id: asset.vendorId,
+        p_notes: 'قيد دائن - ' + (payment.note || 'سداد قسط'),
       });
     }
 
@@ -201,7 +262,6 @@ export function useAssets() {
       note: input.note || null,
     });
 
-    // Update asset value
     if (asset) {
       await (supabase.from('assets' as any) as any)
         .update({ value: asset.value + input.amount, current_value: asset.currentValue + input.amount })
@@ -223,7 +283,44 @@ export function useAssets() {
     await fetchAssets();
   }, [user, assets, fetchAssets]);
 
+  const updateAsset = useCallback(async (id: string, updates: Partial<{
+    name: string;
+    value: number;
+    depreciationRate: number;
+    notes: string;
+    depreciationFundId: string;
+  }>) => {
+    if (!user) return;
+    const updateData: any = {};
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.notes !== undefined) updateData.notes = updates.notes;
+    if (updates.depreciationFundId !== undefined) updateData.depreciation_fund_id = updates.depreciationFundId || null;
+    if (updates.depreciationRate !== undefined) {
+      updateData.depreciation_rate = updates.depreciationRate;
+      const asset = assets.find(a => a.id === id);
+      if (asset) {
+        const val = updates.value ?? asset.value;
+        updateData.monthly_depreciation = (val * updates.depreciationRate / 100) / 12;
+      }
+    }
+    if (updates.value !== undefined) {
+      updateData.value = updates.value;
+      const asset = assets.find(a => a.id === id);
+      if (asset) {
+        const rate = updates.depreciationRate ?? asset.depreciationRate;
+        updateData.monthly_depreciation = (updates.value * rate / 100) / 12;
+      }
+    }
+
+    await (supabase.from('assets' as any) as any).update(updateData).eq('id', id);
+    toast.success('تم تعديل الأصل');
+    await fetchAssets();
+  }, [user, assets, fetchAssets]);
+
   const deleteAsset = useCallback(async (id: string) => {
+    // Delete related payments and improvements first
+    await (supabase.from('asset_payments' as any) as any).delete().eq('asset_id', id);
+    await (supabase.from('asset_improvements' as any) as any).delete().eq('asset_id', id);
     await (supabase.from('assets' as any) as any).delete().eq('id', id);
     toast.success('تم حذف الأصل');
     await fetchAssets();
@@ -237,7 +334,7 @@ export function useAssets() {
   const getAssetImprovements = (assetId: string) => improvements.filter(i => i.assetId === assetId);
 
   return {
-    assets, loading, addAsset, deleteAsset, fetchAssets,
+    assets, loading, addAsset, updateAsset, deleteAsset, fetchAssets,
     totalAssetValue, totalDepreciation, totalAssetRevenue,
     payments, improvements,
     payInstallment, addImprovement,

@@ -34,7 +34,7 @@ export function BusinessPage({
   transactions, fundOptions, accountOptions, currencies,
   onAddTransaction, onEditTransaction, onDeleteTransaction,
 }: BusinessPageProps) {
-  const { assets, addAsset, deleteAsset, totalAssetValue, totalDepreciation,
+  const { assets, addAsset, updateAsset, deleteAsset, totalAssetValue, totalDepreciation,
     payments, improvements, payInstallment, addImprovement,
     getAssetPayments, getAssetImprovements } = useAssets();
   const { directRevenue, businessExpenses } = useBusinessTransactions(transactions);
@@ -343,6 +343,8 @@ export function BusinessPage({
         fundOptions={fundOptions}
         onPayInstallment={payInstallment}
         onAddImprovement={addImprovement}
+        onUpdateAsset={updateAsset}
+        onDeleteAsset={(id) => { deleteAsset(id); setSelectedAsset(null); }}
       />
     </div>
   );

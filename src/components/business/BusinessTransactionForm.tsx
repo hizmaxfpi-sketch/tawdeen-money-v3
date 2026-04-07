@@ -20,6 +20,22 @@ interface BusinessTransactionFormProps {
   onClose: () => void;
 }
 
+const STORAGE_KEY = 'tawdeen_custom_categories';
+
+function getCustomCategories(): { value: string; label: string; type: 'revenue' | 'expense' }[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  } catch { return []; }
+}
+
+function saveCustomCategory(cat: { value: string; label: string; type: 'revenue' | 'expense' }) {
+  const existing = getCustomCategories();
+  if (!existing.find(c => c.value === cat.value)) {
+    existing.push(cat);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
+  }
+}
+
 export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: BusinessTransactionFormProps) {
   const [type, setType] = useState<'revenue' | 'expense'>('expense');
   const [category, setCategory] = useState('');
@@ -33,17 +49,32 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
   const [notes, setNotes] = useState('');
   const [useLineItems, setUseLineItems] = useState(false);
   const [lineItems, setLineItems] = useState<LineItem[]>([{ name: '', amount: '' }]);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [customCategories, setCustomCategories] = useState(getCustomCategories);
 
-  const categories = type === 'revenue' ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES;
+  const baseCategories = type === 'revenue' ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES;
+  const userCustom = customCategories.filter(c => c.type === type);
+  const categories = [...baseCategories, ...userCustom];
 
   const totalFromItems = lineItems.reduce((s, item) => s + (parseFloat(item.amount) || 0), 0);
   const effectiveAmount = useLineItems ? totalFromItems : parseFloat(amount) || 0;
+
+  const handleAddCategory = () => {
+    if (!newCategoryName.trim()) return;
+    const value = 'custom_' + newCategoryName.trim().replace(/\s+/g, '_').toLowerCase();
+    const newCat = { value, label: newCategoryName.trim(), type };
+    saveCustomCategory(newCat);
+    setCustomCategories(getCustomCategories());
+    setCategory(value);
+    setNewCategoryName('');
+    setShowAddCategory(false);
+  };
 
   const handleSubmit = async () => {
     if (!effectiveAmount || !fundId || !category) return;
 
     if (useLineItems && lineItems.length > 0) {
-      // Create individual transactions per line item
       const catLabel = categories.find(c => c.value === category)?.label || category;
       for (const item of lineItems) {
         const itemAmount = parseFloat(item.amount);
@@ -107,14 +138,26 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
           {/* Category */}
           <div>
             <label className="block text-[10px] text-muted-foreground mb-1">الفئة</label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="اختر الفئة" /></SelectTrigger>
-              <SelectContent className="bg-popover z-[110]">
-                {categories.map(c => (
-                  <SelectItem key={c.value} value={c.value} className="text-xs">{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-1.5">
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger className="h-8 text-xs flex-1"><SelectValue placeholder="اختر الفئة" /></SelectTrigger>
+                <SelectContent className="bg-popover z-[110]">
+                  {categories.map(c => (
+                    <SelectItem key={c.value} value={c.value} className="text-xs">{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={() => setShowAddCategory(!showAddCategory)}>
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            {showAddCategory && (
+              <div className="flex gap-1.5 mt-1.5">
+                <Input value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)}
+                  placeholder="اسم الفئة الجديدة" className="h-7 text-xs flex-1" />
+                <Button size="sm" className="h-7 text-[10px] px-2" onClick={handleAddCategory}>إضافة</Button>
+              </div>
+            )}
           </div>
 
           {/* Fund */}

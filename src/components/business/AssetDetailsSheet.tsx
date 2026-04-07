@@ -8,7 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, CheckCircle, Clock, Wrench, DollarSign } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Plus, CheckCircle, Clock, Wrench, Pencil, Trash2 } from 'lucide-react';
 import { Asset, AssetPayment, AssetImprovement } from '@/hooks/useAssets';
 import { FundOption } from '@/types/finance';
 import { cn } from '@/lib/utils';
@@ -22,14 +23,19 @@ interface AssetDetailsSheetProps {
   fundOptions: FundOption[];
   onPayInstallment: (paymentId: string, fundId?: string) => void;
   onAddImprovement: (data: { assetId: string; name: string; amount: number; fundId?: string; note?: string }) => void;
+  onUpdateAsset?: (id: string, updates: any) => void;
+  onDeleteAsset?: (id: string) => void;
 }
 
 export function AssetDetailsSheet({
   asset, open, onOpenChange, payments, improvements,
   fundOptions, onPayInstallment, onAddImprovement,
+  onUpdateAsset, onDeleteAsset,
 }: AssetDetailsSheetProps) {
   const [showAddImprovement, setShowAddImprovement] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const [improvementForm, setImprovementForm] = useState({ name: '', amount: '', fundId: '', note: '' });
+  const [editForm, setEditForm] = useState({ name: '', depreciationRate: '', notes: '', depreciationFundId: '' });
 
   if (!asset) return null;
 
@@ -49,11 +55,66 @@ export function AssetDetailsSheet({
     setShowAddImprovement(false);
   };
 
+  const openEditForm = () => {
+    setEditForm({
+      name: asset.name,
+      depreciationRate: String(asset.depreciationRate),
+      notes: asset.notes || '',
+      depreciationFundId: asset.depreciationFundId || '',
+    });
+    setShowEdit(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!onUpdateAsset) return;
+    onUpdateAsset(asset.id, {
+      name: editForm.name || asset.name,
+      depreciationRate: Number(editForm.depreciationRate) || asset.depreciationRate,
+      notes: editForm.notes,
+      depreciationFundId: editForm.depreciationFundId || undefined,
+    });
+    setShowEdit(false);
+  };
+
+  const handleDelete = () => {
+    if (!onDeleteAsset) return;
+    onDeleteAsset(asset.id);
+    onOpenChange(false);
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="h-[85vh] overflow-y-auto rounded-t-2xl">
         <SheetHeader className="pb-3">
-          <SheetTitle className="text-right">{asset.name}</SheetTitle>
+          <div className="flex items-center justify-between">
+            <SheetTitle className="text-right">{asset.name}</SheetTitle>
+            <div className="flex gap-1.5">
+              {onUpdateAsset && (
+                <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={openEditForm}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              {onDeleteAsset && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-destructive hover:text-destructive">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>حذف الأصل</AlertDialogTitle>
+                      <AlertDialogDescription>هل أنت متأكد من حذف "{asset.name}"؟ سيتم حذف جميع الأقساط والتطويرات المرتبطة.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">حذف</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+          </div>
         </SheetHeader>
 
         <div className="space-y-4">
@@ -205,6 +266,39 @@ export function AssetDetailsSheet({
             </Card>
           )}
         </div>
+
+        {/* Edit Dialog */}
+        <Dialog open={showEdit} onOpenChange={setShowEdit}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>تعديل الأصل</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>اسم الأصل</Label>
+                <Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div>
+                <Label>نسبة الإهلاك السنوية %</Label>
+                <Input type="number" value={editForm.depreciationRate} onChange={e => setEditForm(f => ({ ...f, depreciationRate: e.target.value }))} />
+              </div>
+              <div>
+                <Label>صندوق التطوير</Label>
+                <Select value={editForm.depreciationFundId} onValueChange={v => setEditForm(f => ({ ...f, depreciationFundId: v }))}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="اختر الصندوق" /></SelectTrigger>
+                  <SelectContent>
+                    {fundOptions.map(f => (
+                      <SelectItem key={f.id} value={f.id} className="text-xs">{f.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>ملاحظات</Label>
+                <Textarea value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
+              </div>
+              <Button onClick={handleSaveEdit} className="w-full">حفظ التعديلات</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </SheetContent>
     </Sheet>
   );

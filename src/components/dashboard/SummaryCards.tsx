@@ -16,7 +16,7 @@ interface SummaryCardsProps {
   ledgerNet?: number;
   projectProfit?: number;
   containerProfit?: number;
-  assetRevenue?: number;
+  directRevenue?: number;
   businessExpenses?: number;
   onExpensesClick?: () => void;
 }
@@ -26,7 +26,7 @@ export function SummaryCards({
   displayCurrency = 'USD', currencies = [],
   ledgerDebit = 0, ledgerCredit = 0, ledgerNet = 0,
   projectProfit = 0, containerProfit = 0,
-  assetRevenue = 0, businessExpenses = 0,
+  directRevenue = 0, businessExpenses = 0,
   onExpensesClick,
 }: SummaryCardsProps) {
   const cashTxs = fundTransactions || [];
@@ -34,8 +34,8 @@ export function SummaryCards({
   const fundOut = cashTxs.reduce((sum, tx) => tx.type === 'out' ? sum + tx.amount : sum, 0);
   const fundRemaining = stats.totalLiquidity;
 
-  // Net Profit = Project Profits + Container Profits + Asset Revenue - Business Expenses
-  const totalRevenue = projectProfit + containerProfit + assetRevenue;
+  // Revenue = direct business revenue + project profits + container profits
+  const totalRevenue = directRevenue + projectProfit + containerProfit;
   const netProfit = totalRevenue - businessExpenses;
 
   const conv = (v: number) => convertForDisplay(v, displayCurrency, currencies);
