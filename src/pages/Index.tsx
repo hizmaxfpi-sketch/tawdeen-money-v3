@@ -108,9 +108,9 @@ const Index = () => {
     return { debit, credit, net: debit - credit };
   }, [contacts]);
 
-  // Compute project profit (sum of profit field)
+  // Compute project profit (only realized/completed projects)
   const projectProfit = useMemo(() =>
-    projects.reduce((s, p) => s + (p.profit || 0), 0), [projects]);
+    projects.filter(p => p.status === 'completed').reduce((s, p) => s + (p.profit || 0), 0), [projects]);
 
   // Compute container profit (sum of container profit)
   const containerProfit = useMemo(() =>

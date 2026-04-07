@@ -107,7 +107,8 @@ export function useAssets() {
 
     const assetId = (data as any).id;
 
-    // 1) Register FULL asset value as DEBIT to vendor (vendor owes us / we owe vendor)
+    // 1) Register FULL asset value as DEBIT (out) to vendor — vendor becomes creditor
+    // This is ONLY in the vendor's ledger, NOT in business operations
     if (input.vendorId) {
       await supabase.rpc('process_transaction', {
         p_type: 'out', p_category: 'asset_purchase',
@@ -122,28 +123,27 @@ export function useAssets() {
     // 2) Process payment based on type
     if (input.fundId) {
       if (input.paymentType === 'full') {
-        // Full payment: deduct from fund + credit to vendor
+        // Full payment: deduct from fund
         await supabase.rpc('process_transaction', {
-          p_type: 'out', p_category: 'asset_purchase',
+          p_type: 'out', p_category: 'asset_payment',
           p_amount: input.value,
           p_description: 'سداد أصل: ' + input.name,
           p_date: input.purchaseDate,
           p_fund_id: input.fundId,
-          p_contact_id: input.vendorId || null,
-          p_notes: 'دفعة كاملة - سداد قيمة الأصل',
+          p_notes: 'خصم من الصندوق - سداد كامل',
         });
-        // Credit vendor (payment received)
+        // Credit vendor (reduce his balance)
         if (input.vendorId) {
           await supabase.rpc('process_transaction', {
-            p_type: 'in', p_category: 'asset_purchase',
+            p_type: 'in', p_category: 'asset_payment',
             p_amount: input.value,
-            p_description: 'سداد للمورد - أصل: ' + input.name,
+            p_description: 'سداد أصل: ' + input.name,
             p_date: input.purchaseDate,
             p_contact_id: input.vendorId,
-            p_notes: 'قيد دائن - سداد كامل',
+            p_notes: 'سداد كامل - تخفيض رصيد المورد',
           });
         }
-        // Update paid amount
+
         await (supabase.from('assets' as any) as any)
           .update({ paid_amount: input.value })
           .eq('id', assetId);
@@ -154,23 +154,22 @@ export function useAssets() {
 
         // Deduct first installment from fund
         await supabase.rpc('process_transaction', {
-          p_type: 'out', p_category: 'asset_purchase',
+          p_type: 'out', p_category: 'asset_payment',
           p_amount: firstPayment,
           p_description: 'دفعة أولى - أصل: ' + input.name,
           p_date: input.purchaseDate,
           p_fund_id: input.fundId,
-          p_contact_id: input.vendorId || null,
           p_notes: 'قسط 1 من ' + input.installmentCount,
         });
         // Credit vendor for first payment
         if (input.vendorId) {
           await supabase.rpc('process_transaction', {
-            p_type: 'in', p_category: 'asset_purchase',
+            p_type: 'in', p_category: 'asset_payment',
             p_amount: firstPayment,
-            p_description: 'سداد قسط 1 للمورد - أصل: ' + input.name,
+            p_description: 'سداد قسط 1 - أصل: ' + input.name,
             p_date: input.purchaseDate,
             p_contact_id: input.vendorId,
-            p_notes: 'قيد دائن - قسط 1 من ' + input.installmentCount,
+            p_notes: 'قسط 1 من ' + input.installmentCount + ' - تخفيض رصيد المورد',
           });
         }
 
@@ -195,6 +194,9 @@ export function useAssets() {
       }
     }
 
+    // Sync contact balances
+    await (supabase.rpc as any)('sync_contact_balances');
+
     toast.success('تم إضافة الأصل');
     await fetchAssets();
   }, [user, fetchAssets]);
@@ -208,25 +210,23 @@ export function useAssets() {
     // Deduct from fund
     if (useFund) {
       await supabase.rpc('process_transaction', {
-        p_type: 'out', p_category: 'asset_purchase',
+        p_type: 'out', p_category: 'asset_payment',
         p_amount: payment.amount,
-        p_description: 'قسط أصل: ' + (asset?.name || ''),
+        p_description: 'سداد قسط - أصل: ' + (asset?.name || ''),
         p_date: new Date().toISOString().slice(0, 10),
         p_fund_id: useFund,
-        p_contact_id: asset?.vendorId || null,
-        p_notes: payment.note || '',
+        p_notes: payment.note || 'خصم من الصندوق',
       });
     }
-
-    // Credit vendor for this installment payment
+    // Credit vendor (reduce balance)
     if (asset?.vendorId) {
       await supabase.rpc('process_transaction', {
-        p_type: 'in', p_category: 'asset_purchase',
+        p_type: 'in', p_category: 'asset_payment',
         p_amount: payment.amount,
-        p_description: 'سداد قسط للمورد - أصل: ' + (asset?.name || ''),
+        p_description: 'سداد قسط - أصل: ' + (asset?.name || ''),
         p_date: new Date().toISOString().slice(0, 10),
         p_contact_id: asset.vendorId,
-        p_notes: 'قيد دائن - ' + (payment.note || 'سداد قسط'),
+        p_notes: payment.note || 'تخفيض رصيد المورد',
       });
     }
 
@@ -238,6 +238,8 @@ export function useAssets() {
     await (supabase.from('assets' as any) as any)
       .update({ paid_amount: newPaid })
       .eq('id', payment.assetId);
+
+    await (supabase.rpc as any)('sync_contact_balances');
 
     toast.success('تم سداد القسط');
     await fetchAssets();
@@ -291,25 +293,59 @@ export function useAssets() {
     depreciationFundId: string;
   }>) => {
     if (!user) return;
+    const asset = assets.find(a => a.id === id);
+    if (!asset) return;
+
     const updateData: any = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.notes !== undefined) updateData.notes = updates.notes;
     if (updates.depreciationFundId !== undefined) updateData.depreciation_fund_id = updates.depreciationFundId || null;
-    if (updates.depreciationRate !== undefined) {
-      updateData.depreciation_rate = updates.depreciationRate;
-      const asset = assets.find(a => a.id === id);
-      if (asset) {
-        const val = updates.value ?? asset.value;
-        updateData.monthly_depreciation = (val * updates.depreciationRate / 100) / 12;
-      }
+
+    const newValue = updates.value ?? asset.value;
+    const newRate = updates.depreciationRate ?? asset.depreciationRate;
+
+    if (updates.depreciationRate !== undefined || updates.value !== undefined) {
+      updateData.monthly_depreciation = (newValue * newRate / 100) / 12;
     }
     if (updates.value !== undefined) {
       updateData.value = updates.value;
-      const asset = assets.find(a => a.id === id);
-      if (asset) {
-        const rate = updates.depreciationRate ?? asset.depreciationRate;
-        updateData.monthly_depreciation = (updates.value * rate / 100) / 12;
+      // Recalculate depreciation
+      const monthlyDep = (updates.value * newRate / 100) / 12;
+      const months = getMonthsSince(asset.purchaseDate);
+      const totalDep = Math.min(monthlyDep * months, updates.value);
+      updateData.total_depreciation = totalDep;
+      updateData.current_value = Math.max(0, updates.value - totalDep);
+
+      // If vendor exists and value changed, update the vendor's debit transaction
+      if (asset.vendorId) {
+        // Delete old asset_purchase transaction for this asset from vendor
+        const { data: oldTxs } = await supabase.from('transactions')
+          .select('id')
+          .eq('contact_id', asset.vendorId)
+          .eq('category', 'asset_purchase')
+          .ilike('description', '%' + asset.name + '%');
+
+        if (oldTxs && oldTxs.length > 0) {
+          for (const tx of oldTxs) {
+            await supabase.rpc('reverse_transaction', { p_transaction_id: tx.id });
+          }
+        }
+
+        // Re-register with new value
+        await supabase.rpc('process_transaction', {
+          p_type: 'out', p_category: 'asset_purchase',
+          p_amount: updates.value,
+          p_description: 'شراء أصل: ' + (updates.name || asset.name),
+          p_date: asset.purchaseDate,
+          p_contact_id: asset.vendorId,
+          p_notes: 'قيد مدين - قيمة الأصل المعدلة',
+        });
+
+        await (supabase.rpc as any)('sync_contact_balances');
       }
+    }
+    if (updates.depreciationRate !== undefined) {
+      updateData.depreciation_rate = updates.depreciationRate;
     }
 
     await (supabase.from('assets' as any) as any).update(updateData).eq('id', id);
@@ -318,13 +354,50 @@ export function useAssets() {
   }, [user, assets, fetchAssets]);
 
   const deleteAsset = useCallback(async (id: string) => {
-    // Delete related payments and improvements first
+    const asset = assets.find(a => a.id === id);
+
+    // Delete all related transactions (asset_purchase + asset_payment for this vendor/asset)
+    if (asset?.vendorId) {
+      // Find and reverse all transactions related to this asset
+      const { data: relatedTxs } = await supabase.from('transactions')
+        .select('id')
+        .eq('contact_id', asset.vendorId)
+        .in('category', ['asset_purchase', 'asset_payment'])
+        .ilike('description', '%' + asset.name + '%');
+
+      if (relatedTxs) {
+        for (const tx of relatedTxs) {
+          await supabase.rpc('reverse_transaction', { p_transaction_id: tx.id });
+        }
+      }
+    }
+
+    // Delete improvement transactions
+    const assetImprovements = improvements.filter(i => i.assetId === id);
+    for (const imp of assetImprovements) {
+      if (imp.fundId) {
+        const { data: impTxs } = await supabase.from('transactions')
+          .select('id')
+          .eq('category', 'asset_improvement')
+          .ilike('description', '%' + imp.name + '%');
+        if (impTxs) {
+          for (const tx of impTxs) {
+            await supabase.rpc('reverse_transaction', { p_transaction_id: tx.id });
+          }
+        }
+      }
+    }
+
+    // Delete related records
     await (supabase.from('asset_payments' as any) as any).delete().eq('asset_id', id);
     await (supabase.from('asset_improvements' as any) as any).delete().eq('asset_id', id);
     await (supabase.from('assets' as any) as any).delete().eq('id', id);
+
+    await (supabase.rpc as any)('sync_contact_balances');
+
     toast.success('تم حذف الأصل');
     await fetchAssets();
-  }, [fetchAssets]);
+  }, [assets, improvements, fetchAssets]);
 
   const totalAssetValue = assets.reduce((s, a) => s + a.currentValue, 0);
   const totalDepreciation = assets.reduce((s, a) => s + a.totalDepreciation, 0);
