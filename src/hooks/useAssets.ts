@@ -123,16 +123,26 @@ export function useAssets() {
     // 2) Process payment based on type
     if (input.fundId) {
       if (input.paymentType === 'full') {
-        // Full payment: deduct from fund + credit vendor (reduce his balance)
+        // Full payment: deduct from fund
         await supabase.rpc('process_transaction', {
-          p_type: 'in', p_category: 'asset_payment',
+          p_type: 'out', p_category: 'asset_payment',
           p_amount: input.value,
           p_description: 'سداد أصل: ' + input.name,
           p_date: input.purchaseDate,
           p_fund_id: input.fundId,
-          p_contact_id: input.vendorId || null,
-          p_notes: 'سداد كامل - تخفيض رصيد المورد',
+          p_notes: 'خصم من الصندوق - سداد كامل',
         });
+        // Credit vendor (reduce his balance)
+        if (input.vendorId) {
+          await supabase.rpc('process_transaction', {
+            p_type: 'in', p_category: 'asset_payment',
+            p_amount: input.value,
+            p_description: 'سداد أصل: ' + input.name,
+            p_date: input.purchaseDate,
+            p_contact_id: input.vendorId,
+            p_notes: 'سداد كامل - تخفيض رصيد المورد',
+          });
+        }
 
         await (supabase.from('assets' as any) as any)
           .update({ paid_amount: input.value })
@@ -142,16 +152,26 @@ export function useAssets() {
         const perInstallment = input.value / input.installmentCount;
         const firstPayment = Number(perInstallment.toFixed(2));
 
-        // Credit vendor for first payment (reduce his balance) + deduct from fund
+        // Deduct first installment from fund
         await supabase.rpc('process_transaction', {
-          p_type: 'in', p_category: 'asset_payment',
+          p_type: 'out', p_category: 'asset_payment',
           p_amount: firstPayment,
           p_description: 'دفعة أولى - أصل: ' + input.name,
           p_date: input.purchaseDate,
           p_fund_id: input.fundId,
-          p_contact_id: input.vendorId || null,
           p_notes: 'قسط 1 من ' + input.installmentCount,
         });
+        // Credit vendor for first payment
+        if (input.vendorId) {
+          await supabase.rpc('process_transaction', {
+            p_type: 'in', p_category: 'asset_payment',
+            p_amount: firstPayment,
+            p_description: 'سداد قسط 1 - أصل: ' + input.name,
+            p_date: input.purchaseDate,
+            p_contact_id: input.vendorId,
+            p_notes: 'قسط 1 من ' + input.installmentCount + ' - تخفيض رصيد المورد',
+          });
+        }
 
         await (supabase.from('assets' as any) as any)
           .update({ paid_amount: firstPayment })
