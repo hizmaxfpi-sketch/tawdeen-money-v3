@@ -207,16 +207,28 @@ export function useAssets() {
     const asset = assets.find(a => a.id === payment.assetId);
     const useFund = fundId || payment.fundId;
 
-    // Credit vendor (reduce balance) + deduct from fund
-    await supabase.rpc('process_transaction', {
-      p_type: 'in', p_category: 'asset_payment',
-      p_amount: payment.amount,
-      p_description: 'سداد قسط - أصل: ' + (asset?.name || ''),
-      p_date: new Date().toISOString().slice(0, 10),
-      p_fund_id: useFund || null,
-      p_contact_id: asset?.vendorId || null,
-      p_notes: payment.note || 'سداد قسط',
-    });
+    // Deduct from fund
+    if (useFund) {
+      await supabase.rpc('process_transaction', {
+        p_type: 'out', p_category: 'asset_payment',
+        p_amount: payment.amount,
+        p_description: 'سداد قسط - أصل: ' + (asset?.name || ''),
+        p_date: new Date().toISOString().slice(0, 10),
+        p_fund_id: useFund,
+        p_notes: payment.note || 'خصم من الصندوق',
+      });
+    }
+    // Credit vendor (reduce balance)
+    if (asset?.vendorId) {
+      await supabase.rpc('process_transaction', {
+        p_type: 'in', p_category: 'asset_payment',
+        p_amount: payment.amount,
+        p_description: 'سداد قسط - أصل: ' + (asset?.name || ''),
+        p_date: new Date().toISOString().slice(0, 10),
+        p_contact_id: asset.vendorId,
+        p_notes: payment.note || 'تخفيض رصيد المورد',
+      });
+    }
 
     await (supabase.from('asset_payments' as any) as any)
       .update({ status: 'paid', paid_date: new Date().toISOString().slice(0, 10) })
