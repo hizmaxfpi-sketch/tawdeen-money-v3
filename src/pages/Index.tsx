@@ -180,7 +180,7 @@ const Index = () => {
             ledgerNet={ledgerTotals.net}
             projectProfit={projectProfit}
             containerProfit={containerProfit}
-            assetRevenue={0}
+            directRevenue={directRevenue}
             businessExpenses={businessExpenses}
             onExpensesClick={() => handleNavigate('business')}
           />
