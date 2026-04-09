@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, DollarSign, TrendingDown, Package, ChevronLeft } from 'lucide-react';
+import { Plus, DollarSign, TrendingDown, Package, ChevronLeft, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAssets, Asset } from '@/hooks/useAssets';
 import { useBusinessTransactions, isBusinessTransaction, REVENUE_CATEGORIES, EXPENSE_CATEGORIES } from '@/hooks/useBusinessTransactions';
 import { Transaction, FundOption, AccountOption } from '@/types/finance';
@@ -19,6 +21,8 @@ import { BusinessTransactionForm } from './BusinessTransactionForm';
 import { AssetDetailsSheet } from './AssetDetailsSheet';
 import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
 import { cn } from '@/lib/utils';
+
+const CUSTOM_CATEGORIES_KEY = 'tawdeen_custom_categories';
 
 interface BusinessPageProps {
   transactions: Transaction[];
