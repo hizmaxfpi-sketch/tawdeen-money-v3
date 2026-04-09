@@ -49,6 +49,7 @@ export function BusinessPage({
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'revenue' | 'expense'>('all');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [isSavingAsset, setIsSavingAsset] = useState(false);
   const [assetForm, setAssetForm] = useState({
     name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
     depreciationRate: '', notes: '', fundId: '', vendorId: '',
