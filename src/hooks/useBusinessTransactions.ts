@@ -25,12 +25,6 @@ export const EXPENSE_CATEGORIES = [
   { value: 'other_expense', label: 'مصروف آخر' },
 ];
 
-// Categories that are NOT business transactions (auto-generated from other modules)
-const NON_BUSINESS_CATEGORIES = [
-  'fund_transfer', 'client_collection', 'client_payment', 'vendor_payment',
-  'shipping_expense', 'asset_purchase', 'asset_payment',
-];
-
 export function useBusinessTransactions(transactions: Transaction[]) {
   return useMemo(() => {
     let directRevenue = 0;
@@ -39,12 +33,11 @@ export function useBusinessTransactions(transactions: Transaction[]) {
     for (const tx of transactions) {
       if (tx.sourceType && tx.sourceType !== 'manual') continue;
       if (tx.projectId) continue;
-      if (NON_BUSINESS_CATEGORIES.includes(tx.category)) continue;
-
-      if (tx.type === 'in') {
+      
+      if (DIRECT_REVENUE_CATEGORIES.includes(tx.category) && tx.type === 'in') {
         directRevenue += tx.amount;
       }
-      if (tx.type === 'out') {
+      if (BUSINESS_EXPENSE_CATEGORIES.includes(tx.category) && tx.type === 'out') {
         businessExpenses += tx.amount;
       }
     }
@@ -56,8 +49,6 @@ export function useBusinessTransactions(transactions: Transaction[]) {
 export function isBusinessTransaction(tx: Transaction): boolean {
   if (tx.sourceType && tx.sourceType !== 'manual') return false;
   if (tx.projectId) return false;
-  if (NON_BUSINESS_CATEGORIES.includes(tx.category)) return false;
-  // Any manual transaction that isn't excluded is a business transaction
-  // This allows custom categories to appear
-  return true;
+  const allBizCategories = [...DIRECT_REVENUE_CATEGORIES.map(c => c), ...BUSINESS_EXPENSE_CATEGORIES];
+  return allBizCategories.includes(tx.category);
 }

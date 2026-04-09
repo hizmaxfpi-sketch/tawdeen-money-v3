@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Plus, Trash2, Pencil } from 'lucide-react';
+import { X, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,29 +28,11 @@ function getCustomCategories(): { value: string; label: string; type: 'revenue' 
   } catch { return []; }
 }
 
-function saveCustomCategories(cats: { value: string; label: string; type: 'revenue' | 'expense' }[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(cats));
-}
-
-function addCustomCategory(cat: { value: string; label: string; type: 'revenue' | 'expense' }) {
+function saveCustomCategory(cat: { value: string; label: string; type: 'revenue' | 'expense' }) {
   const existing = getCustomCategories();
   if (!existing.find(c => c.value === cat.value)) {
     existing.push(cat);
-    saveCustomCategories(existing);
-  }
-}
-
-function deleteCustomCategory(value: string) {
-  const existing = getCustomCategories().filter(c => c.value !== value);
-  saveCustomCategories(existing);
-}
-
-function renameCustomCategory(value: string, newLabel: string) {
-  const existing = getCustomCategories();
-  const idx = existing.findIndex(c => c.value === value);
-  if (idx >= 0) {
-    existing[idx].label = newLabel;
-    saveCustomCategories(existing);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
   }
 }
 
@@ -70,9 +52,6 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [customCategories, setCustomCategories] = useState(getCustomCategories);
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
-  const [editCategoryName, setEditCategoryName] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
 
   const baseCategories = type === 'revenue' ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES;
   const userCustom = customCategories.filter(c => c.type === type);
@@ -85,65 +64,41 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
     if (!newCategoryName.trim()) return;
     const value = 'custom_' + newCategoryName.trim().replace(/\s+/g, '_').toLowerCase();
     const newCat = { value, label: newCategoryName.trim(), type };
-    addCustomCategory(newCat);
+    saveCustomCategory(newCat);
     setCustomCategories(getCustomCategories());
     setCategory(value);
     setNewCategoryName('');
     setShowAddCategory(false);
   };
 
-  const handleDeleteCategory = (value: string) => {
-    deleteCustomCategory(value);
-    setCustomCategories(getCustomCategories());
-    if (category === value) setCategory('');
-  };
-
-  const handleStartEdit = (value: string, label: string) => {
-    setEditingCategory(value);
-    setEditCategoryName(label);
-  };
-
-  const handleSaveEdit = (value: string) => {
-    if (editCategoryName.trim()) {
-      renameCustomCategory(value, editCategoryName.trim());
-      setCustomCategories(getCustomCategories());
-    }
-    setEditingCategory(null);
-  };
-
   const handleSubmit = async () => {
-    if (!effectiveAmount || !fundId || !category || isSaving) return;
-    setIsSaving(true);
+    if (!effectiveAmount || !fundId || !category) return;
 
-    try {
-      if (useLineItems && lineItems.length > 0) {
-        const catLabel = categories.find(c => c.value === category)?.label || category;
-        for (const item of lineItems) {
-          const itemAmount = parseFloat(item.amount);
-          if (!itemAmount || !item.name) continue;
-          await onSubmit({
-            type: type === 'revenue' ? 'in' : 'out',
-            category,
-            amount: itemAmount,
-            description: `${catLabel} - ${item.name}`,
-            date, fundId,
-            notes: notes || undefined,
-          });
-        }
-      } else {
+    if (useLineItems && lineItems.length > 0) {
+      const catLabel = categories.find(c => c.value === category)?.label || category;
+      for (const item of lineItems) {
+        const itemAmount = parseFloat(item.amount);
+        if (!itemAmount || !item.name) continue;
         await onSubmit({
           type: type === 'revenue' ? 'in' : 'out',
           category,
-          amount: effectiveAmount,
-          description: description || categories.find(c => c.value === category)?.label || '',
+          amount: itemAmount,
+          description: `${catLabel} - ${item.name}`,
           date, fundId,
           notes: notes || undefined,
         });
       }
-      onClose();
-    } finally {
-      setIsSaving(false);
+    } else {
+      await onSubmit({
+        type: type === 'revenue' ? 'in' : 'out',
+        category,
+        amount: effectiveAmount,
+        description: description || categories.find(c => c.value === category)?.label || '',
+        date, fundId,
+        notes: notes || undefined,
+      });
     }
+    onClose();
   };
 
   const addLineItem = () => setLineItems([...lineItems, { name: '', amount: '' }]);
@@ -153,8 +108,6 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
     updated[i] = { ...updated[i], [field]: val };
     setLineItems(updated);
   };
-
-  const isCustom = (value: string) => value.startsWith('custom_');
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -198,43 +151,11 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
                 <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>
-
-            {/* Add new category */}
             {showAddCategory && (
               <div className="flex gap-1.5 mt-1.5">
                 <Input value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)}
                   placeholder="اسم الفئة الجديدة" className="h-7 text-xs flex-1" />
                 <Button size="sm" className="h-7 text-[10px] px-2" onClick={handleAddCategory}>إضافة</Button>
-              </div>
-            )}
-
-            {/* Custom categories management */}
-            {userCustom.length > 0 && (
-              <div className="mt-2 space-y-1 rounded-lg bg-muted/40 p-2">
-                <p className="text-[10px] text-muted-foreground font-medium mb-1">الفئات المخصصة</p>
-                {userCustom.map(c => (
-                  <div key={c.value} className="flex items-center justify-between gap-1 bg-card rounded px-2 py-1">
-                    {editingCategory === c.value ? (
-                      <div className="flex gap-1 flex-1">
-                        <Input value={editCategoryName} onChange={e => setEditCategoryName(e.target.value)}
-                          className="h-6 text-[10px] flex-1" />
-                        <Button size="sm" className="h-6 text-[9px] px-1.5" onClick={() => handleSaveEdit(c.value)}>حفظ</Button>
-                      </div>
-                    ) : (
-                      <>
-                        <span className="text-[11px]">{c.label}</span>
-                        <div className="flex gap-0.5">
-                          <button onClick={() => handleStartEdit(c.value, c.label)} className="p-0.5 hover:bg-muted rounded">
-                            <Pencil className="h-3 w-3 text-muted-foreground" />
-                          </button>
-                          <button onClick={() => handleDeleteCategory(c.value)} className="p-0.5 hover:bg-muted rounded">
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
               </div>
             )}
           </div>
@@ -311,9 +232,9 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
 
           <div className="flex gap-2 pt-2">
             <Button variant="outline" onClick={onClose} className="flex-1 h-9 text-xs">إلغاء</Button>
-            <Button onClick={handleSubmit} disabled={!effectiveAmount || !fundId || !category || isSaving}
+            <Button onClick={handleSubmit} disabled={!effectiveAmount || !fundId || !category}
               className={cn("flex-1 h-9 text-xs", type === 'revenue' ? "bg-gradient-income" : "bg-gradient-expense")}>
-              {isSaving ? 'جاري الحفظ...' : 'حفظ'}
+              حفظ
             </Button>
           </div>
         </div>
