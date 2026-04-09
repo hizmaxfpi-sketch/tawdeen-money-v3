@@ -84,25 +84,30 @@ export function BusinessPage({
   }, [transactions, filterType, selectedCategories]);
 
   const handleAddAsset = async () => {
-    if (!assetForm.name || !assetForm.value) return;
-    await addAsset({
-      name: assetForm.name,
-      value: Number(assetForm.value),
-      purchaseDate: assetForm.purchaseDate,
-      depreciationRate: Number(assetForm.depreciationRate) || 0,
-      notes: assetForm.notes || undefined,
-      fundId: assetForm.fundId || undefined,
-      vendorId: assetForm.vendorId || undefined,
-      paymentType: assetForm.paymentType,
-      installmentCount: Number(assetForm.installmentCount) || 1,
-      depreciationFundId: assetForm.depreciationFundId || undefined,
-    });
-    setAssetForm({
-      name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
-      depreciationRate: '', notes: '', fundId: '', vendorId: '',
-      paymentType: 'full', installmentCount: '1', depreciationFundId: '',
-    });
-    setShowAddAsset(false);
+    if (!assetForm.name || !assetForm.value || isSavingAsset) return;
+    setIsSavingAsset(true);
+    try {
+      await addAsset({
+        name: assetForm.name,
+        value: Number(assetForm.value),
+        purchaseDate: assetForm.purchaseDate,
+        depreciationRate: Number(assetForm.depreciationRate) || 0,
+        notes: assetForm.notes || undefined,
+        fundId: assetForm.fundId || undefined,
+        vendorId: assetForm.vendorId || undefined,
+        paymentType: assetForm.paymentType,
+        installmentCount: Number(assetForm.installmentCount) || 1,
+        depreciationFundId: assetForm.depreciationFundId || undefined,
+      });
+      setAssetForm({
+        name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
+        depreciationRate: '', notes: '', fundId: '', vendorId: '',
+        paymentType: 'full', installmentCount: '1', depreciationFundId: '',
+      });
+      setShowAddAsset(false);
+    } finally {
+      setIsSavingAsset(false);
+    }
   };
 
   const activeContacts = contacts.filter(c => c.status === 'active');
