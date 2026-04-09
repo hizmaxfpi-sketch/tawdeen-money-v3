@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, DollarSign, TrendingDown, Package, ChevronLeft } from 'lucide-react';
+import { Plus, DollarSign, TrendingDown, Package, ChevronLeft, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAssets, Asset } from '@/hooks/useAssets';
 import { useBusinessTransactions, isBusinessTransaction, REVENUE_CATEGORIES, EXPENSE_CATEGORIES } from '@/hooks/useBusinessTransactions';
 import { Transaction, FundOption, AccountOption } from '@/types/finance';
@@ -19,6 +21,8 @@ import { BusinessTransactionForm } from './BusinessTransactionForm';
 import { AssetDetailsSheet } from './AssetDetailsSheet';
 import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
 import { cn } from '@/lib/utils';
+
+const CUSTOM_CATEGORIES_KEY = 'tawdeen_custom_categories';
 
 interface BusinessPageProps {
   transactions: Transaction[];
@@ -44,21 +48,39 @@ export function BusinessPage({
   const [showAddAsset, setShowAddAsset] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'revenue' | 'expense'>('all');
-  const [filterCategory, setFilterCategory] = useState('all');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [assetForm, setAssetForm] = useState({
     name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
     depreciationRate: '', notes: '', fundId: '', vendorId: '',
     paymentType: 'full', installmentCount: '1', depreciationFundId: '',
   });
 
+  // Build full category list including custom categories from localStorage
+  const customCategories = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem(CUSTOM_CATEGORIES_KEY) || '[]'); }
+    catch { return []; }
+  }, [showAddForm]); // re-read when form closes (new category may have been added)
+  
+  const allCategories = useMemo(() => {
+    const base = [...REVENUE_CATEGORIES, ...EXPENSE_CATEGORIES];
+    const customs = customCategories.filter((c: any) => !base.find(b => b.value === c.value));
+    return [...base, ...customs];
+  }, [customCategories]);
+
+  const toggleCategory = (value: string) => {
+    setSelectedCategories(prev =>
+      prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
+    );
+  };
+
   // Filter business transactions
   const businessTxs = useMemo(() => {
     let filtered = transactions.filter(isBusinessTransaction);
     if (filterType === 'revenue') filtered = filtered.filter(t => t.type === 'in');
     if (filterType === 'expense') filtered = filtered.filter(t => t.type === 'out');
-    if (filterCategory !== 'all') filtered = filtered.filter(t => t.category === filterCategory);
+    if (selectedCategories.length > 0) filtered = filtered.filter(t => selectedCategories.includes(t.category));
     return filtered;
-  }, [transactions, filterType, filterCategory]);
+  }, [transactions, filterType, selectedCategories]);
 
   const handleAddAsset = async () => {
     if (!assetForm.name || !assetForm.value) return;
@@ -83,7 +105,6 @@ export function BusinessPage({
   };
 
   const activeContacts = contacts.filter(c => c.status === 'active');
-  const allCategories = [...REVENUE_CATEGORIES, ...EXPENSE_CATEGORIES];
 
   return (
     <div className="space-y-3 py-3 animate-fade-in">
@@ -146,15 +167,32 @@ export function BusinessPage({
                 <SelectItem value="expense" className="text-xs">مصاريف</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="h-7 text-[10px] flex-1"><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-popover z-[50]">
-                <SelectItem value="all" className="text-xs">كل الفئات</SelectItem>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1 justify-between">
+                  <span>{selectedCategories.length > 0 ? `${selectedCategories.length} فئة` : 'كل الفئات'}</span>
+                  <Filter className="h-3 w-3 mr-1" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2 max-h-60 overflow-y-auto z-[50]" align="start">
+                {selectedCategories.length > 0 && (
+                  <Button variant="ghost" size="sm" className="w-full h-6 text-[10px] mb-1 text-muted-foreground"
+                    onClick={() => setSelectedCategories([])}>
+                    مسح الكل
+                  </Button>
+                )}
                 {allCategories.map(c => (
-                  <SelectItem key={c.value} value={c.value} className="text-xs">{c.label}</SelectItem>
+                  <label key={c.value} className="flex items-center gap-2 px-1 py-1 cursor-pointer hover:bg-muted rounded text-xs">
+                    <Checkbox
+                      checked={selectedCategories.includes(c.value)}
+                      onCheckedChange={() => toggleCategory(c.value)}
+                      className="h-3.5 w-3.5"
+                    />
+                    {c.label}
+                  </label>
                 ))}
-              </SelectContent>
-            </Select>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <UnifiedTransactionLog

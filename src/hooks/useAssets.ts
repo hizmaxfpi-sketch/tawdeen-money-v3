@@ -59,9 +59,41 @@ export function useAssets() {
       supabase.from('asset_payments' as any).select('*').order('due_date', { ascending: true }),
       supabase.from('asset_improvements' as any).select('*').order('date', { ascending: false }),
     ]);
-    if (aData) setAssets((aData as any[]).map(mapAsset));
+    const mappedAssets = aData ? (aData as any[]).map(mapAsset) : [];
+    if (aData) setAssets(mappedAssets);
     if (pData) setPayments((pData as any[]).map(mapPayment));
     if (iData) setImprovements((iData as any[]).map(mapImprovement));
+
+    // Auto-process depreciation: post unrecorded depreciation as expense transactions
+    for (const asset of mappedAssets) {
+      if (asset.depreciationRate <= 0 || asset.status !== 'active') continue;
+      const monthlyDep = (asset.value * asset.depreciationRate / 100) / 12;
+      const months = getMonthsSince(asset.purchaseDate);
+      const expectedTotal = Math.min(monthlyDep * months, asset.value);
+      const unposted = expectedTotal - asset.totalDepreciation;
+      if (unposted > 0.01) {
+        // Post depreciation as expense transaction in business operations
+        await supabase.rpc('process_transaction', {
+          p_type: 'out', p_category: 'asset_depreciation',
+          p_amount: Number(unposted.toFixed(2)),
+          p_description: 'إهلاك أصل: ' + asset.name,
+          p_date: new Date().toISOString().slice(0, 10),
+          p_fund_id: asset.depreciationFundId || null,
+          p_notes: 'إهلاك تلقائي - ' + months + ' شهر',
+        });
+        // Update asset with new depreciation totals
+        await (supabase.from('assets' as any) as any).update({
+          total_depreciation: expectedTotal,
+          current_value: Math.max(0, asset.value - expectedTotal),
+          monthly_depreciation: monthlyDep,
+        }).eq('id', asset.id);
+      }
+    }
+
+    // Re-fetch after depreciation updates
+    const { data: refreshed } = await supabase.from('assets' as any).select('*').order('created_at', { ascending: false });
+    if (refreshed) setAssets((refreshed as any[]).map(mapAsset));
+
     setLoading(false);
   }, [user]);
 
