@@ -48,21 +48,39 @@ export function BusinessPage({
   const [showAddAsset, setShowAddAsset] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'revenue' | 'expense'>('all');
-  const [filterCategory, setFilterCategory] = useState('all');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [assetForm, setAssetForm] = useState({
     name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
     depreciationRate: '', notes: '', fundId: '', vendorId: '',
     paymentType: 'full', installmentCount: '1', depreciationFundId: '',
   });
 
+  // Build full category list including custom categories from localStorage
+  const customCategories = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem(CUSTOM_CATEGORIES_KEY) || '[]'); }
+    catch { return []; }
+  }, [showAddForm]); // re-read when form closes (new category may have been added)
+  
+  const allCategories = useMemo(() => {
+    const base = [...REVENUE_CATEGORIES, ...EXPENSE_CATEGORIES];
+    const customs = customCategories.filter((c: any) => !base.find(b => b.value === c.value));
+    return [...base, ...customs];
+  }, [customCategories]);
+
+  const toggleCategory = (value: string) => {
+    setSelectedCategories(prev =>
+      prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
+    );
+  };
+
   // Filter business transactions
   const businessTxs = useMemo(() => {
     let filtered = transactions.filter(isBusinessTransaction);
     if (filterType === 'revenue') filtered = filtered.filter(t => t.type === 'in');
     if (filterType === 'expense') filtered = filtered.filter(t => t.type === 'out');
-    if (filterCategory !== 'all') filtered = filtered.filter(t => t.category === filterCategory);
+    if (selectedCategories.length > 0) filtered = filtered.filter(t => selectedCategories.includes(t.category));
     return filtered;
-  }, [transactions, filterType, filterCategory]);
+  }, [transactions, filterType, selectedCategories]);
 
   const handleAddAsset = async () => {
     if (!assetForm.name || !assetForm.value) return;
