@@ -105,7 +105,6 @@ export function BusinessPage({
   };
 
   const activeContacts = contacts.filter(c => c.status === 'active');
-  const allCategories = [...REVENUE_CATEGORIES, ...EXPENSE_CATEGORIES];
 
   return (
     <div className="space-y-3 py-3 animate-fade-in">
@@ -168,15 +167,32 @@ export function BusinessPage({
                 <SelectItem value="expense" className="text-xs">مصاريف</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="h-7 text-[10px] flex-1"><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-popover z-[50]">
-                <SelectItem value="all" className="text-xs">كل الفئات</SelectItem>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 text-[10px] flex-1 justify-between">
+                  <span>{selectedCategories.length > 0 ? `${selectedCategories.length} فئة` : 'كل الفئات'}</span>
+                  <Filter className="h-3 w-3 mr-1" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2 max-h-60 overflow-y-auto z-[50]" align="start">
+                {selectedCategories.length > 0 && (
+                  <Button variant="ghost" size="sm" className="w-full h-6 text-[10px] mb-1 text-muted-foreground"
+                    onClick={() => setSelectedCategories([])}>
+                    مسح الكل
+                  </Button>
+                )}
                 {allCategories.map(c => (
-                  <SelectItem key={c.value} value={c.value} className="text-xs">{c.label}</SelectItem>
+                  <label key={c.value} className="flex items-center gap-2 px-1 py-1 cursor-pointer hover:bg-muted rounded text-xs">
+                    <Checkbox
+                      checked={selectedCategories.includes(c.value)}
+                      onCheckedChange={() => toggleCategory(c.value)}
+                      className="h-3.5 w-3.5"
+                    />
+                    {c.label}
+                  </label>
                 ))}
-              </SelectContent>
-            </Select>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <UnifiedTransactionLog
