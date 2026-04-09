@@ -306,7 +306,9 @@ export function BusinessPage({
                     <Label>ملاحظات</Label>
                     <Textarea value={assetForm.notes} onChange={e => setAssetForm(f => ({ ...f, notes: e.target.value }))} placeholder="ملاحظات..." />
                   </div>
-                  <Button className="w-full" onClick={handleAddAsset}>حفظ</Button>
+                  <Button className="w-full" onClick={handleAddAsset} disabled={isSavingAsset}>
+                    {isSavingAsset ? 'جاري الحفظ...' : 'حفظ'}
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
