@@ -51,6 +51,7 @@ export function ProjectDetails() {
     transactions, 
     funds, 
     addTransaction, 
+    updateTransaction,
     deleteTransaction,
     updateProject,
     deleteProject,
@@ -62,6 +63,7 @@ export function ProjectDetails() {
   const [txSubmitting, setTxSubmitting] = useState(false);
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [transactionType, setTransactionType] = useState<'credit' | 'debit'>('credit');
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // حقول نموذج العملية المالية
   const [txAmount, setTxAmount] = useState('');
@@ -147,6 +149,7 @@ export function ProjectDetails() {
   };
 
   const handleOpenTransactionForm = (type: 'credit' | 'debit') => {
+    setEditingTransaction(null);
     setTransactionType(type);
     setTxAmount('');
     const now = new Date();
@@ -156,6 +159,25 @@ export function ProjectDetails() {
     setTxCurrencyCode('USD');
     setTxManualExchangeRate('');
     setShowTransactionForm(true);
+  };
+
+  const openTransactionEditor = (tx: Transaction) => {
+    setEditingTransaction(tx);
+    setTransactionType(tx.type === 'in' ? 'credit' : 'debit');
+    setTxAmount(tx.amount.toString());
+    setTxDate(tx.date);
+    setTxDescription(tx.description);
+    setTxFundId(tx.fundId || '');
+    setTxCurrencyCode(tx.currencyCode || 'USD');
+    setTxManualExchangeRate(
+      tx.currencyCode && tx.currencyCode !== 'USD' && tx.exchangeRate ? String(tx.exchangeRate) : '',
+    );
+    setShowTransactionForm(true);
+  };
+
+  const resetTransactionEditor = () => {
+    setEditingTransaction(null);
+    setTxSubmitting(false);
   };
 
   const handleAddTransaction = async () => {
@@ -168,19 +190,26 @@ export function ProjectDetails() {
       
       const finalAmount = txCurrencyCode === 'USD' ? amount : amount / effectiveRate;
       
-      await addTransaction({
+      const payload = {
         type: txType,
         amount: Number(finalAmount.toFixed(4)),
         date: txDate,
-        category: category,
+        category,
         description: txDescription.trim(),
         fundId: txFundId || '',
         projectId: project.id,
         currencyCode: txCurrencyCode,
         exchangeRate: effectiveRate,
-      } as any);
+      } as any;
+
+      if (editingTransaction) {
+        await updateTransaction(editingTransaction.id, payload);
+      } else {
+        await addTransaction(payload);
+      }
 
       setShowTransactionForm(false);
+      resetTransactionEditor();
     } finally {
       setTxSubmitting(false);
     }
@@ -362,6 +391,7 @@ export function ProjectDetails() {
             title="سجل العمليات المالية للمشروع"
             showExport={true}
             maxHeight="400px"
+            onEditTransaction={openTransactionEditor}
             onDeleteTransaction={handleDeleteTransaction}
             currencies={currencies}
           />
@@ -372,11 +402,16 @@ export function ProjectDetails() {
       <BottomNav currentPage="projects" onNavigate={(page) => navigate(`/?page=${page}`)} />
 
       {/* Transaction Form Dialog */}
-      <Dialog open={showTransactionForm} onOpenChange={setShowTransactionForm}>
+      <Dialog open={showTransactionForm} onOpenChange={(open) => {
+        setShowTransactionForm(open);
+        if (!open) resetTransactionEditor();
+      }}>
         <DialogContent className="max-w-sm z-[100]">
           <DialogHeader>
             <DialogTitle className={transactionType === 'credit' ? 'text-green-600' : 'text-rose-600'}>
-              {transactionType === 'credit' ? 'إضافة إيراد للمشروع' : 'إضافة مصروف من المشروع'}
+              {editingTransaction
+                ? (transactionType === 'credit' ? 'تعديل إيراد المشروع' : 'تعديل مصروف المشروع')
+                : (transactionType === 'credit' ? 'إضافة إيراد للمشروع' : 'إضافة مصروف من المشروع')}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
@@ -494,7 +529,7 @@ export function ProjectDetails() {
               disabled={!txAmount || parseFloat(txAmount) <= 0 || !txDescription.trim() || txSubmitting}
               className={transactionType === 'credit' ? 'bg-green-600 hover:bg-green-700' : 'bg-rose-600 hover:bg-rose-700'}
             >
-              {txSubmitting ? '...' : 'إضافة العملية'}
+              {txSubmitting ? '...' : (editingTransaction ? 'حفظ التعديلات' : 'إضافة العملية')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Camera, Mic, DollarSign, Calendar, FileText, StickyNote, BookOpen, Coins } from 'lucide-react';
 import { Transaction, FundOption, AccountOption, TransactionCategory, TransactionType } from '@/types/finance';
@@ -31,24 +31,45 @@ export function TransactionForm({
   const { t } = useLanguage();
   const { contacts } = useSupabaseContacts();
   
-  const [type, setType] = useState<TransactionType>(editTransaction?.type || defaultType);
-  const [category, setCategory] = useState<TransactionCategory>(editTransaction?.category || (defaultType === 'in' ? 'client_collection' : 'vendor_payment'));
-  const [fundId, setFundId] = useState(editTransaction?.fundId || fundOptions.find(f => f.type === 'cash')?.id || fundOptions[0]?.id || '');
-  const [contactId, setContactId] = useState(editTransaction?.contactId || 'none');
-  const [amount, setAmount] = useState(editTransaction?.amount?.toString() || '');
-  const [date, setDate] = useState(() => {
-    if (editTransaction?.date) return editTransaction.date.split('T')[0];
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  });
-  const [description, setDescription] = useState(editTransaction?.description || '');
+  const [type, setType] = useState<TransactionType>(defaultType);
+  const [category, setCategory] = useState<TransactionCategory>(defaultType === 'in' ? 'client_collection' : 'vendor_payment');
+  const [fundId, setFundId] = useState(fundOptions.find(f => f.type === 'cash')?.id || fundOptions[0]?.id || '');
+  const [contactId, setContactId] = useState('none');
+  const [amount, setAmount] = useState('');
+  const [date, setDate] = useState('');
+  const [description, setDescription] = useState('');
   const [attachments, setAttachments] = useState<string[]>([]);
-  const [notes, setNotes] = useState(editTransaction?.notes || '');
+  const [notes, setNotes] = useState('');
   const [showOCR, setShowOCR] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
   const [currencyCode, setCurrencyCode] = useState('USD');
   const [manualExchangeRate, setManualExchangeRate] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+
+  useEffect(() => {
+    const now = new Date();
+    const nextDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const defaultFundId = fundOptions.find(f => f.type === 'cash')?.id || fundOptions[0]?.id || '';
+
+    setType(editTransaction?.type || defaultType);
+    setCategory((editTransaction?.category || (defaultType === 'in' ? 'client_collection' : 'vendor_payment')) as TransactionCategory);
+    setFundId(editTransaction?.fundId || defaultFundId);
+    setContactId(editTransaction?.contactId || 'none');
+    setAmount(editTransaction?.amount?.toString() || '');
+    setDate(editTransaction?.date ? editTransaction.date.split('T')[0] : nextDate);
+    setDescription(editTransaction?.description || '');
+    setAttachments(editTransaction?.attachment ? [editTransaction.attachment] : []);
+    setNotes(editTransaction?.notes || '');
+    setCurrencyCode(editTransaction?.currencyCode || 'USD');
+    setManualExchangeRate(
+      editTransaction?.currencyCode && editTransaction.currencyCode !== 'USD' && editTransaction.exchangeRate
+        ? String(editTransaction.exchangeRate)
+        : '',
+    );
+    setSubmitting(false);
+    submittingRef.current = false;
+  }, [editTransaction, defaultType, fundOptions]);
 
   const activeContacts = contacts.filter(c => c.status === 'active');
 
@@ -78,7 +99,8 @@ export function TransactionForm({
   };
 
   const handleSubmit = async () => {
-    if (!amount || !description || !fundId || submitting) return;
+    if (!amount || !description || !fundId || submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const parsedAmount = parseFloat(amount);
@@ -97,6 +119,7 @@ export function TransactionForm({
       confetti({ particleCount: 60, spread: 50, origin: { y: 0.7 }, colors: type === 'in' ? ['#22c55e', '#10b981'] : ['#ef4444', '#f97316'] });
       onClose();
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
