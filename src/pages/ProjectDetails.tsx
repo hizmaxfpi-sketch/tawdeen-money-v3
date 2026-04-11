@@ -59,6 +59,7 @@ export function ProjectDetails() {
   const { currencies } = useCurrencies();
   
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [txSubmitting, setTxSubmitting] = useState(false);
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [transactionType, setTransactionType] = useState<'credit' | 'debit'>('credit');
 

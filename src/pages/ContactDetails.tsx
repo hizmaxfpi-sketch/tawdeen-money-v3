@@ -61,6 +61,7 @@ export function ContactDetails() {
   const { currencies } = useCurrencies();
   
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [txSubmitting, setTxSubmitting] = useState(false);
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [transactionType, setTransactionType] = useState<'credit' | 'debit'>('credit');
   const [displayCurrency, setDisplayCurrency] = useState('USD');
@@ -169,29 +170,32 @@ export function ContactDetails() {
 
   const handleAddTransaction = async () => {
     const amount = parseFloat(txAmount);
-    if (!amount || amount <= 0 || !txDescription.trim()) return;
+    if (!amount || amount <= 0 || !txDescription.trim() || txSubmitting) return;
+    setTxSubmitting(true);
+    try {
+      const txType = transactionType === 'debit' ? 'in' : 'out';
+      const category = txFundId
+        ? (transactionType === 'debit' ? 'client_collection' : 'vendor_payment')
+        : (transactionType === 'debit' ? 'ledger_debit' : 'ledger_credit');
+      
+      const finalAmount = txCurrencyCode === 'USD' ? amount : amount / effectiveRate;
+      
+      await addTransaction({
+        type: txType,
+        amount: Number(finalAmount.toFixed(4)),
+        date: txDate,
+        category: category,
+        description: txDescription.trim(),
+        fundId: txFundId || '',
+        contactId: contact.id,
+        currencyCode: txCurrencyCode,
+        exchangeRate: effectiveRate,
+      } as any);
 
-    const txType = transactionType === 'debit' ? 'in' : 'out';
-    // تصنيف ذكي: إذا بدون صندوق = قيد دفتري، مع صندوق = تحصيل/صرف
-    const category = txFundId
-      ? (transactionType === 'debit' ? 'client_collection' : 'vendor_payment')
-      : (transactionType === 'debit' ? 'ledger_debit' : 'ledger_credit');
-    
-    const finalAmount = txCurrencyCode === 'USD' ? amount : amount / effectiveRate;
-    
-    await addTransaction({
-      type: txType,
-      amount: Number(finalAmount.toFixed(4)),
-      date: txDate,
-      category: category,
-      description: txDescription.trim(),
-      fundId: txFundId || '',
-      contactId: contact.id,
-      currencyCode: txCurrencyCode,
-      exchangeRate: effectiveRate,
-    } as any);
-
-    setShowTransactionForm(false);
+      setShowTransactionForm(false);
+    } finally {
+      setTxSubmitting(false);
+    }
   };
 
   const handleWhatsAppClick = () => {
@@ -496,10 +500,10 @@ export function ContactDetails() {
             <Button variant="outline" onClick={() => setShowTransactionForm(false)}>إلغاء</Button>
             <Button 
               onClick={handleAddTransaction}
-              disabled={!txAmount || parseFloat(txAmount) <= 0 || !txDescription.trim()}
+              disabled={!txAmount || parseFloat(txAmount) <= 0 || !txDescription.trim() || txSubmitting}
               className={transactionType === 'debit' ? 'bg-green-600 hover:bg-green-700' : 'bg-rose-600 hover:bg-rose-700'}
             >
-              إضافة العملية
+              {txSubmitting ? '...' : 'إضافة العملية'}
             </Button>
           </DialogFooter>
         </DialogContent>
