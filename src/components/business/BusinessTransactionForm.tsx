@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,7 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [customCategories, setCustomCategories] = useState(getCustomCategories);
+  const submittingRef = useRef(false);
 
   const baseCategories = type === 'revenue' ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES;
   const userCustom = customCategories.filter(c => c.type === type);
@@ -73,7 +74,8 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
   };
 
   const handleSubmit = async () => {
-    if (!effectiveAmount || !fundId || !category || submitting) return;
+    if (!effectiveAmount || !fundId || !category || submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       if (useLineItems && lineItems.length > 0) {
@@ -102,6 +104,7 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
       }
       onClose();
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };

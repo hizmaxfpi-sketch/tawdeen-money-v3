@@ -57,7 +57,7 @@ export function ContactDetails() {
   
   const { user } = useAuth();
   const { contacts, updateContact, deleteContact } = useSupabaseContacts();
-  const { transactions, funds, addTransaction, deleteTransaction, getFundOptions } = useSupabaseFinance();
+  const { transactions, funds, addTransaction, updateTransaction, deleteTransaction, getFundOptions } = useSupabaseFinance();
   const { currencies } = useCurrencies();
   
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -65,6 +65,7 @@ export function ContactDetails() {
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [transactionType, setTransactionType] = useState<'credit' | 'debit'>('credit');
   const [displayCurrency, setDisplayCurrency] = useState('USD');
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // حقول نموذج العملية المالية
   const [txAmount, setTxAmount] = useState('');
@@ -90,7 +91,7 @@ export function ContactDetails() {
     setTxLoading(true);
     supabase
       .from('transactions')
-      .select('id, type, category, amount, description, date, fund_id, contact_id, project_id, notes, created_at, currency_code, exchange_rate')
+      .select('id, type, category, amount, description, date, fund_id, contact_id, project_id, notes, created_at, currency_code, exchange_rate, source_type, created_by_name, attachments')
       .eq('contact_id', contact.id)
       .order('date', { ascending: false })
       .then(({ data, error }) => {
@@ -101,11 +102,13 @@ export function ContactDetails() {
             contactId: t.contact_id || undefined, projectId: t.project_id || undefined,
             notes: t.notes || undefined, createdAt: new Date(t.created_at),
             currencyCode: t.currency_code || 'USD', exchangeRate: Number(t.exchange_rate || 1),
+            sourceType: t.source_type || 'manual', createdByName: t.created_by_name || undefined,
+            attachment: t.attachments?.[0] || undefined,
           })));
         }
         setTxLoading(false);
       });
-  }, [contact, user]);
+  }, [contact, user, transactions]);
   // الإحصائيات - المصدر الوحيد هو سجل العمليات المالية نفسه
   const stats = useMemo(() => {
     return calculateLedgerSummary(contactTransactions);
@@ -157,6 +160,7 @@ export function ContactDetails() {
   };
 
   const handleOpenTransactionForm = (type: 'credit' | 'debit') => {
+    setEditingTransaction(null);
     setTransactionType(type);
     setTxAmount('');
     const now = new Date();
@@ -166,6 +170,25 @@ export function ContactDetails() {
     setTxCurrencyCode('USD');
     setTxManualExchangeRate('');
     setShowTransactionForm(true);
+  };
+
+  const openTransactionEditor = (tx: Transaction) => {
+    setEditingTransaction(tx);
+    setTransactionType(tx.type === 'in' ? 'debit' : 'credit');
+    setTxAmount(tx.amount.toString());
+    setTxDate(tx.date);
+    setTxDescription(tx.description);
+    setTxFundId(tx.fundId || '');
+    setTxCurrencyCode(tx.currencyCode || 'USD');
+    setTxManualExchangeRate(
+      tx.currencyCode && tx.currencyCode !== 'USD' && tx.exchangeRate ? String(tx.exchangeRate) : '',
+    );
+    setShowTransactionForm(true);
+  };
+
+  const resetTransactionEditor = () => {
+    setEditingTransaction(null);
+    setTxSubmitting(false);
   };
 
   const handleAddTransaction = async () => {
@@ -180,19 +203,26 @@ export function ContactDetails() {
       
       const finalAmount = txCurrencyCode === 'USD' ? amount : amount / effectiveRate;
       
-      await addTransaction({
+      const payload = {
         type: txType,
         amount: Number(finalAmount.toFixed(4)),
         date: txDate,
-        category: category,
+        category,
         description: txDescription.trim(),
         fundId: txFundId || '',
         contactId: contact.id,
         currencyCode: txCurrencyCode,
         exchangeRate: effectiveRate,
-      } as any);
+      } as any;
+
+      if (editingTransaction) {
+        await updateTransaction(editingTransaction.id, payload);
+      } else {
+        await addTransaction(payload);
+      }
 
       setShowTransactionForm(false);
+      resetTransactionEditor();
     } finally {
       setTxSubmitting(false);
     }
@@ -364,14 +394,7 @@ export function ContactDetails() {
             currencies={currencies}
             displayCurrencyCode={displayCurrency}
             onDisplayCurrencyChange={setDisplayCurrency}
-            onEditTransaction={(tx) => {
-              setTransactionType(tx.type === 'in' ? 'debit' : 'credit');
-              setTxAmount(tx.amount.toString());
-              setTxDate(tx.date);
-              setTxDescription(tx.description);
-              setTxFundId(tx.fundId || '');
-              setShowTransactionForm(true);
-            }}
+            onEditTransaction={openTransactionEditor}
             onDeleteTransaction={deleteTransaction}
           />
         </motion.div>
@@ -381,11 +404,16 @@ export function ContactDetails() {
       <BottomNav currentPage="accounts" onNavigate={(page) => navigate(`/?page=${page}`)} />
 
       {/* Transaction Form Dialog */}
-      <Dialog open={showTransactionForm} onOpenChange={setShowTransactionForm}>
+      <Dialog open={showTransactionForm} onOpenChange={(open) => {
+        setShowTransactionForm(open);
+        if (!open) resetTransactionEditor();
+      }}>
         <DialogContent className="max-w-sm z-[100]">
           <DialogHeader>
             <DialogTitle className={transactionType === 'debit' ? 'text-emerald-600' : 'text-rose-600'}>
-              {transactionType === 'debit' ? 'إضافة قيد مدين (Debit)' : 'إضافة قيد دائن (Credit)'}
+              {editingTransaction
+                ? (transactionType === 'debit' ? 'تعديل قيد مدين (Debit)' : 'تعديل قيد دائن (Credit)')
+                : (transactionType === 'debit' ? 'إضافة قيد مدين (Debit)' : 'إضافة قيد دائن (Credit)')}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
@@ -503,7 +531,7 @@ export function ContactDetails() {
               disabled={!txAmount || parseFloat(txAmount) <= 0 || !txDescription.trim() || txSubmitting}
               className={transactionType === 'debit' ? 'bg-green-600 hover:bg-green-700' : 'bg-rose-600 hover:bg-rose-700'}
             >
-              {txSubmitting ? '...' : 'إضافة العملية'}
+              {txSubmitting ? '...' : (editingTransaction ? 'حفظ التعديلات' : 'إضافة العملية')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,7 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import {
+  ASSET_TRANSACTION_CATEGORIES,
+  createAssetTransaction,
+  getAssetDepreciationSnapshot,
+  listAssetTransactionIds,
+} from '@/lib/assetAccounting';
 
 export interface Asset {
   id: string;
@@ -50,52 +56,110 @@ export function useAssets() {
   const [payments, setPayments] = useState<AssetPayment[]>([]);
   const [improvements, setImprovements] = useState<AssetImprovement[]>([]);
   const [loading, setLoading] = useState(true);
+  const actionLocks = useRef<Record<'add' | 'pay' | 'improve' | 'update' | 'delete' | 'sync', boolean>>({
+    add: false,
+    pay: false,
+    improve: false,
+    update: false,
+    delete: false,
+    sync: false,
+  });
+
+  const syncDepreciationForAssets = useCallback(async (assetRows: Asset[]) => {
+    if (actionLocks.current.sync) return false;
+
+    actionLocks.current.sync = true;
+    let changed = false;
+
+    try {
+      for (const asset of assetRows) {
+        if (asset.status !== 'active') continue;
+
+        const snapshot = getAssetDepreciationSnapshot(
+          asset.value,
+          asset.depreciationRate,
+          asset.purchaseDate,
+          asset.totalDepreciation,
+        );
+
+        const updatePayload: Record<string, number> = {};
+
+        if (Math.abs(asset.monthlyDepreciation - snapshot.monthlyDepreciation) > 0.01) {
+          updatePayload.monthly_depreciation = snapshot.monthlyDepreciation;
+        }
+
+        const hasExpectedDepreciation = snapshot.expectedTotal > 0.01;
+        const depreciationTxIds = hasExpectedDepreciation
+          ? await listAssetTransactionIds(asset.id, asset.name, ['asset_depreciation'])
+          : [];
+        const needsRepairPosting = hasExpectedDepreciation && depreciationTxIds.length === 0;
+        const amountToPost = needsRepairPosting ? snapshot.expectedTotal : snapshot.unpostedAmount;
+
+        if (amountToPost > 0.01) {
+          await createAssetTransaction({
+            assetId: asset.id,
+            kind: 'depreciation',
+            type: 'out',
+            category: 'asset_depreciation',
+            amount: amountToPost,
+            description: `إهلاك أصل: ${asset.name}`,
+            date: new Date().toISOString().slice(0, 10),
+            note: `إهلاك محاسبي بلا تأثير على الصندوق - ${snapshot.monthsSincePurchase} شهر`,
+          });
+
+          updatePayload.total_depreciation = snapshot.expectedTotal;
+          updatePayload.current_value = snapshot.currentValue;
+        } else {
+          if (Math.abs(asset.currentValue - snapshot.currentValue) > 0.01) {
+            updatePayload.current_value = snapshot.currentValue;
+          }
+        }
+
+        if (Object.keys(updatePayload).length > 0) {
+          changed = true;
+          await (supabase.from('assets' as any) as any)
+            .update(updatePayload)
+            .eq('id', asset.id);
+        }
+      }
+    } finally {
+      actionLocks.current.sync = false;
+    }
+
+    return changed;
+  }, []);
 
   const fetchAssets = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const [{ data: aData }, { data: pData }, { data: iData }] = await Promise.all([
-      supabase.from('assets' as any).select('*').order('created_at', { ascending: false }),
-      supabase.from('asset_payments' as any).select('*').order('due_date', { ascending: true }),
-      supabase.from('asset_improvements' as any).select('*').order('date', { ascending: false }),
-    ]);
-    const mappedAssets = aData ? (aData as any[]).map(mapAsset) : [];
-    if (aData) setAssets(mappedAssets);
-    if (pData) setPayments((pData as any[]).map(mapPayment));
-    if (iData) setImprovements((iData as any[]).map(mapImprovement));
+    try {
+      const [{ data: aData }, { data: pData }, { data: iData }] = await Promise.all([
+        supabase.from('assets' as any).select('*').order('created_at', { ascending: false }),
+        supabase.from('asset_payments' as any).select('*').order('due_date', { ascending: true }),
+        supabase.from('asset_improvements' as any).select('*').order('date', { ascending: false }),
+      ]);
 
-    // Auto-process depreciation: post unrecorded depreciation as expense transactions
-    for (const asset of mappedAssets) {
-      if (asset.depreciationRate <= 0 || asset.status !== 'active') continue;
-      const monthlyDep = (asset.value * asset.depreciationRate / 100) / 12;
-      const months = getMonthsSince(asset.purchaseDate);
-      const expectedTotal = Math.min(monthlyDep * months, asset.value);
-      const unposted = expectedTotal - asset.totalDepreciation;
-      if (unposted > 0.01) {
-        // Post depreciation as expense entry WITHOUT affecting any fund
-        await supabase.rpc('process_transaction', {
-          p_type: 'out', p_category: 'asset_depreciation',
-          p_amount: Number(unposted.toFixed(2)),
-          p_description: 'إهلاك أصل: ' + asset.name,
-          p_date: new Date().toISOString().slice(0, 10),
-          p_fund_id: null,
-          p_notes: 'إهلاك تلقائي - ' + months + ' شهر',
-        });
-        // Update asset with new depreciation totals
-        await (supabase.from('assets' as any) as any).update({
-          total_depreciation: expectedTotal,
-          current_value: Math.max(0, asset.value - expectedTotal),
-          monthly_depreciation: monthlyDep,
-        }).eq('id', asset.id);
+      const mappedAssets = aData ? (aData as any[]).map(mapAsset) : [];
+
+      if (pData) setPayments((pData as any[]).map(mapPayment));
+      if (iData) setImprovements((iData as any[]).map(mapImprovement));
+
+      const didChange = await syncDepreciationForAssets(mappedAssets);
+
+      if (didChange) {
+        const { data: refreshed } = await supabase
+          .from('assets' as any)
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        setAssets(refreshed ? (refreshed as any[]).map(mapAsset) : mappedAssets);
+      } else {
+        setAssets(mappedAssets);
       }
+    } finally {
+      setLoading(false);
     }
-
-    // Re-fetch after depreciation updates
-    const { data: refreshed } = await supabase.from('assets' as any).select('*').order('created_at', { ascending: false });
-    if (refreshed) setAssets((refreshed as any[]).map(mapAsset));
-
-    setLoading(false);
-  }, [user]);
+  }, [user, syncDepreciationForAssets]);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
@@ -111,170 +175,211 @@ export function useAssets() {
     installmentCount: number;
     depreciationFundId?: string;
   }) => {
-    if (!user) return;
-    const monthlyDep = (input.value * input.depreciationRate / 100) / 12;
-    const monthsSincePurchase = getMonthsSince(input.purchaseDate);
-    const totalDep = Math.min(monthlyDep * monthsSincePurchase, input.value);
-    const currentVal = Math.max(0, input.value - totalDep);
+    if (!user || actionLocks.current.add) return;
 
-    const { data, error } = await (supabase.from('assets' as any) as any).insert({
-      user_id: user.id,
-      name: input.name,
-      value: input.value,
-      purchase_date: input.purchaseDate,
-      depreciation_rate: input.depreciationRate,
-      monthly_depreciation: monthlyDep,
-      total_depreciation: totalDep,
-      current_value: currentVal,
-      notes: input.notes || null,
-      fund_id: input.fundId || null,
-      vendor_id: input.vendorId || null,
-      payment_type: input.paymentType,
-      installment_count: input.installmentCount || 1,
-      paid_amount: 0,
-      depreciation_fund_id: input.depreciationFundId || null,
-    }).select().single();
+    actionLocks.current.add = true;
 
-    if (error) { toast.error('فشل إضافة الأصل'); return; }
+    try {
+      const depreciationSnapshot = getAssetDepreciationSnapshot(input.value, input.depreciationRate, input.purchaseDate, 0);
 
-    const assetId = (data as any).id;
+      const { data, error } = await (supabase.from('assets' as any) as any)
+        .insert({
+          user_id: user.id,
+          name: input.name,
+          value: input.value,
+          purchase_date: input.purchaseDate,
+          depreciation_rate: input.depreciationRate,
+          monthly_depreciation: depreciationSnapshot.monthlyDepreciation,
+          total_depreciation: 0,
+          current_value: input.value,
+          notes: input.notes || null,
+          fund_id: input.fundId || null,
+          vendor_id: input.vendorId || null,
+          payment_type: input.paymentType,
+          installment_count: Math.max(1, input.installmentCount || 1),
+          paid_amount: 0,
+          depreciation_fund_id: input.depreciationFundId || null,
+        })
+        .select()
+        .single();
 
-    // 1) Register FULL asset value as DEBIT (out) to vendor — vendor becomes creditor
-    // This is ONLY in the vendor's ledger, NOT in business operations
-    if (input.vendorId) {
-      await supabase.rpc('process_transaction', {
-        p_type: 'out', p_category: 'asset_purchase',
-        p_amount: input.value,
-        p_description: 'شراء أصل: ' + input.name,
-        p_date: input.purchaseDate,
-        p_contact_id: input.vendorId,
-        p_notes: 'قيد مدين - قيمة الأصل الكاملة',
-      });
-    }
+      if (error || !data) {
+        toast.error('فشل إضافة الأصل');
+        return;
+      }
 
-    // 2) Process payment based on type
-    if (input.fundId) {
-      if (input.paymentType === 'full') {
-        // Full payment: deduct from fund
-        await supabase.rpc('process_transaction', {
-          p_type: 'out', p_category: 'asset_payment',
-          p_amount: input.value,
-          p_description: 'سداد أصل: ' + input.name,
-          p_date: input.purchaseDate,
-          p_fund_id: input.fundId,
-          p_notes: 'خصم من الصندوق - سداد كامل',
+      const assetId = (data as any).id as string;
+      const installmentCount = Math.max(1, input.installmentCount || 1);
+      let paidAmount = 0;
+
+      if (input.vendorId) {
+        await createAssetTransaction({
+          assetId,
+          kind: 'purchase',
+          type: 'out',
+          category: 'asset_purchase',
+          amount: input.value,
+          description: `شراء أصل: ${input.name}`,
+          date: input.purchaseDate,
+          contactId: input.vendorId,
+          note: 'إثبات قيمة الأصل على حساب المورد فقط',
         });
-        // Credit vendor (reduce his balance)
+      }
+
+      if (input.fundId && input.paymentType === 'full') {
+        await createAssetTransaction({
+          assetId,
+          kind: 'payment',
+          type: 'out',
+          category: 'asset_payment',
+          amount: input.value,
+          description: `سداد أصل: ${input.name}`,
+          date: input.purchaseDate,
+          fundId: input.fundId,
+          note: 'سداد كامل من الصندوق',
+        });
+
         if (input.vendorId) {
-          await supabase.rpc('process_transaction', {
-            p_type: 'in', p_category: 'asset_payment',
-            p_amount: input.value,
-            p_description: 'سداد أصل: ' + input.name,
-            p_date: input.purchaseDate,
-            p_contact_id: input.vendorId,
-            p_notes: 'سداد كامل - تخفيض رصيد المورد',
+          await createAssetTransaction({
+            assetId,
+            kind: 'payment',
+            type: 'in',
+            category: 'asset_payment',
+            amount: input.value,
+            description: `سداد أصل: ${input.name}`,
+            date: input.purchaseDate,
+            contactId: input.vendorId,
+            note: 'تخفيض رصيد المورد بعد السداد الكامل',
           });
         }
 
-        await (supabase.from('assets' as any) as any)
-          .update({ paid_amount: input.value })
-          .eq('id', assetId);
-      } else {
-        // Installment: pay first installment
-        const perInstallment = input.value / input.installmentCount;
-        const firstPayment = Number(perInstallment.toFixed(2));
+        paidAmount = input.value;
+      }
 
-        // Deduct first installment from fund
-        await supabase.rpc('process_transaction', {
-          p_type: 'out', p_category: 'asset_payment',
-          p_amount: firstPayment,
-          p_description: 'دفعة أولى - أصل: ' + input.name,
-          p_date: input.purchaseDate,
-          p_fund_id: input.fundId,
-          p_notes: 'قسط 1 من ' + input.installmentCount,
-        });
-        // Credit vendor for first payment
-        if (input.vendorId) {
-          await supabase.rpc('process_transaction', {
-            p_type: 'in', p_category: 'asset_payment',
-            p_amount: firstPayment,
-            p_description: 'سداد قسط 1 - أصل: ' + input.name,
-            p_date: input.purchaseDate,
-            p_contact_id: input.vendorId,
-            p_notes: 'قسط 1 من ' + input.installmentCount + ' - تخفيض رصيد المورد',
+      if (input.paymentType === 'installment') {
+        const perInstallment = Number((input.value / installmentCount).toFixed(2));
+
+        if (input.fundId) {
+          await createAssetTransaction({
+            assetId,
+            kind: 'payment',
+            type: 'out',
+            category: 'asset_payment',
+            amount: perInstallment,
+            description: `دفعة أولى - أصل: ${input.name}`,
+            date: input.purchaseDate,
+            fundId: input.fundId,
+            note: `قسط 1 من ${installmentCount}`,
           });
+
+          if (input.vendorId) {
+            await createAssetTransaction({
+              assetId,
+              kind: 'payment',
+              type: 'in',
+              category: 'asset_payment',
+              amount: perInstallment,
+              description: `سداد قسط 1 - أصل: ${input.name}`,
+              date: input.purchaseDate,
+              contactId: input.vendorId,
+              note: `تخفيض رصيد المورد - قسط 1 من ${installmentCount}`,
+            });
+          }
+
+          paidAmount = perInstallment;
         }
 
-        await (supabase.from('assets' as any) as any)
-          .update({ paid_amount: firstPayment })
-          .eq('id', assetId);
+        const scheduleRows = [];
 
-        // Generate remaining installment schedule
-        for (let i = 1; i < input.installmentCount; i++) {
+        for (let i = 1; i < installmentCount; i++) {
           const dueDate = new Date(input.purchaseDate);
           dueDate.setMonth(dueDate.getMonth() + i);
-          await (supabase.from('asset_payments' as any) as any).insert({
+          scheduleRows.push({
             user_id: user.id,
             asset_id: assetId,
-            fund_id: input.fundId,
-            amount: Number(perInstallment.toFixed(2)),
+            fund_id: input.fundId || null,
+            amount: perInstallment,
             due_date: dueDate.toISOString().slice(0, 10),
             status: 'pending',
-            note: `قسط ${i + 1} من ${input.installmentCount}`,
+            note: `قسط ${i + 1} من ${installmentCount}`,
           });
         }
+
+        if (scheduleRows.length > 0) {
+          await (supabase.from('asset_payments' as any) as any).insert(scheduleRows);
+        }
       }
+
+      if (paidAmount > 0) {
+        await (supabase.from('assets' as any) as any)
+          .update({ paid_amount: paidAmount })
+          .eq('id', assetId);
+      }
+
+      await (supabase.rpc as any)('sync_contact_balances');
+      toast.success('تم إضافة الأصل');
+      await fetchAssets();
+    } finally {
+      actionLocks.current.add = false;
     }
-
-    // Sync contact balances
-    await (supabase.rpc as any)('sync_contact_balances');
-
-    toast.success('تم إضافة الأصل');
-    await fetchAssets();
   }, [user, fetchAssets]);
 
   const payInstallment = useCallback(async (paymentId: string, fundId?: string) => {
+    if (actionLocks.current.pay) return;
+
     const payment = payments.find(p => p.id === paymentId);
     if (!payment || !user) return;
     const asset = assets.find(a => a.id === payment.assetId);
     const useFund = fundId || payment.fundId;
 
-    // Deduct from fund
-    if (useFund) {
-      await supabase.rpc('process_transaction', {
-        p_type: 'out', p_category: 'asset_payment',
-        p_amount: payment.amount,
-        p_description: 'سداد قسط - أصل: ' + (asset?.name || ''),
-        p_date: new Date().toISOString().slice(0, 10),
-        p_fund_id: useFund,
-        p_notes: payment.note || 'خصم من الصندوق',
-      });
+    actionLocks.current.pay = true;
+
+    try {
+      const paymentDate = new Date().toISOString().slice(0, 10);
+
+      if (useFund) {
+        await createAssetTransaction({
+          assetId: payment.assetId,
+          kind: 'payment',
+          type: 'out',
+          category: 'asset_payment',
+          amount: payment.amount,
+          description: `سداد قسط - أصل: ${asset?.name || ''}`,
+          date: paymentDate,
+          fundId: useFund,
+          note: payment.note || 'سداد قسط من الصندوق',
+        });
+      }
+
+      if (asset?.vendorId) {
+        await createAssetTransaction({
+          assetId: payment.assetId,
+          kind: 'payment',
+          type: 'in',
+          category: 'asset_payment',
+          amount: payment.amount,
+          description: `سداد قسط - أصل: ${asset.name}`,
+          date: paymentDate,
+          contactId: asset.vendorId,
+          note: payment.note || 'تخفيض رصيد المورد بعد سداد القسط',
+        });
+      }
+
+      await (supabase.from('asset_payments' as any) as any)
+        .update({ status: 'paid', paid_date: paymentDate, fund_id: useFund || null })
+        .eq('id', paymentId);
+
+      const newPaid = (asset?.paidAmount || 0) + payment.amount;
+      await (supabase.from('assets' as any) as any)
+        .update({ paid_amount: newPaid })
+        .eq('id', payment.assetId);
+
+      await (supabase.rpc as any)('sync_contact_balances');
+      toast.success('تم سداد القسط');
+      await fetchAssets();
+    } finally {
+      actionLocks.current.pay = false;
     }
-    // Credit vendor (reduce balance)
-    if (asset?.vendorId) {
-      await supabase.rpc('process_transaction', {
-        p_type: 'in', p_category: 'asset_payment',
-        p_amount: payment.amount,
-        p_description: 'سداد قسط - أصل: ' + (asset?.name || ''),
-        p_date: new Date().toISOString().slice(0, 10),
-        p_contact_id: asset.vendorId,
-        p_notes: payment.note || 'تخفيض رصيد المورد',
-      });
-    }
-
-    await (supabase.from('asset_payments' as any) as any)
-      .update({ status: 'paid', paid_date: new Date().toISOString().slice(0, 10) })
-      .eq('id', paymentId);
-
-    const newPaid = (asset?.paidAmount || 0) + payment.amount;
-    await (supabase.from('assets' as any) as any)
-      .update({ paid_amount: newPaid })
-      .eq('id', payment.assetId);
-
-    await (supabase.rpc as any)('sync_contact_balances');
-
-    toast.success('تم سداد القسط');
-    await fetchAssets();
   }, [user, payments, assets, fetchAssets]);
 
   const addImprovement = useCallback(async (input: {
@@ -284,152 +389,167 @@ export function useAssets() {
     fundId?: string;
     note?: string;
   }) => {
-    if (!user) return;
+    if (!user || actionLocks.current.improve) return;
     const asset = assets.find(a => a.id === input.assetId);
 
-    await (supabase.from('asset_improvements' as any) as any).insert({
-      user_id: user.id,
-      asset_id: input.assetId,
-      name: input.name,
-      amount: input.amount,
-      fund_id: input.fundId || null,
-      note: input.note || null,
-    });
+    actionLocks.current.improve = true;
 
-    if (asset) {
-      await (supabase.from('assets' as any) as any)
-        .update({ value: asset.value + input.amount, current_value: asset.currentValue + input.amount })
-        .eq('id', input.assetId);
-    }
-
-    if (input.fundId) {
-      await supabase.rpc('process_transaction', {
-        p_type: 'out', p_category: 'asset_improvement',
-        p_amount: input.amount,
-        p_description: 'تطوير أصل: ' + (asset?.name || '') + ' - ' + input.name,
-        p_date: new Date().toISOString().slice(0, 10),
-        p_fund_id: input.fundId,
-        p_notes: input.note || '',
+    try {
+      await (supabase.from('asset_improvements' as any) as any).insert({
+        user_id: user.id,
+        asset_id: input.assetId,
+        name: input.name,
+        amount: input.amount,
+        fund_id: input.fundId || null,
+        note: input.note || null,
       });
-    }
 
-    toast.success('تم إضافة التطوير');
-    await fetchAssets();
+      if (asset) {
+        const nextValue = asset.value + input.amount;
+        const nextMonthlyDep = Number(((nextValue * asset.depreciationRate / 100) / 12).toFixed(2));
+
+        await (supabase.from('assets' as any) as any)
+          .update({
+            value: nextValue,
+            current_value: Math.max(0, asset.currentValue + input.amount),
+            monthly_depreciation: nextMonthlyDep,
+          })
+          .eq('id', input.assetId);
+      }
+
+      if (input.fundId) {
+        await createAssetTransaction({
+          assetId: input.assetId,
+          kind: 'improvement',
+          type: 'out',
+          category: 'asset_improvement',
+          amount: input.amount,
+          description: `تطوير أصل: ${asset?.name || ''} - ${input.name}`,
+          date: new Date().toISOString().slice(0, 10),
+          fundId: input.fundId,
+          note: input.note || 'تطوير أصل',
+        });
+      }
+
+      toast.success('تم إضافة التطوير');
+      await fetchAssets();
+    } finally {
+      actionLocks.current.improve = false;
+    }
   }, [user, assets, fetchAssets]);
 
   const updateAsset = useCallback(async (id: string, updates: Partial<{
     name: string;
     value: number;
+    purchaseDate: string;
     depreciationRate: number;
     notes: string;
     depreciationFundId: string;
+    fundId: string;
+    vendorId: string;
+    paymentType: string;
+    installmentCount: number;
   }>) => {
-    if (!user) return;
+    if (!user || actionLocks.current.update) return;
     const asset = assets.find(a => a.id === id);
     if (!asset) return;
 
-    const updateData: any = {};
-    if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.notes !== undefined) updateData.notes = updates.notes;
-    if (updates.depreciationFundId !== undefined) updateData.depreciation_fund_id = updates.depreciationFundId || null;
+    actionLocks.current.update = true;
 
-    const newValue = updates.value ?? asset.value;
-    const newRate = updates.depreciationRate ?? asset.depreciationRate;
+    try {
+      const nextValue = updates.value ?? asset.value;
+      const nextRate = updates.depreciationRate ?? asset.depreciationRate;
+      const nextPurchaseDate = updates.purchaseDate ?? asset.purchaseDate;
+      const snapshot = getAssetDepreciationSnapshot(nextValue, nextRate, nextPurchaseDate, asset.totalDepreciation);
 
-    if (updates.depreciationRate !== undefined || updates.value !== undefined) {
-      updateData.monthly_depreciation = (newValue * newRate / 100) / 12;
-    }
-    if (updates.value !== undefined) {
-      updateData.value = updates.value;
-      // Recalculate depreciation
-      const monthlyDep = (updates.value * newRate / 100) / 12;
-      const months = getMonthsSince(asset.purchaseDate);
-      const totalDep = Math.min(monthlyDep * months, updates.value);
-      updateData.total_depreciation = totalDep;
-      updateData.current_value = Math.max(0, updates.value - totalDep);
+      const updateData: Record<string, any> = {
+        name: updates.name ?? asset.name,
+        notes: updates.notes ?? asset.notes ?? null,
+        purchase_date: nextPurchaseDate,
+        depreciation_rate: nextRate,
+        monthly_depreciation: snapshot.monthlyDepreciation,
+        current_value: Math.max(0, nextValue - asset.totalDepreciation),
+      };
 
-      // If vendor exists and value changed, update the vendor's debit transaction
-      if (asset.vendorId) {
-        // Delete old asset_purchase transaction for this asset from vendor
-        const { data: oldTxs } = await supabase.from('transactions')
-          .select('id')
-          .eq('contact_id', asset.vendorId)
-          .eq('category', 'asset_purchase')
-          .ilike('description', '%' + asset.name + '%');
+      if (updates.value !== undefined) updateData.value = updates.value;
+      if (updates.depreciationFundId !== undefined) updateData.depreciation_fund_id = updates.depreciationFundId || null;
+      if (updates.fundId !== undefined) updateData.fund_id = updates.fundId || null;
+      if (updates.vendorId !== undefined) updateData.vendor_id = updates.vendorId || null;
+      if (updates.paymentType !== undefined) updateData.payment_type = updates.paymentType;
+      if (updates.installmentCount !== undefined) updateData.installment_count = Math.max(1, updates.installmentCount || 1);
 
-        if (oldTxs && oldTxs.length > 0) {
-          for (const tx of oldTxs) {
-            await supabase.rpc('reverse_transaction', { p_transaction_id: tx.id });
+      await (supabase.from('assets' as any) as any)
+        .update(updateData)
+        .eq('id', id);
+
+      if (updates.name && updates.name !== asset.name) {
+        const relatedTxIds = await listAssetTransactionIds(id, asset.name);
+
+        if (relatedTxIds.length > 0) {
+          const { data: relatedTxs } = await (supabase.from('transactions') as any)
+            .select('id, category, description')
+            .in('id', relatedTxIds);
+
+          for (const tx of relatedTxs || []) {
+            let description = tx.description;
+
+            if (tx.category === 'asset_purchase') description = `شراء أصل: ${updates.name}`;
+            if (tx.category === 'asset_depreciation') description = `إهلاك أصل: ${updates.name}`;
+            if (tx.category === 'asset_payment') {
+              description = tx.description?.includes('دفعة أولى')
+                ? `دفعة أولى - أصل: ${updates.name}`
+                : tx.description?.includes('قسط')
+                  ? `سداد قسط - أصل: ${updates.name}`
+                  : `سداد أصل: ${updates.name}`;
+            }
+            if (tx.category === 'asset_improvement') {
+              const parts = String(tx.description || '').split(' - ');
+              description = parts.length > 1 ? `تطوير أصل: ${updates.name} - ${parts.slice(1).join(' - ')}` : `تطوير أصل: ${updates.name}`;
+            }
+
+            await (supabase.from('transactions') as any)
+              .update({ description, reference_id: id })
+              .eq('id', tx.id);
           }
         }
-
-        // Re-register with new value
-        await supabase.rpc('process_transaction', {
-          p_type: 'out', p_category: 'asset_purchase',
-          p_amount: updates.value,
-          p_description: 'شراء أصل: ' + (updates.name || asset.name),
-          p_date: asset.purchaseDate,
-          p_contact_id: asset.vendorId,
-          p_notes: 'قيد مدين - قيمة الأصل المعدلة',
-        });
-
-        await (supabase.rpc as any)('sync_contact_balances');
       }
-    }
-    if (updates.depreciationRate !== undefined) {
-      updateData.depreciation_rate = updates.depreciationRate;
-    }
 
-    await (supabase.from('assets' as any) as any).update(updateData).eq('id', id);
-    toast.success('تم تعديل الأصل');
-    await fetchAssets();
+      await fetchAssets();
+      toast.success('تم تعديل الأصل');
+    } finally {
+      actionLocks.current.update = false;
+    }
   }, [user, assets, fetchAssets]);
 
   const deleteAsset = useCallback(async (id: string) => {
+    if (actionLocks.current.delete) return;
     const asset = assets.find(a => a.id === id);
 
-    // Delete all related transactions (asset_purchase + asset_payment for this vendor/asset)
-    if (asset?.vendorId) {
-      // Find and reverse all transactions related to this asset
-      const { data: relatedTxs } = await supabase.from('transactions')
-        .select('id')
-        .eq('contact_id', asset.vendorId)
-        .in('category', ['asset_purchase', 'asset_payment'])
-        .ilike('description', '%' + asset.name + '%');
+    actionLocks.current.delete = true;
 
-      if (relatedTxs) {
-        for (const tx of relatedTxs) {
-          await supabase.rpc('reverse_transaction', { p_transaction_id: tx.id });
-        }
+    try {
+      const relatedTxIds = asset
+        ? await listAssetTransactionIds(asset.id, asset.name, ASSET_TRANSACTION_CATEGORIES)
+        : [];
+
+      for (const txId of relatedTxIds) {
+        await supabase.rpc('reverse_transaction', { p_transaction_id: txId });
       }
+
+      await Promise.all([
+        (supabase.from('asset_payments' as any) as any).delete().eq('asset_id', id),
+        (supabase.from('asset_improvements' as any) as any).delete().eq('asset_id', id),
+      ]);
+
+      await (supabase.from('assets' as any) as any).delete().eq('id', id);
+      await (supabase.rpc as any)('sync_contact_balances');
+
+      toast.success('تم حذف الأصل');
+      await fetchAssets();
+    } finally {
+      actionLocks.current.delete = false;
     }
-
-    // Delete improvement transactions
-    const assetImprovements = improvements.filter(i => i.assetId === id);
-    for (const imp of assetImprovements) {
-      if (imp.fundId) {
-        const { data: impTxs } = await supabase.from('transactions')
-          .select('id')
-          .eq('category', 'asset_improvement')
-          .ilike('description', '%' + imp.name + '%');
-        if (impTxs) {
-          for (const tx of impTxs) {
-            await supabase.rpc('reverse_transaction', { p_transaction_id: tx.id });
-          }
-        }
-      }
-    }
-
-    // Delete related records
-    await (supabase.from('asset_payments' as any) as any).delete().eq('asset_id', id);
-    await (supabase.from('asset_improvements' as any) as any).delete().eq('asset_id', id);
-    await (supabase.from('assets' as any) as any).delete().eq('id', id);
-
-    await (supabase.rpc as any)('sync_contact_balances');
-
-    toast.success('تم حذف الأصل');
-    await fetchAssets();
-  }, [assets, improvements, fetchAssets]);
+  }, [assets, fetchAssets]);
 
   const totalAssetValue = assets.reduce((s, a) => s + a.currentValue, 0);
   const totalDepreciation = assets.reduce((s, a) => s + a.totalDepreciation, 0);
@@ -479,10 +599,4 @@ function mapImprovement(row: any): AssetImprovement {
     amount: Number(row.amount), fundId: row.fund_id,
     date: row.date, note: row.note,
   };
-}
-
-function getMonthsSince(dateStr: string): number {
-  const d = new Date(dateStr);
-  const now = new Date();
-  return (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
 }
