@@ -72,13 +72,13 @@ export function useAssets() {
       const expectedTotal = Math.min(monthlyDep * months, asset.value);
       const unposted = expectedTotal - asset.totalDepreciation;
       if (unposted > 0.01) {
-        // Post depreciation as expense transaction in business operations
+        // Post depreciation as expense entry WITHOUT affecting any fund
         await supabase.rpc('process_transaction', {
           p_type: 'out', p_category: 'asset_depreciation',
           p_amount: Number(unposted.toFixed(2)),
           p_description: 'إهلاك أصل: ' + asset.name,
           p_date: new Date().toISOString().slice(0, 10),
-          p_fund_id: asset.depreciationFundId || null,
+          p_fund_id: null,
           p_notes: 'إهلاك تلقائي - ' + months + ' شهر',
         });
         // Update asset with new depreciation totals
