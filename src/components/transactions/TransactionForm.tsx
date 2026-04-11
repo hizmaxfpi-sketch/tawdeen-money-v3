@@ -48,6 +48,7 @@ export function TransactionForm({
   const [showVoice, setShowVoice] = useState(false);
   const [currencyCode, setCurrencyCode] = useState('USD');
   const [manualExchangeRate, setManualExchangeRate] = useState<string>('');
+  const [submitting, setSubmitting] = useState(false);
 
   const activeContacts = contacts.filter(c => c.status === 'active');
 
@@ -77,22 +78,27 @@ export function TransactionForm({
   };
 
   const handleSubmit = async () => {
-    if (!amount || !description || !fundId) return;
-    const parsedAmount = parseFloat(amount);
-    const finalAmount = currencyCode === 'USD' ? parsedAmount : parsedAmount / effectiveRate;
+    if (!amount || !description || !fundId || submitting) return;
+    setSubmitting(true);
+    try {
+      const parsedAmount = parseFloat(amount);
+      const finalAmount = currencyCode === 'USD' ? parsedAmount : parsedAmount / effectiveRate;
 
-    await onSubmit({
-      type, category,
-      amount: Number(finalAmount.toFixed(4)),
-      description, date, fundId,
-      contactId: contactId !== 'none' ? contactId : undefined,
-      attachment: attachments.length > 0 ? attachments[0] : undefined,
-      notes: notes || undefined,
-      currencyCode, exchangeRate: effectiveRate,
-    });
+      await onSubmit({
+        type, category,
+        amount: Number(finalAmount.toFixed(4)),
+        description, date, fundId,
+        contactId: contactId !== 'none' ? contactId : undefined,
+        attachment: attachments.length > 0 ? attachments[0] : undefined,
+        notes: notes || undefined,
+        currencyCode, exchangeRate: effectiveRate,
+      });
 
-    confetti({ particleCount: 60, spread: 50, origin: { y: 0.7 }, colors: type === 'in' ? ['#22c55e', '#10b981'] : ['#ef4444', '#f97316'] });
-    onClose();
+      confetti({ particleCount: 60, spread: 50, origin: { y: 0.7 }, colors: type === 'in' ? ['#22c55e', '#10b981'] : ['#ef4444', '#f97316'] });
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleOCRResult = (data: { amount?: number; date?: string; merchant?: string }) => {
@@ -267,9 +273,9 @@ export function TransactionForm({
 
           <div className="flex gap-2 pt-2">
             <Button variant="outline" onClick={onClose} className="flex-1 h-9 text-xs">{t('common.cancel')}</Button>
-            <Button onClick={handleSubmit} disabled={!amount || !description || !fundId}
+            <Button onClick={handleSubmit} disabled={!amount || !description || !fundId || submitting}
               className={cn("flex-1 h-9 text-xs", type === 'in' ? "bg-gradient-income" : "bg-gradient-expense")}>
-              {t('tx.save')}
+              {submitting ? '...' : t('tx.save')}
             </Button>
           </div>
         </div>

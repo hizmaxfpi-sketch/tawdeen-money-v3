@@ -59,6 +59,7 @@ export function ProjectDetails() {
   const { currencies } = useCurrencies();
   
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [txSubmitting, setTxSubmitting] = useState(false);
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [transactionType, setTransactionType] = useState<'credit' | 'debit'>('credit');
 
@@ -159,26 +160,30 @@ export function ProjectDetails() {
 
   const handleAddTransaction = async () => {
     const amount = parseFloat(txAmount);
-    if (!amount || amount <= 0 || !txDescription.trim()) return;
+    if (!amount || amount <= 0 || !txDescription.trim() || txSubmitting) return;
+    setTxSubmitting(true);
+    try {
+      const txType = transactionType === 'credit' ? 'in' : 'out';
+      const category = transactionType === 'credit' ? 'client_collection' : 'expense';
+      
+      const finalAmount = txCurrencyCode === 'USD' ? amount : amount / effectiveRate;
+      
+      await addTransaction({
+        type: txType,
+        amount: Number(finalAmount.toFixed(4)),
+        date: txDate,
+        category: category,
+        description: txDescription.trim(),
+        fundId: txFundId || '',
+        projectId: project.id,
+        currencyCode: txCurrencyCode,
+        exchangeRate: effectiveRate,
+      } as any);
 
-    const txType = transactionType === 'credit' ? 'in' : 'out';
-    const category = transactionType === 'credit' ? 'client_collection' : 'expense';
-    
-    const finalAmount = txCurrencyCode === 'USD' ? amount : amount / effectiveRate;
-    
-    await addTransaction({
-      type: txType,
-      amount: Number(finalAmount.toFixed(4)),
-      date: txDate,
-      category: category,
-      description: txDescription.trim(),
-      fundId: txFundId || '',
-      projectId: project.id,
-      currencyCode: txCurrencyCode,
-      exchangeRate: effectiveRate,
-    } as any);
-
-    setShowTransactionForm(false);
+      setShowTransactionForm(false);
+    } finally {
+      setTxSubmitting(false);
+    }
   };
 
   const handleDeleteTransaction = (transactionId: string) => {
@@ -486,10 +491,10 @@ export function ProjectDetails() {
             <Button variant="outline" onClick={() => setShowTransactionForm(false)}>إلغاء</Button>
             <Button 
               onClick={handleAddTransaction}
-              disabled={!txAmount || parseFloat(txAmount) <= 0 || !txDescription.trim()}
+              disabled={!txAmount || parseFloat(txAmount) <= 0 || !txDescription.trim() || txSubmitting}
               className={transactionType === 'credit' ? 'bg-green-600 hover:bg-green-700' : 'bg-rose-600 hover:bg-rose-700'}
             >
-              إضافة العملية
+              {txSubmitting ? '...' : 'إضافة العملية'}
             </Button>
           </DialogFooter>
         </DialogContent>

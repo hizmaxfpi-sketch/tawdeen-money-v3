@@ -48,6 +48,7 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
   });
   const [notes, setNotes] = useState('');
   const [useLineItems, setUseLineItems] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [lineItems, setLineItems] = useState<LineItem[]>([{ name: '', amount: '' }]);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -72,33 +73,37 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
   };
 
   const handleSubmit = async () => {
-    if (!effectiveAmount || !fundId || !category) return;
-
-    if (useLineItems && lineItems.length > 0) {
-      const catLabel = categories.find(c => c.value === category)?.label || category;
-      for (const item of lineItems) {
-        const itemAmount = parseFloat(item.amount);
-        if (!itemAmount || !item.name) continue;
+    if (!effectiveAmount || !fundId || !category || submitting) return;
+    setSubmitting(true);
+    try {
+      if (useLineItems && lineItems.length > 0) {
+        const catLabel = categories.find(c => c.value === category)?.label || category;
+        for (const item of lineItems) {
+          const itemAmount = parseFloat(item.amount);
+          if (!itemAmount || !item.name) continue;
+          await onSubmit({
+            type: type === 'revenue' ? 'in' : 'out',
+            category,
+            amount: itemAmount,
+            description: `${catLabel} - ${item.name}`,
+            date, fundId,
+            notes: notes || undefined,
+          });
+        }
+      } else {
         await onSubmit({
           type: type === 'revenue' ? 'in' : 'out',
           category,
-          amount: itemAmount,
-          description: `${catLabel} - ${item.name}`,
+          amount: effectiveAmount,
+          description: description || categories.find(c => c.value === category)?.label || '',
           date, fundId,
           notes: notes || undefined,
         });
       }
-    } else {
-      await onSubmit({
-        type: type === 'revenue' ? 'in' : 'out',
-        category,
-        amount: effectiveAmount,
-        description: description || categories.find(c => c.value === category)?.label || '',
-        date, fundId,
-        notes: notes || undefined,
-      });
+      onClose();
+    } finally {
+      setSubmitting(false);
     }
-    onClose();
   };
 
   const addLineItem = () => setLineItems([...lineItems, { name: '', amount: '' }]);
@@ -232,9 +237,9 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
 
           <div className="flex gap-2 pt-2">
             <Button variant="outline" onClick={onClose} className="flex-1 h-9 text-xs">إلغاء</Button>
-            <Button onClick={handleSubmit} disabled={!effectiveAmount || !fundId || !category}
+            <Button onClick={handleSubmit} disabled={!effectiveAmount || !fundId || !category || submitting}
               className={cn("flex-1 h-9 text-xs", type === 'revenue' ? "bg-gradient-income" : "bg-gradient-expense")}>
-              حفظ
+              {submitting ? '...' : 'حفظ'}
             </Button>
           </div>
         </div>
