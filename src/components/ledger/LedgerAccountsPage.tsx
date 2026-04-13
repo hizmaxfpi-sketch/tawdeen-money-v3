@@ -58,6 +58,7 @@ export function LedgerAccountsPage() {
   const [statementTxs, setStatementTxs] = useState<Transaction[]>([]);
   const [loadingStatement, setLoadingStatement] = useState(false);
   const statementRef = useRef<HTMLDivElement>(null);
+  const [showFilteredPreview, setShowFilteredPreview] = useState(false);
 
   const stats = getStats();
 
