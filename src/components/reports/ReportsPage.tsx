@@ -92,11 +92,12 @@ export function ReportsPage({
     return shipments.filter(s => {
       if (filterClient !== 'all' && s.clientId !== filterClient) return false;
       if (filterStatus !== 'all' && s.paymentStatus !== filterStatus) return false;
+      if (filterContainerIds.size > 0 && !filterContainerIds.has(s.containerId)) return false;
       if (dateFrom && s.createdAt < new Date(dateFrom)) return false;
       if (dateTo && s.createdAt > new Date(dateTo)) return false;
       return true;
     });
-  }, [shipments, filterClient, filterStatus, dateFrom, dateTo]);
+  }, [shipments, filterClient, filterStatus, filterContainerIds, dateFrom, dateTo]);
 
   const paymentDistribution = useMemo(() => {
     const paid = shipments.filter(s => s.paymentStatus === 'paid').length;
