@@ -8,6 +8,8 @@ import {
   ChevronDown, ChevronUp, AlertTriangle, Weight, Hash, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Transaction, Fund, AccountOption, Container, Shipment, Project, ProjectStats, FinanceStats } from '@/types/finance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
