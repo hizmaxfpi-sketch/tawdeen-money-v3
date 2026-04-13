@@ -455,6 +455,43 @@ export function ReportsPage({
               </Select>
               <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-[10px]" placeholder="من" />
               <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 text-[10px]" placeholder="إلى" />
+              {/* Container multi-select filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-8 text-[10px] justify-between relative">
+                    {filterContainerIds.size > 0 ? `${filterContainerIds.size} حاوية` : 'الحاويات'}
+                    {filterContainerIds.size > 0 && (
+                      <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-primary text-primary-foreground text-[8px] flex items-center justify-center">
+                        {filterContainerIds.size}
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2 space-y-1 max-h-60 overflow-y-auto" align="start">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-medium">اختر الحاويات</span>
+                    {filterContainerIds.size > 0 && (
+                      <button className="text-[9px] text-destructive" onClick={() => setFilterContainerIds(new Set())}>مسح</button>
+                    )}
+                  </div>
+                  {containers.map(c => (
+                    <label key={c.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer">
+                      <Checkbox
+                        checked={filterContainerIds.has(c.id)}
+                        onCheckedChange={(checked) => {
+                          setFilterContainerIds(prev => {
+                            const next = new Set(prev);
+                            checked ? next.add(c.id) : next.delete(c.id);
+                            return next;
+                          });
+                        }}
+                      />
+                      <span className="text-[10px]">{c.containerNumber} - {c.route}</span>
+                    </label>
+                  ))}
+                  {containers.length === 0 && <p className="text-[10px] text-muted-foreground text-center py-2">لا توجد حاويات</p>}
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
