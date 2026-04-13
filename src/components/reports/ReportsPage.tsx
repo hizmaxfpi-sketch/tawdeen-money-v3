@@ -8,6 +8,8 @@ import {
   ChevronDown, ChevronUp, AlertTriangle, Weight, Hash, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Transaction, Fund, AccountOption, Container, Shipment, Project, ProjectStats, FinanceStats } from '@/types/finance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,7 +71,7 @@ export function ReportsPage({
   const [filterClient, setFilterClient] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterFund, setFilterFund] = useState('all');
-
+  const [filterContainerIds, setFilterContainerIds] = useState<Set<string>>(new Set());
 
   const previewRef = useRef<HTMLDivElement>(null);
 
@@ -90,11 +92,12 @@ export function ReportsPage({
     return shipments.filter(s => {
       if (filterClient !== 'all' && s.clientId !== filterClient) return false;
       if (filterStatus !== 'all' && s.paymentStatus !== filterStatus) return false;
+      if (filterContainerIds.size > 0 && !filterContainerIds.has(s.containerId)) return false;
       if (dateFrom && s.createdAt < new Date(dateFrom)) return false;
       if (dateTo && s.createdAt > new Date(dateTo)) return false;
       return true;
     });
-  }, [shipments, filterClient, filterStatus, dateFrom, dateTo]);
+  }, [shipments, filterClient, filterStatus, filterContainerIds, dateFrom, dateTo]);
 
   const paymentDistribution = useMemo(() => {
     const paid = shipments.filter(s => s.paymentStatus === 'paid').length;
@@ -452,6 +455,43 @@ export function ReportsPage({
               </Select>
               <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-[10px]" placeholder="من" />
               <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 text-[10px]" placeholder="إلى" />
+              {/* Container multi-select filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-8 text-[10px] justify-between relative">
+                    {filterContainerIds.size > 0 ? `${filterContainerIds.size} حاوية` : 'الحاويات'}
+                    {filterContainerIds.size > 0 && (
+                      <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-primary text-primary-foreground text-[8px] flex items-center justify-center">
+                        {filterContainerIds.size}
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2 space-y-1 max-h-60 overflow-y-auto" align="start">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-medium">اختر الحاويات</span>
+                    {filterContainerIds.size > 0 && (
+                      <button className="text-[9px] text-destructive" onClick={() => setFilterContainerIds(new Set())}>مسح</button>
+                    )}
+                  </div>
+                  {containers.map(c => (
+                    <label key={c.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer">
+                      <Checkbox
+                        checked={filterContainerIds.has(c.id)}
+                        onCheckedChange={(checked) => {
+                          setFilterContainerIds(prev => {
+                            const next = new Set(prev);
+                            checked ? next.add(c.id) : next.delete(c.id);
+                            return next;
+                          });
+                        }}
+                      />
+                      <span className="text-[10px]">{c.containerNumber} - {c.route}</span>
+                    </label>
+                  ))}
+                  {containers.length === 0 && <p className="text-[10px] text-muted-foreground text-center py-2">لا توجد حاويات</p>}
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 

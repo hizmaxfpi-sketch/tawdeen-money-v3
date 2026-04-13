@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Plus, Search, UserCheck, Truck, Ship, Briefcase, Handshake, User, ChevronLeft, Phone, MessageCircle, Building2, MoreVertical, TrendingUp, TrendingDown, ArrowRightLeft, Receipt, RefreshCw, Eye, FileText, FileSpreadsheet, Download, Filter, LayoutGrid, List, X, CheckSquare } from 'lucide-react';
+import { BookOpen, Plus, Search, UserCheck, Truck, Ship, Briefcase, Handshake, User, ChevronLeft, Phone, MessageCircle, Building2, MoreVertical, TrendingUp, TrendingDown, ArrowRightLeft, Receipt, RefreshCw, Eye, FileText, FileSpreadsheet, Download, Filter, LayoutGrid, List, X, CheckSquare, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -58,6 +58,7 @@ export function LedgerAccountsPage() {
   const [statementTxs, setStatementTxs] = useState<Transaction[]>([]);
   const [loadingStatement, setLoadingStatement] = useState(false);
   const statementRef = useRef<HTMLDivElement>(null);
+  const [showFilteredPreview, setShowFilteredPreview] = useState(false);
 
   const stats = getStats();
 
@@ -394,6 +395,36 @@ export function LedgerAccountsPage() {
         </div>
       )}
 
+      {/* === Filtered Summary (independent, frontend-only) === */}
+      {(selectedTypes.size > 0 || selectedCustomTypes.size > 0 || searchQuery.trim()) && filteredContacts.length > 0 && (() => {
+        const filteredSummary = filteredContacts.reduce(
+          (acc, c) => {
+            const s = contactLedgerSummaries.get(c.id) || EMPTY_LEDGER_SUMMARY;
+            acc.totalDebit += s.totalDebit;
+            acc.totalCredit += s.totalCredit;
+            return acc;
+          },
+          { totalDebit: 0, totalCredit: 0 }
+        );
+        const filteredBalance = filteredSummary.totalDebit - filteredSummary.totalCredit;
+        return (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-1 rounded-lg border border-border bg-card/80 px-3 py-1.5">
+              <span className="text-[10px] font-bold text-green-600">مدين: ${formatNumber(filteredSummary.totalDebit)}</span>
+              <span className="text-muted-foreground text-[10px]">|</span>
+              <span className="text-[10px] font-bold text-red-600">دائن: ${formatNumber(filteredSummary.totalCredit)}</span>
+              <span className="text-muted-foreground text-[10px]">|</span>
+              <span className={cn("text-[10px] font-bold", filteredBalance >= 0 ? "text-green-600" : "text-red-600")}>
+                الرصيد: ${formatNumber(Math.abs(filteredBalance))}
+              </span>
+            </div>
+            <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 shrink-0" onClick={() => setShowFilteredPreview(true)}>
+              <Eye className="h-3 w-3" /> معاينة
+            </Button>
+          </div>
+        );
+      })()}
+
       {/* Accounts List */}
       <div className={cn(viewMode === 'list' ? "space-y-0.5" : "space-y-2")}>
         {filteredContacts.length === 0 ? (
@@ -726,6 +757,69 @@ export function LedgerAccountsPage() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Filtered Preview Modal (independent) */}
+      <Dialog open={showFilteredPreview} onOpenChange={setShowFilteredPreview}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-sm flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-primary" />
+              معاينة الحسابات المفلترة
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {/* Filtered transactions list */}
+            <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+              {filteredContacts.map(contact => {
+                const ls = contactLedgerSummaries.get(contact.id) || EMPTY_LEDGER_SUMMARY;
+                if (ls.transactionCount === 0) return null;
+                return (
+                  <div key={contact.id} className="flex items-center justify-between p-2 rounded-lg border border-border bg-muted/30">
+                    <div>
+                      <p className="text-xs font-bold">{contact.name}</p>
+                      <p className="text-[9px] text-muted-foreground">{CONTACT_TYPE_LABELS[contact.type]} • {ls.transactionCount} عملية</p>
+                    </div>
+                    <div className="text-left space-y-0.5">
+                      <p className="text-[10px] text-green-600">مدين: ${formatNumber(ls.totalDebit)}</p>
+                      <p className="text-[10px] text-red-600">دائن: ${formatNumber(ls.totalCredit)}</p>
+                      <p className={cn("text-[10px] font-bold", ls.balance >= 0 ? "text-green-600" : "text-red-600")}>
+                        ${formatNumber(Math.abs(ls.balance))}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Summary footer */}
+            {(() => {
+              const s = filteredContacts.reduce(
+                (acc, c) => {
+                  const ls = contactLedgerSummaries.get(c.id) || EMPTY_LEDGER_SUMMARY;
+                  acc.d += ls.totalDebit; acc.c += ls.totalCredit;
+                  return acc;
+                }, { d: 0, c: 0 }
+              );
+              const bal = s.d - s.c;
+              return (
+                <div className="grid grid-cols-3 gap-2 border-t border-border pt-2">
+                  <div className="text-center p-2 rounded-lg bg-green-500/10">
+                    <p className="text-[9px] text-muted-foreground">إجمالي مدين</p>
+                    <p className="text-xs font-bold text-green-600">${formatNumber(s.d)}</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-red-500/10">
+                    <p className="text-[9px] text-muted-foreground">إجمالي دائن</p>
+                    <p className="text-xs font-bold text-red-600">${formatNumber(s.c)}</p>
+                  </div>
+                  <div className={cn("text-center p-2 rounded-lg", bal >= 0 ? "bg-green-500/10" : "bg-red-500/10")}>
+                    <p className="text-[9px] text-muted-foreground">الرصيد</p>
+                    <p className={cn("text-xs font-bold", bal >= 0 ? "text-green-600" : "text-red-600")}>${formatNumber(Math.abs(bal))}</p>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
