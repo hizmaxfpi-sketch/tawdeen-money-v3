@@ -71,7 +71,7 @@ export function ReportsPage({
   const [filterClient, setFilterClient] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterFund, setFilterFund] = useState('all');
-
+  const [filterContainerIds, setFilterContainerIds] = useState<Set<string>>(new Set());
 
   const previewRef = useRef<HTMLDivElement>(null);
 
