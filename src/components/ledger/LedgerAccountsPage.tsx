@@ -394,6 +394,36 @@ export function LedgerAccountsPage() {
         </div>
       )}
 
+      {/* === Filtered Summary (independent, frontend-only) === */}
+      {(selectedTypes.size > 0 || selectedCustomTypes.size > 0 || searchQuery.trim()) && filteredContacts.length > 0 && (() => {
+        const filteredSummary = filteredContacts.reduce(
+          (acc, c) => {
+            const s = contactLedgerSummaries.get(c.id) || EMPTY_LEDGER_SUMMARY;
+            acc.totalDebit += s.totalDebit;
+            acc.totalCredit += s.totalCredit;
+            return acc;
+          },
+          { totalDebit: 0, totalCredit: 0 }
+        );
+        const filteredBalance = filteredSummary.totalDebit - filteredSummary.totalCredit;
+        return (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-1 rounded-lg border border-border bg-card/80 px-3 py-1.5">
+              <span className="text-[10px] font-bold text-green-600">مدين: ${formatNumber(filteredSummary.totalDebit)}</span>
+              <span className="text-muted-foreground text-[10px]">|</span>
+              <span className="text-[10px] font-bold text-red-600">دائن: ${formatNumber(filteredSummary.totalCredit)}</span>
+              <span className="text-muted-foreground text-[10px]">|</span>
+              <span className={cn("text-[10px] font-bold", filteredBalance >= 0 ? "text-green-600" : "text-red-600")}>
+                الرصيد: ${formatNumber(Math.abs(filteredBalance))}
+              </span>
+            </div>
+            <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 shrink-0" onClick={() => setShowFilteredPreview(true)}>
+              <Eye className="h-3 w-3" /> معاينة
+            </Button>
+          </div>
+        );
+      })()}
+
       {/* Accounts List */}
       <div className={cn(viewMode === 'list' ? "space-y-0.5" : "space-y-2")}>
         {filteredContacts.length === 0 ? (
