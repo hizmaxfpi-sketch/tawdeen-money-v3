@@ -213,6 +213,7 @@ export function useSupabaseShipping() {
   }, [user, fetchContainers]);
 
   const updateContainer = useCallback(async (id: string, updates: Partial<Container>) => {
+    if (guardOffline()) return;
     // جلب البيانات الحالية من DB مباشرة
     const { data: current } = await supabase.from('containers').select('*').eq('id', id).single();
     if (!current) return;
@@ -241,6 +242,7 @@ export function useSupabaseShipping() {
   }, [fetchContainers]);
 
   const deleteContainer = useCallback(async (id: string) => {
+    if (guardOffline()) return;
     const { error } = await supabase.rpc('delete_container_with_shipments', { p_container_id: id });
     if (error) { toast.error('خطأ في حذف الحاوية'); console.error(error); return; }
     toast.success('تم حذف الحاوية وجميع شحناتها بنجاح');
@@ -309,6 +311,7 @@ export function useSupabaseShipping() {
   }, [user, fetchShipments, fetchContainers]);
 
   const updateShipment = useCallback(async (id: string, updates: Partial<Shipment>) => {
+    if (guardOffline()) return;
     const { error } = await supabase.rpc('update_shipment_with_accounting', {
       p_shipment_id: id,
       p_client_name: updates.clientName || null,
@@ -333,6 +336,7 @@ export function useSupabaseShipping() {
   }, [fetchShipments, fetchContainers]);
 
   const deleteShipment = useCallback(async (id: string) => {
+    if (guardOffline()) return;
     const { error } = await supabase.rpc('delete_shipment_with_accounting', { p_shipment_id: id });
     if (error) { toast.error('خطأ في حذف الشحنة'); console.error(error); return; }
     toast.success('تم حذف الشحنة بنجاح');
@@ -346,6 +350,7 @@ export function useSupabaseShipping() {
     _updateFundBalance?: (fundId: string, amount: number) => Promise<void>
   ) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { error } = await supabase.rpc('process_shipment_payment', {
       p_shipment_id: shipmentId,
       p_amount: amount,
