@@ -26,8 +26,6 @@ export function useProjects() {
     const currentPage = reset ? 0 : page;
     if (!initialLoaded || reset) setLoading(true);
     else if (!reset) setLoadingMore(true);
-    // Don't flash loading on background refetch
-    if (reset && initialLoaded) { /* keep data visible */ }
     
     const { data, error } = await supabase
       .from('projects')

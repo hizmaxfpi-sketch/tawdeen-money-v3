@@ -27,8 +27,6 @@ export function useSupabaseShipping() {
     const currentPage = reset ? 0 : containerPage;
     if (!containersInitial || reset) setContainersLoading(true);
     else if (!reset) setLoadingMoreContainers(true);
-    // Don't flash loading on background refetch
-    if (reset && containersInitial) { /* keep data visible */ }
 
     const { data, error } = await supabase
       .from('containers')
@@ -81,8 +79,6 @@ export function useSupabaseShipping() {
     const currentPage = reset ? 0 : shipmentPage;
     if (!shipmentsInitial || reset) setShipmentsLoading(true);
     else if (!reset) setLoadingMoreShipments(true);
-    // Don't flash loading on background refetch
-    if (reset && shipmentsInitial) { /* keep data visible */ }
 
     const { data, error } = await supabase
       .from('shipments')
