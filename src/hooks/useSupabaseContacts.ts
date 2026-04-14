@@ -37,10 +37,8 @@ export function useSupabaseContacts() {
       return;
     }
     const currentPage = reset ? 0 : page;
-    if (!initialLoaded || reset) setIsLoading(true);
+    if (!initialLoaded) setIsLoading(true);
     else if (!reset) setLoadingMore(true);
-    // Don't show loading spinner on background refetch (reset=true after initial)
-    if (reset && initialLoaded) { /* keep current data visible */ }
 
     const { data, error } = await supabase
       .from('contacts')
