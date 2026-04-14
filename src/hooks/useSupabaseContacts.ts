@@ -133,6 +133,7 @@ export function useSupabaseContacts() {
 
   const updateContact = useCallback(async (id: string, updates: Partial<Contact>) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { error } = await supabase.from('contacts').update({
       name: updates.name,
       type: updates.type,
