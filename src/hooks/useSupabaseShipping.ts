@@ -25,7 +25,7 @@ export function useSupabaseShipping() {
   const fetchContainers = useCallback(async (reset = false) => {
     if (!user) return;
     const currentPage = reset ? 0 : containerPage;
-    if (!containersInitial || reset) setContainersLoading(true);
+    if (!containersInitial) setContainersLoading(true);
     else if (!reset) setLoadingMoreContainers(true);
 
     const { data, error } = await supabase
@@ -77,7 +77,7 @@ export function useSupabaseShipping() {
   const fetchShipments = useCallback(async (reset = false) => {
     if (!user) return;
     const currentPage = reset ? 0 : shipmentPage;
-    if (!shipmentsInitial || reset) setShipmentsLoading(true);
+    if (!shipmentsInitial) setShipmentsLoading(true);
     else if (!reset) setLoadingMoreShipments(true);
 
     const { data, error } = await supabase

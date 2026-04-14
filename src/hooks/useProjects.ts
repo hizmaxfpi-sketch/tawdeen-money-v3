@@ -24,7 +24,7 @@ export function useProjects() {
   const fetchProjects = useCallback(async (reset = false) => {
     if (!user) return;
     const currentPage = reset ? 0 : page;
-    if (!initialLoaded || reset) setLoading(true);
+    if (!initialLoaded) setLoading(true);
     else if (!reset) setLoadingMore(true);
     
     const { data, error } = await supabase
