@@ -72,6 +72,7 @@ export function useSupabaseContacts() {
       }));
       if (reset || currentPage === 0) {
         setContacts(mapped);
+        cacheSet('contacts', mapped);
         setPage(0);
         _cachedContacts = mapped;
         _contactsCacheUserId = user.id;
