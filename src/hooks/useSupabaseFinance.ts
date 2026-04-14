@@ -5,7 +5,7 @@ import { useFunds } from './useFunds';
 import { useTransactions } from './useTransactions';
 import { useProjects } from './useProjects';
 import { useDebts } from './useDebts';
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { FinanceStats, AccountOption } from '@/types/finance';
 import { useSupabaseContacts } from './useSupabaseContacts';
 import { useAuth } from '@/contexts/AuthContext';
@@ -44,7 +44,17 @@ export function useSupabaseFinance() {
   }, [user]);
 
   // جلب الإحصائيات عند تغير البيانات
-  useEffect(() => { if (user) fetchStats(); }, [user, fundsHook.funds, txHook.transactions, debtsHook.debts]);
+  // Debounce stats fetching to avoid cascade of RPC calls
+  const statsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    if (statsTimerRef.current) clearTimeout(statsTimerRef.current);
+    statsTimerRef.current = setTimeout(() => {
+      fetchStats();
+      statsTimerRef.current = null;
+    }, 800);
+    return () => { if (statsTimerRef.current) clearTimeout(statsTimerRef.current); };
+  }, [user, fundsHook.funds, txHook.transactions, debtsHook.debts]);
 
   const getStats = useCallback((): FinanceStats => dbStats, [dbStats]);
 

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -27,6 +27,7 @@ export function useTransactions() {
   const [loading, setLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
 
   const fetchTransactions = useCallback(async (_reset = false) => {
     if (!user) return;
@@ -34,12 +35,13 @@ export function useTransactions() {
     // استخدام الكاش إذا كان حديثاً
     if (!_reset && _cachedTransactions && _cacheUserId === user.id && (Date.now() - _cacheTime) < CACHE_TTL) {
       setTransactions(_cachedTransactions as any);
-      setLoading(false);
+      if (loading) setLoading(false);
       setInitialLoaded(true);
       return;
     }
 
-    setLoading(true);
+    // Only show loading spinner on first load, not on refetch
+    if (!initialLoaded) setLoading(true);
 
     const allRows: any[] = [];
     let from = 0;
@@ -102,11 +104,12 @@ export function useTransactions() {
   }, [user, fetchTransactions]);
 
   // Realtime: auto-refresh when transactions change
-  useRealtimeSync(['transactions'], () => {
+  const rt = useRealtimeSync(['transactions'], () => {
     _cachedTransactions = null;
     _cacheTime = 0;
     fetchTransactions(true);
   });
+  realtimeRef.current = rt;
 
   const loadMore = useCallback(() => {
     return;
@@ -145,6 +148,7 @@ export function useTransactions() {
     if (user) {
       await (supabase.rpc as any)('sync_contact_balances');
     }
+    realtimeRef.current.suppressNext();
     await fetchTransactions(true);
     return data;
   }, [user, fetchTransactions]);
@@ -176,6 +180,7 @@ export function useTransactions() {
     if (user) {
       await (supabase.rpc as any)('sync_contact_balances');
     }
+    realtimeRef.current.suppressNext();
     await fetchTransactions(true);
   }, [user, fetchTransactions]);
 
@@ -196,6 +201,7 @@ export function useTransactions() {
     if (user) {
       await (supabase.rpc as any)('sync_contact_balances');
     }
+    realtimeRef.current.suppressNext();
     await fetchTransactions(true);
   }, [user, transactions, fetchTransactions]);
 

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -19,12 +19,13 @@ export function useProjects() {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
 
   const fetchProjects = useCallback(async (reset = false) => {
     if (!user) return;
     const currentPage = reset ? 0 : page;
-    if (!initialLoaded || reset) setLoading(true);
-    else setLoadingMore(true);
+    if (!initialLoaded) setLoading(true);
+    else if (!reset) setLoadingMore(true);
     
     const { data, error } = await supabase
       .from('projects')
@@ -75,9 +76,10 @@ export function useProjects() {
   }, [user]);
 
   // Realtime: auto-refresh when projects change
-  useRealtimeSync(['projects'], () => {
+  const rt = useRealtimeSync(['projects'], () => {
     fetchProjects(true);
   });
+  realtimeRef.current = rt;
 
   const loadMore = useCallback(() => {
     if (hasMore && !loadingMore) setPage(prev => prev + 1);
@@ -109,6 +111,7 @@ export function useProjects() {
     }
     toast.success('تم إضافة المشروع بنجاح - تم ترحيل القيود المحاسبية تلقائياً');
     if (user && data) await logToActivity(user.id, 'project_created', 'project', data as string, project.name, { contractValue: project.contractValue, status: project.status });
+    realtimeRef.current.suppressNext();
     await fetchProjects();
     return data;
   }, [user, fetchProjects]);
@@ -140,6 +143,7 @@ export function useProjects() {
     }
     toast.success('تم تحديث المشروع');
     if (user) await logToActivity(user.id, 'project_updated', 'project', id, merged.name, { contractValue: merged.contractValue, status: merged.status });
+    realtimeRef.current.suppressNext();
     await fetchProjects();
   }, [projects, fetchProjects]);
 
@@ -151,6 +155,7 @@ export function useProjects() {
     if (error) { toast.error('خطأ في حذف المشروع'); console.error(error); return; }
     toast.success('تم حذف المشروع وجميع القيود المرتبطة');
     if (user && project) await logToActivity(user.id, 'project_deleted', 'project', id, project.name, { contractValue: project.contractValue, profit: project.profit }, 'deleted');
+    realtimeRef.current.suppressNext();
     await fetchProjects();
   }, [user, projects, fetchProjects]);
 
