@@ -124,6 +124,7 @@ export function useSupabaseShipping() {
       }));
       if (reset || currentPage === 0) {
         setShipments(mapped);
+        cacheSet('shipments', mapped);
         setShipmentPage(0);
       } else {
         setShipments(prev => [...prev, ...mapped]);
