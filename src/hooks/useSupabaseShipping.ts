@@ -183,6 +183,7 @@ export function useSupabaseShipping() {
     shippingAgentId?: string;
   }) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { error } = await supabase.rpc('create_container_with_accounting', {
       p_container_number: data.containerNumber,
       p_type: data.type || '40ft',
