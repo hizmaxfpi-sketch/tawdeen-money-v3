@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -20,17 +20,19 @@ export function useFunds() {
   const [funds, setFunds] = useState<Fund[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
+  const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
 
   const fetchFunds = useCallback(async () => {
     if (!user) return;
     // كاش بسيط
     if (_cachedFunds && _fundsCacheUserId === user.id && (Date.now() - _fundsCacheTime) < FUNDS_CACHE_TTL) {
       setFunds(_cachedFunds);
-      setLoading(false);
+      if (loading) setLoading(false);
       setInitialLoaded(true);
       return;
     }
     if (!initialLoaded) setLoading(true);
+    // Don't set loading=true on subsequent fetches to prevent data flash
     const { data, error } = await supabase
       .from('funds')
       .select('id, name, type, balance, description, created_at')
@@ -65,10 +67,11 @@ export function useFunds() {
   }, [user, fetchFunds]);
 
   // Realtime: auto-refresh when funds change from another session/user
-  useRealtimeSync(['funds'], () => {
+  const rt = useRealtimeSync(['funds'], () => {
     invalidateCache();
     fetchFunds();
   });
+  realtimeRef.current = rt;
 
   const addFund = useCallback(async (fund: { name: string; type: FundType; description?: string }) => {
     if (!user) return;
@@ -80,6 +83,7 @@ export function useFunds() {
     if (error) { toast.error('خطأ في إضافة الصندوق'); console.error(error); return; }
     toast.success('تم إضافة الصندوق بنجاح');
     if (user && data) await logToActivity(user.id, 'fund_created', 'fund', (data as any).id, fund.name, { type: fund.type });
+    realtimeRef.current.suppressNext();
     invalidateCache();
     await fetchFunds();
     return data;
@@ -95,7 +99,9 @@ export function useFunds() {
     const { error } = await supabase.from('funds').update(updateData).eq('id', id);
     if (error) { toast.error('خطأ في تحديث الصندوق'); return; }
     if (user) await logToActivity(user.id, 'fund_updated', 'fund', id, updates.name || '', { updates: Object.keys(updateData) });
-    invalidateCache(); await fetchFunds();
+    realtimeRef.current.suppressNext();
+    invalidateCache();
+    await fetchFunds();
   }, [fetchFunds]);
 
   const deleteFund = useCallback(async (id: string) => {
@@ -104,7 +110,9 @@ export function useFunds() {
     if (error) { toast.error('خطأ في حذف الصندوق'); return; }
     toast.success('تم حذف الصندوق');
     if (user && fund) await logToActivity(user.id, 'fund_deleted', 'fund', id, fund.name, { type: fund.type, balance: fund.balance }, 'deleted');
-    invalidateCache(); await fetchFunds();
+    realtimeRef.current.suppressNext();
+    invalidateCache();
+    await fetchFunds();
   }, [user, funds, fetchFunds, invalidateCache]);
 
   const transferFunds = useCallback(async (fromFundId: string, toFundId: string, amount: number, note?: string) => {
@@ -121,7 +129,9 @@ export function useFunds() {
     });
     if (error) { toast.error('خطأ في التحويل'); console.error(error); return; }
     toast.success('تم التحويل بنجاح');
-    invalidateCache(); await fetchFunds();
+    realtimeRef.current.suppressNext();
+    invalidateCache();
+    await fetchFunds();
   }, [user, fetchFunds, invalidateCache]);
 
   const getFundOptions = useCallback((): FundOption[] =>
