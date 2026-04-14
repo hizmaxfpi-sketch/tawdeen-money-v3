@@ -23,7 +23,7 @@ export function useDebts() {
       .order('created_at', { ascending: false });
     if (error) { console.error('Error fetching debts:', error); }
     else {
-      setDebts((data || []).map(d => ({
+      const mapped = (data || []).map(d => ({
         id: d.id,
         type: d.type as DebtType,
         accountId: d.account_id || d.contact_id || '',
@@ -41,12 +41,10 @@ export function useDebts() {
           note: p.note || undefined,
         })),
         createdAt: new Date(d.created_at),
-      })));
+      }));
+      setDebts(mapped);
+      cacheSet('debts', mapped);
     }
-    setLoading(false);
-    setInitialLoaded(true);
-    // Cache debts for offline
-    if (!error) cacheSet('debts', debts);
   }, [user, initialLoaded]);
 
   useEffect(() => {
