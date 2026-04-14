@@ -260,6 +260,7 @@ export function useSupabaseShipping() {
     fundId?: string;
   }) => {
     if (!user) return;
+    if (guardOffline()) return;
 
     // رقم الباكج التلقائي إذا لم يُحدد
     let pkgNum = data.packageNumber;
