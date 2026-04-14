@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Project, ProjectStatus, ProjectStats } from '@/types/finance';
 import { useRealtimeSync } from './useRealtimeSync';
+import { cacheSet, cacheGet } from '@/lib/offlineCache';
+import { guardOffline } from '@/lib/offlineGuard';
 
 // Activity log helper (fire-and-forget)
 const logToActivity = async (userId: string, eventType: string, entityType: string, entityId: string | null, entityName: string | null, details: Record<string, any> = {}, status = 'active') => {
@@ -13,7 +15,7 @@ const logToActivity = async (userId: string, eventType: string, entityType: stri
 export function useProjects() {
   const { user } = useAuth();
   const PAGE_SIZE = 20;
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>(() => cacheGet<Project[]>('projects') || []);
   const [loading, setLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [hasMore, setHasMore] = useState(true);

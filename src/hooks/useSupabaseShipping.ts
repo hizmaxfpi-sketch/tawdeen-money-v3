@@ -4,12 +4,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Container, Shipment, ShippingStats } from '@/types/finance';
 import { useRealtimeSync } from './useRealtimeSync';
+import { cacheSet, cacheGet } from '@/lib/offlineCache';
+import { guardOffline } from '@/lib/offlineGuard';
 
 export function useSupabaseShipping() {
   const { user } = useAuth();
   const PAGE_SIZE = 50;
-  const [containers, setContainers] = useState<Container[]>([]);
-  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [containers, setContainers] = useState<Container[]>(() => cacheGet<Container[]>('containers') || []);
+  const [shipments, setShipments] = useState<Shipment[]>(() => cacheGet<Shipment[]>('shipments') || []);
   const [containersLoading, setContainersLoading] = useState(true);
   const [shipmentsLoading, setShipmentsLoading] = useState(true);
   const [hasMoreContainers, setHasMoreContainers] = useState(true);

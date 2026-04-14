@@ -10,6 +10,8 @@ import {
   ContactsStats,
 } from '@/types/contacts';
 import { useRealtimeSync } from './useRealtimeSync';
+import { cacheSet, cacheGet } from '@/lib/offlineCache';
+import { guardOffline } from '@/lib/offlineGuard';
 
 let _cachedContacts: Contact[] | null = null;
 let _contactsCacheUserId: string | null = null;
@@ -19,7 +21,7 @@ const CONTACTS_CACHE_TTL = 30_000;
 export function useSupabaseContacts() {
   const { user } = useAuth();
   const PAGE_SIZE = 50; // زيادة حجم الصفحة لتقليل الطلبات
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>(() => cacheGet<Contact[]>('contacts') || []);
   const [isLoading, setIsLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [hasMore, setHasMore] = useState(true);

@@ -4,10 +4,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Debt, DebtType, DebtStatus } from '@/types/finance';
 import { useRealtimeSync } from './useRealtimeSync';
+import { cacheSet, cacheGet } from '@/lib/offlineCache';
+import { guardOffline } from '@/lib/offlineGuard';
 
 export function useDebts() {
   const { user } = useAuth();
-  const [debts, setDebts] = useState<Debt[]>([]);
+  const [debts, setDebts] = useState<Debt[]>(() => cacheGet<Debt[]>('debts') || []);
   const [loading, setLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
