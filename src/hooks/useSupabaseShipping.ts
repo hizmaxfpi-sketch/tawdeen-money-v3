@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -20,12 +20,15 @@ export function useSupabaseShipping() {
   const [loadingMoreShipments, setLoadingMoreShipments] = useState(false);
   const [containersInitial, setContainersInitial] = useState(false);
   const [shipmentsInitial, setShipmentsInitial] = useState(false);
+  const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
 
   const fetchContainers = useCallback(async (reset = false) => {
     if (!user) return;
     const currentPage = reset ? 0 : containerPage;
     if (!containersInitial || reset) setContainersLoading(true);
-    else setLoadingMoreContainers(true);
+    else if (!reset) setLoadingMoreContainers(true);
+    // Don't flash loading on background refetch
+    if (reset && containersInitial) { /* keep data visible */ }
 
     const { data, error } = await supabase
       .from('containers')
@@ -77,7 +80,9 @@ export function useSupabaseShipping() {
     if (!user) return;
     const currentPage = reset ? 0 : shipmentPage;
     if (!shipmentsInitial || reset) setShipmentsLoading(true);
-    else setLoadingMoreShipments(true);
+    else if (!reset) setLoadingMoreShipments(true);
+    // Don't flash loading on background refetch
+    if (reset && shipmentsInitial) { /* keep data visible */ }
 
     const { data, error } = await supabase
       .from('shipments')
@@ -136,10 +141,11 @@ export function useSupabaseShipping() {
   }, [user]);
 
   // Realtime: auto-refresh when containers or shipments change
-  useRealtimeSync(['containers', 'shipments'], () => {
+  const rt = useRealtimeSync(['containers', 'shipments'], () => {
     fetchContainers(true);
     fetchShipments(true);
   });
+  realtimeRef.current = rt;
 
   const loadMoreContainers = useCallback(() => {
     if (hasMoreContainers && !loadingMoreContainers) setContainerPage(prev => prev + 1);
@@ -201,6 +207,7 @@ export function useSupabaseShipping() {
       p_shipping_agent_id: data.shippingAgentId || null,
     });
     if (error) { toast.error('خطأ في إضافة الحاوية'); console.error(error); throw error; }
+    realtimeRef.current.suppressNext();
     await fetchContainers(true);
   }, [user, fetchContainers]);
 
@@ -228,7 +235,8 @@ export function useSupabaseShipping() {
     }).eq('id', id);
     if (error) { toast.error('خطأ في تحديث الحاوية'); return; }
     toast.success('تم تحديث الحاوية بنجاح');
-    await fetchContainers();
+    realtimeRef.current.suppressNext();
+    await fetchContainers(true);
   }, [fetchContainers]);
 
   const deleteContainer = useCallback(async (id: string) => {
@@ -236,6 +244,7 @@ export function useSupabaseShipping() {
     if (error) { toast.error('خطأ في حذف الحاوية'); console.error(error); return; }
     toast.success('تم حذف الحاوية وجميع شحناتها بنجاح');
     if (user) await (supabase.rpc as any)('sync_contact_balances');
+    realtimeRef.current.suppressNext();
     await Promise.all([fetchContainers(), fetchShipments()]);
   }, [user, fetchContainers, fetchShipments]);
 
@@ -292,6 +301,7 @@ export function useSupabaseShipping() {
     }
 
     toast.success(`تم إضافة الشحنة بنجاح - ${pkgNum}`);
+    realtimeRef.current.suppressNext();
     await Promise.all([fetchShipments(), fetchContainers()]);
     return shipmentId;
     
@@ -317,6 +327,7 @@ export function useSupabaseShipping() {
       await supabase.from('shipments').update({ attachments: updates.attachments }).eq('id', id);
     }
     toast.success('تم تحديث الشحنة بنجاح');
+    realtimeRef.current.suppressNext();
     await Promise.all([fetchShipments(), fetchContainers()]);
   }, [fetchShipments, fetchContainers]);
 
@@ -325,6 +336,7 @@ export function useSupabaseShipping() {
     if (error) { toast.error('خطأ في حذف الشحنة'); console.error(error); return; }
     toast.success('تم حذف الشحنة بنجاح');
     if (user) await (supabase.rpc as any)('sync_contact_balances');
+    realtimeRef.current.suppressNext();
     await Promise.all([fetchShipments(), fetchContainers()]);
   }, [user, fetchShipments, fetchContainers]);
 
@@ -342,6 +354,7 @@ export function useSupabaseShipping() {
     if (error) { toast.error('خطأ في تسجيل الدفعة'); console.error(error); return; }
     toast.success('تم تسجيل الدفعة بنجاح');
     if (user) await (supabase.rpc as any)('sync_contact_balances');
+    realtimeRef.current.suppressNext();
     await fetchShipments();
   }, [user, fetchShipments]);
 

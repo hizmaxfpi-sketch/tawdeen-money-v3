@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -25,19 +25,22 @@ export function useSupabaseContacts() {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
 
   const fetchContacts = useCallback(async (reset = false) => {
     if (!user) return;
     // كاش للصفحة الأولى فقط
     if (reset && _cachedContacts && _contactsCacheUserId === user.id && (Date.now() - _contactsCacheTime) < CONTACTS_CACHE_TTL) {
       setContacts(_cachedContacts);
-      setIsLoading(false);
+      if (isLoading) setIsLoading(false);
       setInitialLoaded(true);
       return;
     }
     const currentPage = reset ? 0 : page;
     if (!initialLoaded || reset) setIsLoading(true);
-    else setLoadingMore(true);
+    else if (!reset) setLoadingMore(true);
+    // Don't show loading spinner on background refetch (reset=true after initial)
+    if (reset && initialLoaded) { /* keep current data visible */ }
 
     const { data, error } = await supabase
       .from('contacts')
@@ -88,11 +91,12 @@ export function useSupabaseContacts() {
   }, [user]);
 
   // Realtime: auto-refresh when contacts change
-  useRealtimeSync(['contacts'], () => {
+  const rt = useRealtimeSync(['contacts'], () => {
     _cachedContacts = null;
     _contactsCacheTime = 0;
     fetchContacts(true);
   });
+  realtimeRef.current = rt;
 
   const loadMore = useCallback(() => {
     if (hasMore && !loadingMore) setPage(prev => prev + 1);
@@ -120,7 +124,8 @@ export function useSupabaseContacts() {
     toast.success('تم إضافة جهة الاتصال بنجاح');
     // Log to activity
     try { await supabase.from('activity_log').insert({ user_id: user.id, event_type: 'contact_created', entity_type: 'contact', entity_id: (data as any)?.id, entity_name: input.name, details: { type: input.type, customType: input.customType }, status: 'active' } as any); } catch {}
-    fetchContacts();
+    realtimeRef.current.suppressNext();
+    fetchContacts(true);
     return data;
   }, [user, fetchContacts]);
 
@@ -139,7 +144,8 @@ export function useSupabaseContacts() {
     toast.success('تم تحديث جهة الاتصال بنجاح');
     // Log to activity
     try { await supabase.from('activity_log').insert({ user_id: user.id, event_type: 'contact_updated', entity_type: 'contact', entity_id: id, entity_name: updates.name || '', details: { type: updates.type }, status: 'active' } as any); } catch {}
-    fetchContacts();
+    realtimeRef.current.suppressNext();
+    fetchContacts(true);
   }, [user, fetchContacts]);
 
   const deleteContact = useCallback(async (id: string) => {
@@ -152,7 +158,8 @@ export function useSupabaseContacts() {
     if (contact) {
       try { await supabase.from('activity_log').insert({ user_id: user.id, event_type: 'contact_deleted', entity_type: 'contact', entity_id: id, entity_name: contact.name, details: { type: contact.type, balance: contact.balance }, status: 'deleted' } as any); } catch {}
     }
-    fetchContacts();
+    realtimeRef.current.suppressNext();
+    fetchContacts(true);
   }, [user, contacts, fetchContacts]);
 
   // مزامنة أرصدة الحسابات من الدفتر الموحد (v_contact_balance)

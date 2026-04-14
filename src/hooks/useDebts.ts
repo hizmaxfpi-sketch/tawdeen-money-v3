@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ export function useDebts() {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
+  const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
 
   const fetchDebts = useCallback(async () => {
     if (!user) return;
@@ -49,9 +50,10 @@ export function useDebts() {
   }, [user, fetchDebts]);
 
   // Realtime: auto-refresh when debts change
-  useRealtimeSync(['debts'], () => {
+  const rt = useRealtimeSync(['debts'], () => {
     fetchDebts();
   });
+  realtimeRef.current = rt;
 
   const addDebt = useCallback(async (debt: Omit<Debt, 'id' | 'createdAt' | 'payments' | 'status'>) => {
     if (!user) return;
@@ -68,6 +70,7 @@ export function useDebts() {
     });
     if (error) { toast.error('خطأ في إضافة المديونية'); console.error(error); return; }
     toast.success('تم إضافة المديونية بنجاح');
+    realtimeRef.current.suppressNext();
     await fetchDebts();
   }, [user, fetchDebts]);
 
@@ -98,6 +101,7 @@ export function useDebts() {
     }
 
     toast.success('تم تسجيل السداد بنجاح');
+    realtimeRef.current.suppressNext();
     await fetchDebts();
   }, [user, debts, fetchDebts]);
 
@@ -105,6 +109,7 @@ export function useDebts() {
     const { error } = await supabase.from('debts').delete().eq('id', id);
     if (error) { toast.error('خطأ في حذف المديونية'); return; }
     toast.success('تم حذف المديونية');
+    realtimeRef.current.suppressNext();
     await fetchDebts();
   }, [fetchDebts]);
 
