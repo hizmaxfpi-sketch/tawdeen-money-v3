@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Fund, FundType, FundOption } from '@/types/finance';
 import { useRealtimeSync } from './useRealtimeSync';
+import { cacheSet, cacheGet } from '@/lib/offlineCache';
+import { guardOffline } from '@/lib/offlineGuard';
 
 // Activity log helper (fire-and-forget)
 const logToActivity = async (userId: string, eventType: string, entityType: string, entityId: string | null, entityName: string | null, details: Record<string, any> = {}, status = 'active') => {
@@ -17,7 +19,7 @@ const FUNDS_CACHE_TTL = 30_000;
 
 export function useFunds() {
   const { user } = useAuth();
-  const [funds, setFunds] = useState<Fund[]>([]);
+  const [funds, setFunds] = useState<Fund[]>(() => cacheGet<Fund[]>('funds') || []);
   const [loading, setLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
@@ -49,6 +51,7 @@ export function useFunds() {
         createdAt: new Date(f.created_at),
       }));
       setFunds(mapped);
+      cacheSet('funds', mapped);
       _cachedFunds = mapped;
       _fundsCacheUserId = user.id;
       _fundsCacheTime = Date.now();
@@ -75,6 +78,7 @@ export function useFunds() {
 
   const addFund = useCallback(async (fund: { name: string; type: FundType; description?: string }) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { data, error } = await supabase
       .from('funds')
       .insert({ user_id: user.id, name: fund.name, type: fund.type, description: fund.description, balance: 0 })
@@ -90,6 +94,7 @@ export function useFunds() {
   }, [user, fetchFunds]);
 
   const updateFund = useCallback(async (id: string, updates: Partial<Fund>) => {
+    if (guardOffline()) return;
     const updateData: any = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.description !== undefined) updateData.description = updates.description;
@@ -105,6 +110,7 @@ export function useFunds() {
   }, [fetchFunds]);
 
   const deleteFund = useCallback(async (id: string) => {
+    if (guardOffline()) return;
     const fund = funds.find(f => f.id === id);
     const { error } = await supabase.from('funds').delete().eq('id', id);
     if (error) { toast.error('خطأ في حذف الصندوق'); return; }
@@ -117,6 +123,7 @@ export function useFunds() {
 
   const transferFunds = useCallback(async (fromFundId: string, toFundId: string, amount: number, note?: string) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { error } = await supabase.rpc('process_transaction', {
       p_user_id: user.id,
       p_type: 'out',

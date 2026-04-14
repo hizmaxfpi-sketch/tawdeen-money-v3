@@ -4,10 +4,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Debt, DebtType, DebtStatus } from '@/types/finance';
 import { useRealtimeSync } from './useRealtimeSync';
+import { cacheSet, cacheGet } from '@/lib/offlineCache';
+import { guardOffline } from '@/lib/offlineGuard';
 
 export function useDebts() {
   const { user } = useAuth();
-  const [debts, setDebts] = useState<Debt[]>([]);
+  const [debts, setDebts] = useState<Debt[]>(() => cacheGet<Debt[]>('debts') || []);
   const [loading, setLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
@@ -21,7 +23,7 @@ export function useDebts() {
       .order('created_at', { ascending: false });
     if (error) { console.error('Error fetching debts:', error); }
     else {
-      setDebts((data || []).map(d => ({
+      const mapped = (data || []).map(d => ({
         id: d.id,
         type: d.type as DebtType,
         accountId: d.account_id || d.contact_id || '',
@@ -39,10 +41,10 @@ export function useDebts() {
           note: p.note || undefined,
         })),
         createdAt: new Date(d.created_at),
-      })));
+      }));
+      setDebts(mapped);
+      cacheSet('debts', mapped);
     }
-    setLoading(false);
-    setInitialLoaded(true);
   }, [user, initialLoaded]);
 
   useEffect(() => {
@@ -57,6 +59,7 @@ export function useDebts() {
 
   const addDebt = useCallback(async (debt: Omit<Debt, 'id' | 'createdAt' | 'payments' | 'status'>) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { error } = await supabase.from('debts').insert({
       user_id: user.id,
       type: debt.type,
@@ -76,6 +79,7 @@ export function useDebts() {
 
   const addDebtPayment = useCallback(async ({ debtId, amount, fundId, note }: { debtId: string; amount: number; fundId: string; note?: string }) => {
     if (!user) return;
+    if (guardOffline()) return;
     const debt = debts.find(d => d.id === debtId);
     if (!debt) return;
 
@@ -106,6 +110,7 @@ export function useDebts() {
   }, [user, debts, fetchDebts]);
 
   const deleteDebt = useCallback(async (id: string) => {
+    if (guardOffline()) return;
     const { error } = await supabase.from('debts').delete().eq('id', id);
     if (error) { toast.error('خطأ في حذف المديونية'); return; }
     toast.success('تم حذف المديونية');

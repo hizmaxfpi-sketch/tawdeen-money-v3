@@ -10,6 +10,8 @@ import {
   ContactsStats,
 } from '@/types/contacts';
 import { useRealtimeSync } from './useRealtimeSync';
+import { cacheSet, cacheGet } from '@/lib/offlineCache';
+import { guardOffline } from '@/lib/offlineGuard';
 
 let _cachedContacts: Contact[] | null = null;
 let _contactsCacheUserId: string | null = null;
@@ -19,7 +21,7 @@ const CONTACTS_CACHE_TTL = 30_000;
 export function useSupabaseContacts() {
   const { user } = useAuth();
   const PAGE_SIZE = 50; // زيادة حجم الصفحة لتقليل الطلبات
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>(() => cacheGet<Contact[]>('contacts') || []);
   const [isLoading, setIsLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -70,6 +72,7 @@ export function useSupabaseContacts() {
       }));
       if (reset || currentPage === 0) {
         setContacts(mapped);
+        cacheSet('contacts', mapped);
         setPage(0);
         _cachedContacts = mapped;
         _contactsCacheUserId = user.id;
@@ -106,6 +109,7 @@ export function useSupabaseContacts() {
 
   const addContact = useCallback(async (input: CreateContactInput) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { data, error } = await supabase.from('contacts').insert({
       user_id: user.id,
       name: input.name,
@@ -129,6 +133,7 @@ export function useSupabaseContacts() {
 
   const updateContact = useCallback(async (id: string, updates: Partial<Contact>) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { error } = await supabase.from('contacts').update({
       name: updates.name,
       type: updates.type,
@@ -148,6 +153,7 @@ export function useSupabaseContacts() {
 
   const deleteContact = useCallback(async (id: string) => {
     if (!user) return;
+    if (guardOffline()) return;
     const contact = contacts.find(c => c.id === id);
     const { error } = await supabase.from('contacts').delete().eq('id', id);
     if (error) { toast.error('خطأ في حذف جهة الاتصال'); return; }

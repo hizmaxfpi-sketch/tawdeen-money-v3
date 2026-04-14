@@ -4,12 +4,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Container, Shipment, ShippingStats } from '@/types/finance';
 import { useRealtimeSync } from './useRealtimeSync';
+import { cacheSet, cacheGet } from '@/lib/offlineCache';
+import { guardOffline } from '@/lib/offlineGuard';
 
 export function useSupabaseShipping() {
   const { user } = useAuth();
   const PAGE_SIZE = 50;
-  const [containers, setContainers] = useState<Container[]>([]);
-  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [containers, setContainers] = useState<Container[]>(() => cacheGet<Container[]>('containers') || []);
+  const [shipments, setShipments] = useState<Shipment[]>(() => cacheGet<Shipment[]>('shipments') || []);
   const [containersLoading, setContainersLoading] = useState(true);
   const [shipmentsLoading, setShipmentsLoading] = useState(true);
   const [hasMoreContainers, setHasMoreContainers] = useState(true);
@@ -63,6 +65,7 @@ export function useSupabaseShipping() {
       }));
       if (reset || currentPage === 0) {
         setContainers(mapped);
+        cacheSet('containers', mapped);
         setContainerPage(0);
       } else {
         setContainers(prev => [...prev, ...mapped]);
@@ -121,6 +124,7 @@ export function useSupabaseShipping() {
       }));
       if (reset || currentPage === 0) {
         setShipments(mapped);
+        cacheSet('shipments', mapped);
         setShipmentPage(0);
       } else {
         setShipments(prev => [...prev, ...mapped]);
@@ -179,6 +183,7 @@ export function useSupabaseShipping() {
     shippingAgentId?: string;
   }) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { error } = await supabase.rpc('create_container_with_accounting', {
       p_container_number: data.containerNumber,
       p_type: data.type || '40ft',
@@ -208,6 +213,7 @@ export function useSupabaseShipping() {
   }, [user, fetchContainers]);
 
   const updateContainer = useCallback(async (id: string, updates: Partial<Container>) => {
+    if (guardOffline()) return;
     // جلب البيانات الحالية من DB مباشرة
     const { data: current } = await supabase.from('containers').select('*').eq('id', id).single();
     if (!current) return;
@@ -236,6 +242,7 @@ export function useSupabaseShipping() {
   }, [fetchContainers]);
 
   const deleteContainer = useCallback(async (id: string) => {
+    if (guardOffline()) return;
     const { error } = await supabase.rpc('delete_container_with_shipments', { p_container_id: id });
     if (error) { toast.error('خطأ في حذف الحاوية'); console.error(error); return; }
     toast.success('تم حذف الحاوية وجميع شحناتها بنجاح');
@@ -253,6 +260,7 @@ export function useSupabaseShipping() {
     fundId?: string;
   }) => {
     if (!user) return;
+    if (guardOffline()) return;
 
     // رقم الباكج التلقائي إذا لم يُحدد
     let pkgNum = data.packageNumber;
@@ -304,6 +312,7 @@ export function useSupabaseShipping() {
   }, [user, fetchShipments, fetchContainers]);
 
   const updateShipment = useCallback(async (id: string, updates: Partial<Shipment>) => {
+    if (guardOffline()) return;
     const { error } = await supabase.rpc('update_shipment_with_accounting', {
       p_shipment_id: id,
       p_client_name: updates.clientName || null,
@@ -328,6 +337,7 @@ export function useSupabaseShipping() {
   }, [fetchShipments, fetchContainers]);
 
   const deleteShipment = useCallback(async (id: string) => {
+    if (guardOffline()) return;
     const { error } = await supabase.rpc('delete_shipment_with_accounting', { p_shipment_id: id });
     if (error) { toast.error('خطأ في حذف الشحنة'); console.error(error); return; }
     toast.success('تم حذف الشحنة بنجاح');
@@ -341,6 +351,7 @@ export function useSupabaseShipping() {
     _updateFundBalance?: (fundId: string, amount: number) => Promise<void>
   ) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { error } = await supabase.rpc('process_shipment_payment', {
       p_shipment_id: shipmentId,
       p_amount: amount,

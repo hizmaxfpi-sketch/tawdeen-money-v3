@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Project, ProjectStatus, ProjectStats } from '@/types/finance';
 import { useRealtimeSync } from './useRealtimeSync';
+import { cacheSet, cacheGet } from '@/lib/offlineCache';
+import { guardOffline } from '@/lib/offlineGuard';
 
 // Activity log helper (fire-and-forget)
 const logToActivity = async (userId: string, eventType: string, entityType: string, entityId: string | null, entityName: string | null, details: Record<string, any> = {}, status = 'active') => {
@@ -13,7 +15,7 @@ const logToActivity = async (userId: string, eventType: string, entityType: stri
 export function useProjects() {
   const { user } = useAuth();
   const PAGE_SIZE = 20;
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>(() => cacheGet<Project[]>('projects') || []);
   const [loading, setLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -60,6 +62,7 @@ export function useProjects() {
       }));
       if (reset || currentPage === 0) {
         setProjects(mapped);
+        cacheSet('projects', mapped);
         setPage(0);
       } else {
         setProjects(prev => [...prev, ...mapped]);
@@ -91,6 +94,7 @@ export function useProjects() {
 
   const addProject = useCallback(async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'profit' | 'receivedAmount'>) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { data, error } = await supabase.rpc('create_project_with_accounting', {
       p_name: project.name,
       p_client_id: project.clientId || null,
@@ -117,6 +121,7 @@ export function useProjects() {
   }, [user, fetchProjects]);
 
   const updateProject = useCallback(async (id: string, updates: Partial<Project>) => {
+    if (guardOffline()) return;
     const project = projects.find(p => p.id === id);
     if (!project) return;
     const merged = { ...project, ...updates };
@@ -148,6 +153,7 @@ export function useProjects() {
   }, [projects, fetchProjects]);
 
   const deleteProject = useCallback(async (id: string) => {
+    if (guardOffline()) return;
     const project = projects.find(p => p.id === id);
     const { error } = await (supabase.rpc as any)('delete_project_with_accounting', {
       p_project_id: id,

@@ -6,6 +6,8 @@ import { Transaction, TransactionType, TransactionCategory, TrendData, ChartData
 import { calculateMonthlyTrend, calculateExpenseBreakdown } from '@/utils/calculationEngine';
 import { compareTransactionsByBusinessDateDesc } from '@/utils/transactionSort';
 import { useRealtimeSync } from './useRealtimeSync';
+import { cacheSet, cacheGet } from '@/lib/offlineCache';
+import { guardOffline } from '@/lib/offlineGuard';
 
 // Activity log helper (fire-and-forget)
 const logToActivity = async (userId: string, eventType: string, entityType: string, entityId: string | null, entityName: string | null, details: Record<string, any> = {}, status = 'active') => {
@@ -23,7 +25,7 @@ const CACHE_TTL = 30_000; // 30 ثانية
 
 export function useTransactions() {
   const { user } = useAuth();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>(() => cacheGet<Transaction[]>('transactions') || []);
   const [loading, setLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -91,6 +93,7 @@ export function useTransactions() {
       .sort(compareTransactionsByBusinessDateDesc);
 
     setTransactions(mapped);
+    cacheSet('transactions', mapped);
     _cachedTransactions = mapped;
     _cacheUserId = user.id;
     _cacheTime = Date.now();
@@ -118,6 +121,7 @@ export function useTransactions() {
   // استخدام RPC للذرية
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'> & { contactId?: string; currencyCode?: string; exchangeRate?: number }) => {
     if (!user) return;
+    if (guardOffline()) return;
     
     const { data, error } = await supabase.rpc('process_transaction', {
       p_type: transaction.type,
@@ -156,6 +160,7 @@ export function useTransactions() {
   // تحديث عملية موجودة (UPDATE وليس INSERT)
   const updateTransaction = useCallback(async (transactionId: string, updates: Omit<Transaction, 'id' | 'createdAt'> & { contactId?: string; currencyCode?: string; exchangeRate?: number }) => {
     if (!user) return;
+    if (guardOffline()) return;
     
     const { error } = await supabase.rpc('update_transaction', {
       p_transaction_id: transactionId,
@@ -186,6 +191,7 @@ export function useTransactions() {
 
   // استخدام RPC للحذف الذري
   const deleteTransaction = useCallback(async (transactionId: string) => {
+    if (guardOffline()) return;
     // Capture transaction details before deleting for audit trail
     const txToDelete = transactions.find(t => t.id === transactionId);
     const { error } = await supabase.rpc('reverse_transaction', {

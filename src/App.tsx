@@ -8,6 +8,8 @@ import { LanguageProvider } from "@/i18n/LanguageContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { CompanyStatusGuard } from "@/components/CompanyStatusGuard";
 import { RoleGuard } from "@/components/RoleGuard";
+import { OfflineBanner } from "@/components/OfflineBanner";
+import { NetworkContext, useNetworkStatusProvider } from "@/hooks/useNetworkStatus";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import SuperAdmin from "./pages/SuperAdmin";
@@ -43,9 +45,10 @@ function FundDetailsWrapper() {
   );
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <LanguageProvider>
+function AppInner() {
+  return (
+    <>
+      <OfflineBanner />
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -70,8 +73,21 @@ const App = () => (
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
-    </LanguageProvider>
-  </QueryClientProvider>
-);
+    </>
+  );
+}
+
+const App = () => {
+  const networkStatus = useNetworkStatusProvider();
+  return (
+    <QueryClientProvider client={queryClient}>
+      <NetworkContext.Provider value={networkStatus}>
+        <LanguageProvider>
+          <AppInner />
+        </LanguageProvider>
+      </NetworkContext.Provider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
