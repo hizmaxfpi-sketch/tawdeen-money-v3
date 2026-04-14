@@ -81,6 +81,7 @@ export function useDebts() {
 
   const addDebtPayment = useCallback(async ({ debtId, amount, fundId, note }: { debtId: string; amount: number; fundId: string; note?: string }) => {
     if (!user) return;
+    if (guardOffline()) return;
     const debt = debts.find(d => d.id === debtId);
     if (!debt) return;
 
@@ -111,6 +112,7 @@ export function useDebts() {
   }, [user, debts, fetchDebts]);
 
   const deleteDebt = useCallback(async (id: string) => {
+    if (guardOffline()) return;
     const { error } = await supabase.from('debts').delete().eq('id', id);
     if (error) { toast.error('خطأ في حذف المديونية'); return; }
     toast.success('تم حذف المديونية');

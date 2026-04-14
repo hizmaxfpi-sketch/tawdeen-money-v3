@@ -152,6 +152,7 @@ export function useSupabaseContacts() {
 
   const deleteContact = useCallback(async (id: string) => {
     if (!user) return;
+    if (guardOffline()) return;
     const contact = contacts.find(c => c.id === id);
     const { error } = await supabase.from('contacts').delete().eq('id', id);
     if (error) { toast.error('خطأ في حذف جهة الاتصال'); return; }

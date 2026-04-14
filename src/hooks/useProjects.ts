@@ -121,6 +121,7 @@ export function useProjects() {
   }, [user, fetchProjects]);
 
   const updateProject = useCallback(async (id: string, updates: Partial<Project>) => {
+    if (guardOffline()) return;
     const project = projects.find(p => p.id === id);
     if (!project) return;
     const merged = { ...project, ...updates };
@@ -152,6 +153,7 @@ export function useProjects() {
   }, [projects, fetchProjects]);
 
   const deleteProject = useCallback(async (id: string) => {
+    if (guardOffline()) return;
     const project = projects.find(p => p.id === id);
     const { error } = await (supabase.rpc as any)('delete_project_with_accounting', {
       p_project_id: id,
