@@ -109,6 +109,7 @@ export function useSupabaseContacts() {
 
   const addContact = useCallback(async (input: CreateContactInput) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { data, error } = await supabase.from('contacts').insert({
       user_id: user.id,
       name: input.name,

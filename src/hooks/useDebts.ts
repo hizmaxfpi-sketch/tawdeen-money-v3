@@ -45,6 +45,8 @@ export function useDebts() {
     }
     setLoading(false);
     setInitialLoaded(true);
+    // Cache debts for offline
+    if (!error) cacheSet('debts', debts);
   }, [user, initialLoaded]);
 
   useEffect(() => {
@@ -59,6 +61,7 @@ export function useDebts() {
 
   const addDebt = useCallback(async (debt: Omit<Debt, 'id' | 'createdAt' | 'payments' | 'status'>) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { error } = await supabase.from('debts').insert({
       user_id: user.id,
       type: debt.type,

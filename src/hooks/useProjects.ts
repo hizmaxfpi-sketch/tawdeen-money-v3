@@ -62,6 +62,7 @@ export function useProjects() {
       }));
       if (reset || currentPage === 0) {
         setProjects(mapped);
+        cacheSet('projects', mapped);
         setPage(0);
       } else {
         setProjects(prev => [...prev, ...mapped]);
@@ -93,6 +94,7 @@ export function useProjects() {
 
   const addProject = useCallback(async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'profit' | 'receivedAmount'>) => {
     if (!user) return;
+    if (guardOffline()) return;
     const { data, error } = await supabase.rpc('create_project_with_accounting', {
       p_name: project.name,
       p_client_id: project.clientId || null,

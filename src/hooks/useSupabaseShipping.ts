@@ -65,6 +65,7 @@ export function useSupabaseShipping() {
       }));
       if (reset || currentPage === 0) {
         setContainers(mapped);
+        cacheSet('containers', mapped);
         setContainerPage(0);
       } else {
         setContainers(prev => [...prev, ...mapped]);
