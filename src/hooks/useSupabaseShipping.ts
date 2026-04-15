@@ -212,12 +212,24 @@ export function useSupabaseShipping() {
     await fetchContainers(true);
   }, [user, fetchContainers]);
 
-  const updateContainer = useCallback(async (id: string, updates: Partial<Container>) => {
+  const updateContainer = useCallback(async (id: string, updates: Partial<Container> & { containerPrice?: number; glassFees?: number }) => {
     if (guardOffline()) return;
-    // جلب البيانات الحالية من DB مباشرة
     const { data: current } = await supabase.from('containers').select('*').eq('id', id).single();
     if (!current) return;
-    
+
+    // Get extra expenses total for this container
+    const { data: expData } = await supabase.from('container_expenses').select('amount').eq('container_id', id);
+    const extraExpenses = (expData || []).reduce((s, e) => s + Number(e.amount), 0);
+
+    const cp = (updates as any).containerPrice ?? Number(current.container_price);
+    const sc = updates.shippingCost ?? Number(current.shipping_cost);
+    const cc = updates.customsCost ?? Number(current.customs_cost);
+    const pc = updates.portCost ?? Number(current.port_cost);
+    const gf = (updates as any).glassFees ?? Number(current.glass_fees);
+    const oc = updates.otherCosts ?? Number(current.other_costs);
+    const baseCost = cp + sc + cc + pc + gf + oc;
+    const newTotal = baseCost + extraExpenses;
+
     const { error } = await supabase.from('containers').update({
       container_number: updates.containerNumber ?? current.container_number,
       type: updates.type ?? current.type,
@@ -226,12 +238,14 @@ export function useSupabaseShipping() {
       departure_date: updates.departureDate ?? current.departure_date,
       arrival_date: updates.arrivalDate ?? current.arrival_date,
       clearance_date: updates.clearanceDate ?? current.clearance_date,
-      shipping_cost: updates.shippingCost ?? current.shipping_cost,
-      customs_cost: updates.customsCost ?? current.customs_cost,
-      port_cost: updates.portCost ?? current.port_cost,
-      other_costs: updates.otherCosts ?? current.other_costs,
-      total_cost: (updates.shippingCost ?? Number(current.shipping_cost)) + (updates.customsCost ?? Number(current.customs_cost)) + (updates.portCost ?? Number(current.port_cost)) + (updates.otherCosts ?? Number(current.other_costs)),
-      profit: Number(current.total_revenue) - ((updates.shippingCost ?? Number(current.shipping_cost)) + (updates.customsCost ?? Number(current.customs_cost)) + (updates.portCost ?? Number(current.port_cost)) + (updates.otherCosts ?? Number(current.other_costs))),
+      container_price: cp,
+      shipping_cost: sc,
+      customs_cost: cc,
+      port_cost: pc,
+      glass_fees: gf,
+      other_costs: oc,
+      total_cost: newTotal,
+      profit: Number(current.total_revenue) - newTotal,
       notes: updates.notes ?? current.notes,
       attachments: updates.attachments ?? current.attachments,
     }).eq('id', id);
