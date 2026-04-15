@@ -124,13 +124,14 @@ export function useFunds() {
   const transferFunds = useCallback(async (fromFundId: string, toFundId: string, amount: number, note?: string) => {
     if (!user) return;
     if (guardOffline()) return;
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
     const { error } = await supabase.rpc('process_transaction', {
-      p_user_id: user.id,
       p_type: 'out',
       p_category: 'fund_transfer',
       p_amount: amount,
       p_description: note || 'تحويل بين الصناديق',
-      p_date: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; })(),
+      p_date: dateStr,
       p_fund_id: fromFundId,
       p_to_fund_id: toFundId,
     });
