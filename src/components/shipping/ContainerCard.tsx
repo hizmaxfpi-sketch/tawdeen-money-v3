@@ -58,6 +58,10 @@ export function ContainerCard({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showCostDetails, setShowCostDetails] = useState(false);
   const [extraExpenses, setExtraExpenses] = useState<ContainerExpense[]>([]);
+  const [addingExpense, setAddingExpense] = useState(false);
+  const [newExpDesc, setNewExpDesc] = useState('');
+  const [newExpAmount, setNewExpAmount] = useState('');
+  const [submittingExpense, setSubmittingExpense] = useState(false);
 
   const isOverCapacity = container.usedCapacity > container.capacity;
   const isClosed = container.isManullyClosed;
@@ -79,7 +83,6 @@ export function ContainerCard({
   }, [isExpanded, container.id]);
 
   const extraTotal = extraExpenses.reduce((s, e) => s + e.amount, 0);
-  const baseCost = container.totalCost - extraTotal;
 
   return (
     <motion.div
