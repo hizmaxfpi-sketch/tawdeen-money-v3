@@ -206,30 +206,44 @@ export function ContainerCard({
                     <DollarSign className="h-3.5 w-3.5" />
                     التكاليف
                   </h4>
-                  <Button
-                    size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-2"
-                    onClick={(e) => { e.stopPropagation(); setShowCostDetails(!showCostDetails); }}
-                  >
-                    {showCostDetails ? <><EyeOff className="h-3 w-3" />إخفاء</> : <><Eye className="h-3 w-3" />تفاصيل</>}
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm" variant="ghost" className="h-6 text-[10px] gap-1 px-2"
+                      onClick={(e) => { e.stopPropagation(); setShowCostDetails(!showCostDetails); }}
+                    >
+                      {showCostDetails ? <><EyeOff className="h-3 w-3" />إخفاء</> : <><Eye className="h-3 w-3" />تفاصيل</>}
+                    </Button>
+                    {canEdit && (
+                      <Button
+                        size="sm" variant="outline" className="h-6 text-[10px] gap-1 px-2"
+                        onClick={(e) => { e.stopPropagation(); setAddingExpense(!addingExpense); }}
+                      >
+                        <Plus className="h-3 w-3" />مصروف
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 {showCostDetails && (
-                  <div className="space-y-1.5">
-                    <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-                      {container.shippingCost > 0 && (
-                        <div className="flex justify-between"><span className="text-muted-foreground">الشحن:</span><span>${container.shippingCost.toLocaleString()}</span></div>
-                      )}
-                      {container.customsCost > 0 && (
-                        <div className="flex justify-between"><span className="text-muted-foreground">الجمارك:</span><span>${container.customsCost.toLocaleString()}</span></div>
-                      )}
-                      {container.portCost > 0 && (
-                        <div className="flex justify-between"><span className="text-muted-foreground">الميناء:</span><span>${container.portCost.toLocaleString()}</span></div>
-                      )}
-                      {container.otherCosts > 0 && (
-                        <div className="flex justify-between"><span className="text-muted-foreground">أخرى:</span><span>${container.otherCosts.toLocaleString()}</span></div>
-                      )}
-                    </div>
+                  <div className="space-y-1 text-[11px]">
+                    {container.containerPrice > 0 && (
+                      <div className="flex justify-between"><span className="text-muted-foreground">سعر الحاوية:</span><span>${container.containerPrice.toLocaleString()}</span></div>
+                    )}
+                    {container.shippingCost > 0 && (
+                      <div className="flex justify-between"><span className="text-muted-foreground">الشحن:</span><span>${container.shippingCost.toLocaleString()}</span></div>
+                    )}
+                    {container.customsCost > 0 && (
+                      <div className="flex justify-between"><span className="text-muted-foreground">الجمارك:</span><span>${container.customsCost.toLocaleString()}</span></div>
+                    )}
+                    {container.portCost > 0 && (
+                      <div className="flex justify-between"><span className="text-muted-foreground">الميناء:</span><span>${container.portCost.toLocaleString()}</span></div>
+                    )}
+                    {container.glassFees > 0 && (
+                      <div className="flex justify-between"><span className="text-muted-foreground">رسوم الزجاج:</span><span>${container.glassFees.toLocaleString()}</span></div>
+                    )}
+                    {container.otherCosts > 0 && (
+                      <div className="flex justify-between"><span className="text-muted-foreground">أخرى:</span><span>${container.otherCosts.toLocaleString()}</span></div>
+                    )}
                     {/* Extra expenses */}
                     {extraExpenses.length > 0 && (
                       <div className="border-t border-border pt-1.5 space-y-1">
@@ -242,6 +256,40 @@ export function ContainerCard({
                         ))}
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Add expense inline form */}
+                {addingExpense && (
+                  <div className="border-t border-border pt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-2">
+                      <Input placeholder="وصف المصروف" value={newExpDesc} onChange={(e) => setNewExpDesc(e.target.value)} className="h-7 text-[11px] flex-1" />
+                      <Input type="number" placeholder="المبلغ" value={newExpAmount} onChange={(e) => setNewExpAmount(e.target.value)} className="h-7 text-[11px] w-24" />
+                    </div>
+                    <Button
+                      size="sm" className="w-full h-7 text-[10px]"
+                      disabled={submittingExpense || !newExpDesc.trim() || !(parseFloat(newExpAmount) > 0)}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        setSubmittingExpense(true);
+                        const { data, error } = await supabase.from('container_expenses').insert({
+                          container_id: container.id,
+                          user_id: (await supabase.auth.getUser()).data.user?.id || '',
+                          amount: parseFloat(newExpAmount),
+                          description: newExpDesc.trim(),
+                        }).select().single();
+                        if (!error && data) {
+                          setExtraExpenses(prev => [...prev, { id: data.id, amount: Number(data.amount), description: data.description, date: data.date }]);
+                          setNewExpDesc(''); setNewExpAmount(''); setAddingExpense(false);
+                          // The DB trigger will recalculate container totals
+                          // Force parent to refresh
+                          window.dispatchEvent(new CustomEvent('container-expense-added'));
+                        }
+                        setSubmittingExpense(false);
+                      }}
+                    >
+                      {submittingExpense ? <Loader2 className="h-3 w-3 animate-spin" /> : 'إضافة'}
+                    </Button>
                   </div>
                 )}
 
