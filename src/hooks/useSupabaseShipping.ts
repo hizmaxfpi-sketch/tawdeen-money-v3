@@ -32,27 +32,33 @@ export function useSupabaseShipping() {
 
     const { data, error } = await supabase
       .from('containers')
-      .select('id, container_number, type, capacity, used_capacity, route, status, is_manually_closed, departure_date, arrival_date, clearance_date, shipping_cost, customs_cost, port_cost, other_costs, total_cost, total_revenue, profit, notes, attachments, created_at, updated_at, created_by_name')
+      .select('id, container_number, type, capacity, used_capacity, route, status, is_manually_closed, departure_date, arrival_date, clearance_date, shipping_cost, customs_cost, port_cost, other_costs, total_cost, total_revenue, profit, notes, attachments, created_at, updated_at, created_by_name, container_price, glass_fees, origin_country, destination_country, rental_date, shipping_agent_id')
       .order('created_at', { ascending: false })
       .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
 
     if (error) { console.error('Error fetching containers:', error); }
     else {
-      const mapped = (data || []).map(c => ({
+      const mapped: Container[] = (data || []).map(c => ({
         id: c.id,
         containerNumber: c.container_number,
         type: c.type as any,
         capacity: Number(c.capacity),
         usedCapacity: Number(c.used_capacity),
         route: c.route,
+        originCountry: c.origin_country || undefined,
+        destinationCountry: c.destination_country || undefined,
         status: c.status as any,
         isManullyClosed: c.is_manually_closed || false,
         departureDate: c.departure_date || undefined,
         arrivalDate: c.arrival_date || undefined,
         clearanceDate: c.clearance_date || undefined,
+        rentalDate: c.rental_date || undefined,
+        shippingAgentId: c.shipping_agent_id || undefined,
+        containerPrice: Number(c.container_price || 0),
         shippingCost: Number(c.shipping_cost),
         customsCost: Number(c.customs_cost),
         portCost: Number(c.port_cost),
+        glassFees: Number(c.glass_fees || 0),
         otherCosts: Number(c.other_costs),
         totalCost: Number(c.total_cost),
         totalRevenue: Number(c.total_revenue),
@@ -212,7 +218,7 @@ export function useSupabaseShipping() {
     await fetchContainers(true);
   }, [user, fetchContainers]);
 
-  const updateContainer = useCallback(async (id: string, updates: Partial<Container> & { containerPrice?: number; glassFees?: number }) => {
+  const updateContainer = useCallback(async (id: string, updates: Partial<Container>) => {
     if (guardOffline()) return;
     const { data: current } = await supabase.from('containers').select('*').eq('id', id).single();
     if (!current) return;
@@ -221,11 +227,11 @@ export function useSupabaseShipping() {
     const { data: expData } = await supabase.from('container_expenses').select('amount').eq('container_id', id);
     const extraExpenses = (expData || []).reduce((s, e) => s + Number(e.amount), 0);
 
-    const cp = (updates as any).containerPrice ?? Number(current.container_price);
+    const cp = updates.containerPrice ?? Number(current.container_price || 0);
     const sc = updates.shippingCost ?? Number(current.shipping_cost);
     const cc = updates.customsCost ?? Number(current.customs_cost);
     const pc = updates.portCost ?? Number(current.port_cost);
-    const gf = (updates as any).glassFees ?? Number(current.glass_fees);
+    const gf = updates.glassFees ?? Number(current.glass_fees || 0);
     const oc = updates.otherCosts ?? Number(current.other_costs);
     const baseCost = cp + sc + cc + pc + gf + oc;
     const newTotal = baseCost + extraExpenses;
@@ -233,11 +239,15 @@ export function useSupabaseShipping() {
     const { error } = await supabase.from('containers').update({
       container_number: updates.containerNumber ?? current.container_number,
       type: updates.type ?? current.type,
+      capacity: updates.capacity ?? current.capacity,
       route: updates.route ?? current.route,
+      origin_country: updates.originCountry ?? current.origin_country,
+      destination_country: updates.destinationCountry ?? current.destination_country,
       status: updates.status ?? current.status,
       departure_date: updates.departureDate ?? current.departure_date,
       arrival_date: updates.arrivalDate ?? current.arrival_date,
       clearance_date: updates.clearanceDate ?? current.clearance_date,
+      rental_date: updates.rentalDate ?? current.rental_date,
       container_price: cp,
       shipping_cost: sc,
       customs_cost: cc,

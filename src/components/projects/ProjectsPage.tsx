@@ -6,7 +6,7 @@ import {
   Clock, DollarSign, AlertCircle, Edit, Trash2,
   Calendar, User, Building, ChevronDown, ChevronUp,
   FileText, Paperclip, RefreshCw, Eye, TrendingDown,
-  ArrowUpCircle, ArrowDownCircle
+  ArrowUpCircle, ArrowDownCircle, Search, Filter, SlidersHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -69,6 +69,10 @@ export function ProjectsPage({
   const [displayCurrency, setDisplayCurrency] = useState('USD');
   const [showPreview, setShowPreview] = useState(false);
   const [previewProject, setPreviewProject] = useState<Project | null>(null);
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   const conv = (v: number) => convertForDisplay(v, displayCurrency, currencies);
   const sym = getCurrencySymbol(displayCurrency, currencies);
@@ -92,6 +96,30 @@ export function ProjectsPage({
 
   const clients = accountOptions.filter(a => a.type === 'client');
   const vendors = accountOptions.filter(a => a.type === 'vendor');
+
+  // Filtered projects - stats always use ALL projects (independent)
+  const filteredProjects = useMemo(() => {
+    let result = [...projects];
+    if (filterStatus !== 'all') result = result.filter(p => p.status === filterStatus);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(p => p.name.toLowerCase().includes(q) || p.clientName?.toLowerCase().includes(q) || p.vendorName?.toLowerCase().includes(q) || p.notes?.toLowerCase().includes(q));
+    }
+    return result;
+  }, [projects, filterStatus, searchQuery]);
+
+  // Group by status for display
+  const groupedProjects = useMemo(() => {
+    const groups: Record<string, Project[]> = {};
+    for (const p of filteredProjects) {
+      if (!groups[p.status]) groups[p.status] = [];
+      groups[p.status].push(p);
+    }
+    return groups;
+  }, [filteredProjects]);
+
+  const statusOrder: ProjectStatus[] = ['active', 'completed', 'paused', 'cancelled'];
+  const isFiltered = filterStatus !== 'all' || searchQuery.trim().length > 0;
 
   const resetForm = () => {
     setFormData({
@@ -224,6 +252,9 @@ export function ProjectsPage({
       <div className="flex items-center justify-between">
         <h2 className="text-base font-bold">المشاريع</h2>
         <div className="flex gap-1.5">
+          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setShowFilters(!showFilters)} title="فلاتر">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+          </Button>
           <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setShowPreview(true)} title="معاينة">
             <Eye className="h-3.5 w-3.5" />
           </Button>
@@ -241,16 +272,53 @@ export function ProjectsPage({
         </div>
       </div>
 
-      {/* قائمة المشاريع */}
-      <div className="space-y-2">
-        {projects.length === 0 ? (
+      {/* الفلاتر */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <div className="bg-card rounded-xl p-3 border border-border space-y-2">
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="بحث بالاسم أو العميل أو المورد..." className="h-8 text-xs pr-8" />
+                </div>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="h-8 text-xs w-32"><SelectValue placeholder="الحالة" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">الكل</SelectItem>
+                    {Object.entries(statusConfig).map(([key, val]) => (
+                      <SelectItem key={key} value={key} className="text-xs">{val.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {isFiltered && (
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-muted-foreground">نتائج: {filteredProjects.length} من {projects.length}</span>
+                  <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={() => { setSearchQuery(''); setFilterStatus('all'); }}>مسح الفلاتر</Button>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* قائمة المشاريع - مجمعة حسب الحالة */}
+      <div className="space-y-3">
+        {filteredProjects.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Briefcase className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p className="text-sm">لا توجد مشاريع بعد</p>
               {canCreateProject && <p className="text-xs mt-1">أضف مشروعك الأول للبدء</p>}
           </div>
         ) : (
-          projects.map((project, index) => {
+          statusOrder.filter(s => groupedProjects[s]?.length).map(statusKey => (
+            <div key={statusKey} className="space-y-1.5">
+              <div className="flex items-center gap-2 px-1">
+                <Badge className={cn("text-[10px] px-2 py-0.5 text-white border-0", statusConfig[statusKey].color)}>{statusConfig[statusKey].label}</Badge>
+                <span className="text-[10px] text-muted-foreground">({groupedProjects[statusKey].length})</span>
+              </div>
+              {groupedProjects[statusKey].map((project, index) => {
             const isExpanded = expandedId === project.id;
             const StatusIcon = statusConfig[project.status].icon;
             
@@ -262,7 +330,6 @@ export function ProjectsPage({
                 transition={{ delay: index * 0.03 }}
                 className="rounded-xl bg-card border border-border overflow-hidden"
               >
-                {/* الصف الرئيسي */}
                 <div 
                   className="p-3 cursor-pointer"
                   onClick={() => setExpandedId(isExpanded ? null : project.id)}
@@ -280,155 +347,51 @@ export function ProjectsPage({
                           )}
                         </p>
                         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                          {project.clientName && (
-                            <span className="flex items-center gap-0.5">
-                              <User className="h-3 w-3" />
-                              {project.clientName}
-                            </span>
-                          )}
-                          {project.vendorName && (
-                            <span className="flex items-center gap-0.5">
-                              <Building className="h-3 w-3" />
-                              {project.vendorName}
-                            </span>
-                          )}
-                          {project.createdByName && (
-                            <span className="flex items-center gap-0.5 text-primary">
-                              ● {project.createdByName}
-                            </span>
-                          )}
+                          {project.clientName && <span className="flex items-center gap-0.5"><User className="h-3 w-3" />{project.clientName}</span>}
+                          {project.vendorName && <span className="flex items-center gap-0.5"><Building className="h-3 w-3" />{project.vendorName}</span>}
+                          {project.createdByName && <span className="flex items-center gap-0.5 text-primary">● {project.createdByName}</span>}
                         </div>
                       </div>
                     </div>
-                    
                     <div className="flex items-center gap-2">
                       <div className="text-left">
-                        <p className={cn("text-sm font-bold", project.profit >= 0 ? "text-emerald-600" : "text-red-500")}>
-                          {fmt(project.profit)}
-                        </p>
+                        <p className={cn("text-sm font-bold", project.profit >= 0 ? "text-emerald-600" : "text-red-500")}>{fmt(project.profit)}</p>
                         <p className="text-[9px] text-muted-foreground">الربح</p>
                       </div>
                       {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                     </div>
                   </div>
                 </div>
-
-                {/* التفاصيل الموسعة */}
                 <AnimatePresence>
                   {isExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden"
-                    >
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                       <div className="px-3 pb-3 pt-1 border-t border-border space-y-2">
-                        {/* تفاصيل مالية */}
                         <div className="grid grid-cols-2 gap-2 text-[11px]">
-                          <div className="bg-muted/50 p-2 rounded-lg">
-                            <span className="text-muted-foreground">قيمة المشروع</span>
-                            <p className="font-medium">{fmt(project.contractValue)}</p>
-                          </div>
-                          <div className="bg-muted/50 p-2 rounded-lg">
-                            <span className="text-muted-foreground">التكلفة</span>
-                            <p className="font-medium">{fmt(project.expenses)}</p>
-                          </div>
-                          {project.commission > 0 && (
-                            <div className="bg-muted/50 p-2 rounded-lg">
-                              <span className="text-muted-foreground">العمولة</span>
-                              <p className="font-medium text-emerald-600">+{fmt(project.commission)}</p>
-                            </div>
-                          )}
-                          {project.currencyDifference !== 0 && (
-                            <div className="bg-muted/50 p-2 rounded-lg">
-                              <span className="text-muted-foreground">فرق العملة</span>
-                              <p className={cn("font-medium", project.currencyDifference >= 0 ? "text-emerald-600" : "text-red-500")}>
-                                {project.currencyDifference >= 0 ? '+' : ''}{fmt(project.currencyDifference)}
-                              </p>
-                            </div>
-                          )}
+                          <div className="bg-muted/50 p-2 rounded-lg"><span className="text-muted-foreground">قيمة المشروع</span><p className="font-medium">{fmt(project.contractValue)}</p></div>
+                          <div className="bg-muted/50 p-2 rounded-lg"><span className="text-muted-foreground">التكلفة</span><p className="font-medium">{fmt(project.expenses)}</p></div>
+                          {project.commission > 0 && <div className="bg-muted/50 p-2 rounded-lg"><span className="text-muted-foreground">العمولة</span><p className="font-medium text-emerald-600">+{fmt(project.commission)}</p></div>}
+                          {project.currencyDifference !== 0 && <div className="bg-muted/50 p-2 rounded-lg"><span className="text-muted-foreground">فرق العملة</span><p className={cn("font-medium", project.currencyDifference >= 0 ? "text-emerald-600" : "text-red-500")}>{project.currencyDifference >= 0 ? '+' : ''}{fmt(project.currencyDifference)}</p></div>}
                         </div>
-
-                        {/* الحالة والتواريخ */}
                         <div className="flex items-center justify-between text-[10px]">
-                          <Badge variant="outline" className={cn("text-[10px]", statusConfig[project.status].color, "text-white border-0")}>
-                            {statusConfig[project.status].label}
-                          </Badge>
-                          {project.startDate && (
-                            <span className="flex items-center gap-1 text-muted-foreground">
-                              <Calendar className="h-3 w-3" />
-                              {project.startDate}
-                            </span>
-                          )}
+                          <Badge variant="outline" className={cn("text-[10px]", statusConfig[project.status].color, "text-white border-0")}>{statusConfig[project.status].label}</Badge>
+                          {project.startDate && <span className="flex items-center gap-1 text-muted-foreground"><Calendar className="h-3 w-3" />{project.startDate}</span>}
                         </div>
-
-                        {/* المرفقات */}
-                        {project.attachments && project.attachments.length > 0 && (
-                          <DocumentAttachment
-                            attachments={project.attachments}
-                            onAttachmentsChange={() => {}}
-                            compact
-                            readOnly
-                          />
-                        )}
-
-                        {/* تغيير الحالة */}
+                        {project.attachments && project.attachments.length > 0 && <DocumentAttachment attachments={project.attachments} onAttachmentsChange={() => {}} compact readOnly />}
                         {canEditProject && (
                           <div className="flex gap-1 flex-wrap">
-                            {(['active', 'completed', 'paused', 'cancelled'] as ProjectStatus[]).map(status => (
-                              <Button
-                                key={status}
-                                size="sm"
-                                variant={project.status === status ? "default" : "outline"}
-                                className="h-6 text-[10px] px-2"
-                                onClick={(e) => { e.stopPropagation(); handleStatusChange(project.id, status); }}
-                              >
-                                {statusConfig[status].label}
+                            {(['active', 'completed', 'paused', 'cancelled'] as ProjectStatus[]).map(s => (
+                              <Button key={s} size="sm" variant={project.status === s ? "default" : "outline"} className="h-6 text-[10px] px-2"
+                                onClick={(e) => { e.stopPropagation(); handleStatusChange(project.id, s); }}>
+                                {statusConfig[s].label}
                               </Button>
                             ))}
                           </div>
                         )}
-
-                        {/* أزرار التحكم */}
                         <div className="flex gap-2 pt-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 text-xs gap-1 px-3"
-                            onClick={(e) => { e.stopPropagation(); setPreviewProject(project); setShowPreview(true); }}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            معاينة
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="flex-1 h-8 text-xs gap-1 bg-primary"
-                            onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}`); }}
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                            السجل المالي
-                          </Button>
-                          {canEditProject && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 text-xs gap-1 px-3"
-                              onClick={(e) => { e.stopPropagation(); handleOpenEdit(project); }}
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          {canDeleteProject && (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="h-8 text-xs gap-1 px-3"
-                              onClick={(e) => { e.stopPropagation(); setDeletingProject(project); }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
+                          <Button size="sm" variant="outline" className="h-8 text-xs gap-1 px-3" onClick={(e) => { e.stopPropagation(); setPreviewProject(project); setShowPreview(true); }}><Eye className="h-3.5 w-3.5" />معاينة</Button>
+                          <Button size="sm" variant="default" className="flex-1 h-8 text-xs gap-1 bg-primary" onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}`); }}><FileText className="h-3.5 w-3.5" />السجل المالي</Button>
+                          {canEditProject && <Button size="sm" variant="outline" className="h-8 text-xs gap-1 px-3" onClick={(e) => { e.stopPropagation(); handleOpenEdit(project); }}><Edit className="h-3.5 w-3.5" /></Button>}
+                          {canDeleteProject && <Button size="sm" variant="destructive" className="h-8 text-xs gap-1 px-3" onClick={(e) => { e.stopPropagation(); setDeletingProject(project); }}><Trash2 className="h-3.5 w-3.5" /></Button>}
                         </div>
                       </div>
                     </motion.div>
@@ -436,7 +399,9 @@ export function ProjectsPage({
                 </AnimatePresence>
               </motion.div>
             );
-          })
+          })}
+            </div>
+          ))
         )}
       </div>
 

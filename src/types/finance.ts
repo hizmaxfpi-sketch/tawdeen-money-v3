@@ -214,9 +214,13 @@ export interface Container {
   capacity: number;                  // السعة الكلية CBM
   usedCapacity: number;              // المستخدم CBM
   route: string;                     // المسار (من - إلى)
+  originCountry?: string;            // بلد المنشأ
+  destinationCountry?: string;       // بلد الوصول
+  containerPrice: number;            // سعر الحاوية
   shippingCost: number;              // تكلفة الشحن الإجمالية
   customsCost: number;               // تكلفة الجمارك
   portCost: number;                  // مصاريف الميناء
+  glassFees: number;                 // رسوم الزجاج
   otherCosts: number;                // مصاريف أخرى
   totalCost: number;                 // إجمالي التكاليف
   totalRevenue: number;              // إجمالي الإيرادات (من الشحنات)
@@ -226,6 +230,8 @@ export interface Container {
   departureDate?: string;
   arrivalDate?: string;
   clearanceDate?: string;            // تاريخ التخليص
+  rentalDate?: string;               // تاريخ الإيجار
+  shippingAgentId?: string;          // وكيل الشحن
   notes?: string;
   attachments?: string[];
   createdByName?: string;
