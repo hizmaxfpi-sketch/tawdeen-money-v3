@@ -97,6 +97,30 @@ export function ProjectsPage({
   const clients = accountOptions.filter(a => a.type === 'client');
   const vendors = accountOptions.filter(a => a.type === 'vendor');
 
+  // Filtered projects - stats always use ALL projects (independent)
+  const filteredProjects = useMemo(() => {
+    let result = [...projects];
+    if (filterStatus !== 'all') result = result.filter(p => p.status === filterStatus);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(p => p.name.toLowerCase().includes(q) || p.clientName?.toLowerCase().includes(q) || p.vendorName?.toLowerCase().includes(q) || p.notes?.toLowerCase().includes(q));
+    }
+    return result;
+  }, [projects, filterStatus, searchQuery]);
+
+  // Group by status for display
+  const groupedProjects = useMemo(() => {
+    const groups: Record<string, Project[]> = {};
+    for (const p of filteredProjects) {
+      if (!groups[p.status]) groups[p.status] = [];
+      groups[p.status].push(p);
+    }
+    return groups;
+  }, [filteredProjects]);
+
+  const statusOrder: ProjectStatus[] = ['active', 'completed', 'paused', 'cancelled'];
+  const isFiltered = filterStatus !== 'all' || searchQuery.trim().length > 0;
+
   const resetForm = () => {
     setFormData({
       name: '',
