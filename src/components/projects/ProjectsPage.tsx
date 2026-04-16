@@ -312,10 +312,13 @@ export function ProjectsPage({
               {canCreateProject && <p className="text-xs mt-1">أضف مشروعك الأول للبدء</p>}
           </div>
         ) : (
-          projects.map((project, index) => {
-            const isExpanded = expandedId === project.id;
-            const StatusIcon = statusConfig[project.status].icon;
-            
+          statusOrder.filter(s => groupedProjects[s]?.length).map(statusKey => (
+            <div key={statusKey} className="space-y-1.5">
+              <div className="flex items-center gap-2 px-1">
+                <Badge className={cn("text-[10px] px-2 py-0.5 text-white border-0", statusConfig[statusKey].color)}>{statusConfig[statusKey].label}</Badge>
+                <span className="text-[10px] text-muted-foreground">({groupedProjects[statusKey].length})</span>
+              </div>
+          {groupedProjects[statusKey].map((project, index) => {
             return (
               <motion.div
                 key={project.id}
