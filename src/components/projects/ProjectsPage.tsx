@@ -252,6 +252,9 @@ export function ProjectsPage({
       <div className="flex items-center justify-between">
         <h2 className="text-base font-bold">المشاريع</h2>
         <div className="flex gap-1.5">
+          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setShowFilters(!showFilters)} title="فلاتر">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+          </Button>
           <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setShowPreview(true)} title="معاينة">
             <Eye className="h-3.5 w-3.5" />
           </Button>
@@ -269,9 +272,40 @@ export function ProjectsPage({
         </div>
       </div>
 
-      {/* قائمة المشاريع */}
-      <div className="space-y-2">
-        {projects.length === 0 ? (
+      {/* الفلاتر */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <div className="bg-card rounded-xl p-3 border border-border space-y-2">
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="بحث بالاسم أو العميل أو المورد..." className="h-8 text-xs pr-8" />
+                </div>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="h-8 text-xs w-32"><SelectValue placeholder="الحالة" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">الكل</SelectItem>
+                    {Object.entries(statusConfig).map(([key, val]) => (
+                      <SelectItem key={key} value={key} className="text-xs">{val.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {isFiltered && (
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-muted-foreground">نتائج: {filteredProjects.length} من {projects.length}</span>
+                  <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={() => { setSearchQuery(''); setFilterStatus('all'); }}>مسح الفلاتر</Button>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* قائمة المشاريع - مجمعة حسب الحالة */}
+      <div className="space-y-3">
+        {filteredProjects.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Briefcase className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p className="text-sm">لا توجد مشاريع بعد</p>
