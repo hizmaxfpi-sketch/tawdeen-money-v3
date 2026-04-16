@@ -32,27 +32,33 @@ export function useSupabaseShipping() {
 
     const { data, error } = await supabase
       .from('containers')
-      .select('id, container_number, type, capacity, used_capacity, route, status, is_manually_closed, departure_date, arrival_date, clearance_date, shipping_cost, customs_cost, port_cost, other_costs, total_cost, total_revenue, profit, notes, attachments, created_at, updated_at, created_by_name')
+      .select('id, container_number, type, capacity, used_capacity, route, status, is_manually_closed, departure_date, arrival_date, clearance_date, shipping_cost, customs_cost, port_cost, other_costs, total_cost, total_revenue, profit, notes, attachments, created_at, updated_at, created_by_name, container_price, glass_fees, origin_country, destination_country, rental_date, shipping_agent_id')
       .order('created_at', { ascending: false })
       .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
 
     if (error) { console.error('Error fetching containers:', error); }
     else {
-      const mapped = (data || []).map(c => ({
+      const mapped: Container[] = (data || []).map(c => ({
         id: c.id,
         containerNumber: c.container_number,
         type: c.type as any,
         capacity: Number(c.capacity),
         usedCapacity: Number(c.used_capacity),
         route: c.route,
+        originCountry: c.origin_country || undefined,
+        destinationCountry: c.destination_country || undefined,
         status: c.status as any,
         isManullyClosed: c.is_manually_closed || false,
         departureDate: c.departure_date || undefined,
         arrivalDate: c.arrival_date || undefined,
         clearanceDate: c.clearance_date || undefined,
+        rentalDate: c.rental_date || undefined,
+        shippingAgentId: c.shipping_agent_id || undefined,
+        containerPrice: Number(c.container_price || 0),
         shippingCost: Number(c.shipping_cost),
         customsCost: Number(c.customs_cost),
         portCost: Number(c.port_cost),
+        glassFees: Number(c.glass_fees || 0),
         otherCosts: Number(c.other_costs),
         totalCost: Number(c.total_cost),
         totalRevenue: Number(c.total_revenue),
