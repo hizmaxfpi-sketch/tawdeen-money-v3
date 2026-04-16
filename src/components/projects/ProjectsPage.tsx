@@ -318,7 +318,10 @@ export function ProjectsPage({
                 <Badge className={cn("text-[10px] px-2 py-0.5 text-white border-0", statusConfig[statusKey].color)}>{statusConfig[statusKey].label}</Badge>
                 <span className="text-[10px] text-muted-foreground">({groupedProjects[statusKey].length})</span>
               </div>
-          {groupedProjects[statusKey].map((project, index) => {
+              {groupedProjects[statusKey].map((project, index) => {
+            const isExpanded = expandedId === project.id;
+            const StatusIcon = statusConfig[project.status].icon;
+            
             return (
               <motion.div
                 key={project.id}
@@ -327,7 +330,6 @@ export function ProjectsPage({
                 transition={{ delay: index * 0.03 }}
                 className="rounded-xl bg-card border border-border overflow-hidden"
               >
-                {/* الصف الرئيسي */}
                 <div 
                   className="p-3 cursor-pointer"
                   onClick={() => setExpandedId(isExpanded ? null : project.id)}
@@ -345,155 +347,51 @@ export function ProjectsPage({
                           )}
                         </p>
                         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                          {project.clientName && (
-                            <span className="flex items-center gap-0.5">
-                              <User className="h-3 w-3" />
-                              {project.clientName}
-                            </span>
-                          )}
-                          {project.vendorName && (
-                            <span className="flex items-center gap-0.5">
-                              <Building className="h-3 w-3" />
-                              {project.vendorName}
-                            </span>
-                          )}
-                          {project.createdByName && (
-                            <span className="flex items-center gap-0.5 text-primary">
-                              ● {project.createdByName}
-                            </span>
-                          )}
+                          {project.clientName && <span className="flex items-center gap-0.5"><User className="h-3 w-3" />{project.clientName}</span>}
+                          {project.vendorName && <span className="flex items-center gap-0.5"><Building className="h-3 w-3" />{project.vendorName}</span>}
+                          {project.createdByName && <span className="flex items-center gap-0.5 text-primary">● {project.createdByName}</span>}
                         </div>
                       </div>
                     </div>
-                    
                     <div className="flex items-center gap-2">
                       <div className="text-left">
-                        <p className={cn("text-sm font-bold", project.profit >= 0 ? "text-emerald-600" : "text-red-500")}>
-                          {fmt(project.profit)}
-                        </p>
+                        <p className={cn("text-sm font-bold", project.profit >= 0 ? "text-emerald-600" : "text-red-500")}>{fmt(project.profit)}</p>
                         <p className="text-[9px] text-muted-foreground">الربح</p>
                       </div>
                       {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                     </div>
                   </div>
                 </div>
-
-                {/* التفاصيل الموسعة */}
                 <AnimatePresence>
                   {isExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden"
-                    >
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                       <div className="px-3 pb-3 pt-1 border-t border-border space-y-2">
-                        {/* تفاصيل مالية */}
                         <div className="grid grid-cols-2 gap-2 text-[11px]">
-                          <div className="bg-muted/50 p-2 rounded-lg">
-                            <span className="text-muted-foreground">قيمة المشروع</span>
-                            <p className="font-medium">{fmt(project.contractValue)}</p>
-                          </div>
-                          <div className="bg-muted/50 p-2 rounded-lg">
-                            <span className="text-muted-foreground">التكلفة</span>
-                            <p className="font-medium">{fmt(project.expenses)}</p>
-                          </div>
-                          {project.commission > 0 && (
-                            <div className="bg-muted/50 p-2 rounded-lg">
-                              <span className="text-muted-foreground">العمولة</span>
-                              <p className="font-medium text-emerald-600">+{fmt(project.commission)}</p>
-                            </div>
-                          )}
-                          {project.currencyDifference !== 0 && (
-                            <div className="bg-muted/50 p-2 rounded-lg">
-                              <span className="text-muted-foreground">فرق العملة</span>
-                              <p className={cn("font-medium", project.currencyDifference >= 0 ? "text-emerald-600" : "text-red-500")}>
-                                {project.currencyDifference >= 0 ? '+' : ''}{fmt(project.currencyDifference)}
-                              </p>
-                            </div>
-                          )}
+                          <div className="bg-muted/50 p-2 rounded-lg"><span className="text-muted-foreground">قيمة المشروع</span><p className="font-medium">{fmt(project.contractValue)}</p></div>
+                          <div className="bg-muted/50 p-2 rounded-lg"><span className="text-muted-foreground">التكلفة</span><p className="font-medium">{fmt(project.expenses)}</p></div>
+                          {project.commission > 0 && <div className="bg-muted/50 p-2 rounded-lg"><span className="text-muted-foreground">العمولة</span><p className="font-medium text-emerald-600">+{fmt(project.commission)}</p></div>}
+                          {project.currencyDifference !== 0 && <div className="bg-muted/50 p-2 rounded-lg"><span className="text-muted-foreground">فرق العملة</span><p className={cn("font-medium", project.currencyDifference >= 0 ? "text-emerald-600" : "text-red-500")}>{project.currencyDifference >= 0 ? '+' : ''}{fmt(project.currencyDifference)}</p></div>}
                         </div>
-
-                        {/* الحالة والتواريخ */}
                         <div className="flex items-center justify-between text-[10px]">
-                          <Badge variant="outline" className={cn("text-[10px]", statusConfig[project.status].color, "text-white border-0")}>
-                            {statusConfig[project.status].label}
-                          </Badge>
-                          {project.startDate && (
-                            <span className="flex items-center gap-1 text-muted-foreground">
-                              <Calendar className="h-3 w-3" />
-                              {project.startDate}
-                            </span>
-                          )}
+                          <Badge variant="outline" className={cn("text-[10px]", statusConfig[project.status].color, "text-white border-0")}>{statusConfig[project.status].label}</Badge>
+                          {project.startDate && <span className="flex items-center gap-1 text-muted-foreground"><Calendar className="h-3 w-3" />{project.startDate}</span>}
                         </div>
-
-                        {/* المرفقات */}
-                        {project.attachments && project.attachments.length > 0 && (
-                          <DocumentAttachment
-                            attachments={project.attachments}
-                            onAttachmentsChange={() => {}}
-                            compact
-                            readOnly
-                          />
-                        )}
-
-                        {/* تغيير الحالة */}
+                        {project.attachments && project.attachments.length > 0 && <DocumentAttachment attachments={project.attachments} onAttachmentsChange={() => {}} compact readOnly />}
                         {canEditProject && (
                           <div className="flex gap-1 flex-wrap">
-                            {(['active', 'completed', 'paused', 'cancelled'] as ProjectStatus[]).map(status => (
-                              <Button
-                                key={status}
-                                size="sm"
-                                variant={project.status === status ? "default" : "outline"}
-                                className="h-6 text-[10px] px-2"
-                                onClick={(e) => { e.stopPropagation(); handleStatusChange(project.id, status); }}
-                              >
-                                {statusConfig[status].label}
+                            {(['active', 'completed', 'paused', 'cancelled'] as ProjectStatus[]).map(s => (
+                              <Button key={s} size="sm" variant={project.status === s ? "default" : "outline"} className="h-6 text-[10px] px-2"
+                                onClick={(e) => { e.stopPropagation(); handleStatusChange(project.id, s); }}>
+                                {statusConfig[s].label}
                               </Button>
                             ))}
                           </div>
                         )}
-
-                        {/* أزرار التحكم */}
                         <div className="flex gap-2 pt-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 text-xs gap-1 px-3"
-                            onClick={(e) => { e.stopPropagation(); setPreviewProject(project); setShowPreview(true); }}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            معاينة
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="flex-1 h-8 text-xs gap-1 bg-primary"
-                            onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}`); }}
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                            السجل المالي
-                          </Button>
-                          {canEditProject && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 text-xs gap-1 px-3"
-                              onClick={(e) => { e.stopPropagation(); handleOpenEdit(project); }}
-                            >
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          {canDeleteProject && (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="h-8 text-xs gap-1 px-3"
-                              onClick={(e) => { e.stopPropagation(); setDeletingProject(project); }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
+                          <Button size="sm" variant="outline" className="h-8 text-xs gap-1 px-3" onClick={(e) => { e.stopPropagation(); setPreviewProject(project); setShowPreview(true); }}><Eye className="h-3.5 w-3.5" />معاينة</Button>
+                          <Button size="sm" variant="default" className="flex-1 h-8 text-xs gap-1 bg-primary" onClick={(e) => { e.stopPropagation(); navigate(`/projects/${project.id}`); }}><FileText className="h-3.5 w-3.5" />السجل المالي</Button>
+                          {canEditProject && <Button size="sm" variant="outline" className="h-8 text-xs gap-1 px-3" onClick={(e) => { e.stopPropagation(); handleOpenEdit(project); }}><Edit className="h-3.5 w-3.5" /></Button>}
+                          {canDeleteProject && <Button size="sm" variant="destructive" className="h-8 text-xs gap-1 px-3" onClick={(e) => { e.stopPropagation(); setDeletingProject(project); }}><Trash2 className="h-3.5 w-3.5" /></Button>}
                         </div>
                       </div>
                     </motion.div>
@@ -501,7 +399,9 @@ export function ProjectsPage({
                 </AnimatePresence>
               </motion.div>
             );
-          })
+          })}
+            </div>
+          ))
         )}
       </div>
 
