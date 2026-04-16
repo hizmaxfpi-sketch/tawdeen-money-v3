@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Ship, Package, ChevronDown, ChevronUp, Edit, Trash2, Plus,
-  MapPin, DollarSign, Lock, Unlock, Paperclip, User, Eye, EyeOff
+  MapPin, DollarSign, Lock, Unlock, Paperclip, User, Eye, EyeOff, Loader2
 } from 'lucide-react';
 import { DocumentAttachment } from '@/components/shared/DocumentAttachment';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
