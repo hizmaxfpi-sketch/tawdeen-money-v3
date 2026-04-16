@@ -6,7 +6,7 @@ import {
   Clock, DollarSign, AlertCircle, Edit, Trash2,
   Calendar, User, Building, ChevronDown, ChevronUp,
   FileText, Paperclip, RefreshCw, Eye, TrendingDown,
-  ArrowUpCircle, ArrowDownCircle
+  ArrowUpCircle, ArrowDownCircle, Search, Filter, SlidersHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
