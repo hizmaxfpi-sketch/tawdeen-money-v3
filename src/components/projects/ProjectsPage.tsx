@@ -69,6 +69,10 @@ export function ProjectsPage({
   const [displayCurrency, setDisplayCurrency] = useState('USD');
   const [showPreview, setShowPreview] = useState(false);
   const [previewProject, setPreviewProject] = useState<Project | null>(null);
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   const conv = (v: number) => convertForDisplay(v, displayCurrency, currencies);
   const sym = getCurrencySymbol(displayCurrency, currencies);
