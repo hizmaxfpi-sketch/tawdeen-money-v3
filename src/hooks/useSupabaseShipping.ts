@@ -218,7 +218,7 @@ export function useSupabaseShipping() {
     await fetchContainers(true);
   }, [user, fetchContainers]);
 
-  const updateContainer = useCallback(async (id: string, updates: Partial<Container> & { containerPrice?: number; glassFees?: number }) => {
+  const updateContainer = useCallback(async (id: string, updates: Partial<Container>) => {
     if (guardOffline()) return;
     const { data: current } = await supabase.from('containers').select('*').eq('id', id).single();
     if (!current) return;
@@ -227,11 +227,11 @@ export function useSupabaseShipping() {
     const { data: expData } = await supabase.from('container_expenses').select('amount').eq('container_id', id);
     const extraExpenses = (expData || []).reduce((s, e) => s + Number(e.amount), 0);
 
-    const cp = (updates as any).containerPrice ?? Number(current.container_price);
+    const cp = updates.containerPrice ?? Number(current.container_price || 0);
     const sc = updates.shippingCost ?? Number(current.shipping_cost);
     const cc = updates.customsCost ?? Number(current.customs_cost);
     const pc = updates.portCost ?? Number(current.port_cost);
-    const gf = (updates as any).glassFees ?? Number(current.glass_fees);
+    const gf = updates.glassFees ?? Number(current.glass_fees || 0);
     const oc = updates.otherCosts ?? Number(current.other_costs);
     const baseCost = cp + sc + cc + pc + gf + oc;
     const newTotal = baseCost + extraExpenses;
@@ -239,11 +239,15 @@ export function useSupabaseShipping() {
     const { error } = await supabase.from('containers').update({
       container_number: updates.containerNumber ?? current.container_number,
       type: updates.type ?? current.type,
+      capacity: updates.capacity ?? current.capacity,
       route: updates.route ?? current.route,
+      origin_country: updates.originCountry ?? current.origin_country,
+      destination_country: updates.destinationCountry ?? current.destination_country,
       status: updates.status ?? current.status,
       departure_date: updates.departureDate ?? current.departure_date,
       arrival_date: updates.arrivalDate ?? current.arrival_date,
       clearance_date: updates.clearanceDate ?? current.clearance_date,
+      rental_date: updates.rentalDate ?? current.rental_date,
       container_price: cp,
       shipping_cost: sc,
       customs_cost: cc,
