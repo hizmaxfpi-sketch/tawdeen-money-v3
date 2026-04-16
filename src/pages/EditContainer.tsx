@@ -159,28 +159,26 @@ export default function EditContainer() {
     setIsSubmitting(true);
     try {
       const route = `${originCountry} - ${destinationCountry}`;
+      // Single consolidated update - all fields in one call
       await shippingStore.updateContainer(id!, {
         containerNumber: containerNumber.trim(),
         type: type as any,
         route,
         status,
+        capacity,
+        originCountry,
+        destinationCountry,
         departureDate: departureDate || undefined,
         arrivalDate: arrivalDate || undefined,
+        rentalDate: rentalDate || undefined,
+        containerPrice: parseFloat(containerPrice) || 0,
         shippingCost: parseFloat(shippingCost) || 0,
         customsCost: parseFloat(customsCost) || 0,
         portCost: parseFloat(portCost) || 0,
+        glassFees: parseFloat(glassFees) || 0,
         otherCosts: parseFloat(otherCosts) || 0,
         notes: notes.trim() || undefined,
-      } as any);
-      // Also update containerPrice, glassFees, rentalDate directly
-      await supabase.from('containers').update({
-        container_price: parseFloat(containerPrice) || 0,
-        glass_fees: parseFloat(glassFees) || 0,
-        rental_date: rentalDate || null,
-        origin_country: originCountry,
-        destination_country: destinationCountry,
-        capacity,
-      }).eq('id', id!);
+      });
       toast.success('تم تحديث الحاوية بنجاح');
       navigate(-1);
     } catch (error) {
