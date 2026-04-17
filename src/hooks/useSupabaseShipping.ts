@@ -220,46 +220,34 @@ export function useSupabaseShipping() {
 
   const updateContainer = useCallback(async (id: string, updates: Partial<Container>) => {
     if (guardOffline()) return;
-    const { data: current } = await supabase.from('containers').select('*').eq('id', id).single();
-    if (!current) return;
-
-    // Get extra expenses total for this container
-    const { data: expData } = await supabase.from('container_expenses').select('amount').eq('container_id', id);
-    const extraExpenses = (expData || []).reduce((s, e) => s + Number(e.amount), 0);
-
-    const cp = updates.containerPrice ?? Number(current.container_price || 0);
-    const sc = updates.shippingCost ?? Number(current.shipping_cost);
-    const cc = updates.customsCost ?? Number(current.customs_cost);
-    const pc = updates.portCost ?? Number(current.port_cost);
-    const gf = updates.glassFees ?? Number(current.glass_fees || 0);
-    const oc = updates.otherCosts ?? Number(current.other_costs);
-    const baseCost = cp + sc + cc + pc + gf + oc;
-    const newTotal = baseCost + extraExpenses;
-
-    const { error } = await supabase.from('containers').update({
-      container_number: updates.containerNumber ?? current.container_number,
-      type: updates.type ?? current.type,
-      capacity: updates.capacity ?? current.capacity,
-      route: updates.route ?? current.route,
-      origin_country: updates.originCountry ?? current.origin_country,
-      destination_country: updates.destinationCountry ?? current.destination_country,
-      status: updates.status ?? current.status,
-      departure_date: updates.departureDate ?? current.departure_date,
-      arrival_date: updates.arrivalDate ?? current.arrival_date,
-      clearance_date: updates.clearanceDate ?? current.clearance_date,
-      rental_date: updates.rentalDate ?? current.rental_date,
-      container_price: cp,
-      shipping_cost: sc,
-      customs_cost: cc,
-      port_cost: pc,
-      glass_fees: gf,
-      other_costs: oc,
-      total_cost: newTotal,
-      profit: Number(current.total_revenue) - newTotal,
-      notes: updates.notes ?? current.notes,
-      attachments: updates.attachments ?? current.attachments,
-    }).eq('id', id);
-    if (error) { toast.error('خطأ في تحديث الحاوية'); return; }
+    // Use new RPC that reverses & re-posts the shipping_agent accounting entry
+    const { error } = await (supabase.rpc as any)('update_container_with_accounting', {
+      p_container_id: id,
+      p_container_number: updates.containerNumber ?? null,
+      p_type: updates.type ?? null,
+      p_capacity: updates.capacity ?? null,
+      p_route: updates.route ?? null,
+      p_origin_country: updates.originCountry ?? null,
+      p_destination_country: updates.destinationCountry ?? null,
+      p_status: updates.status ?? null,
+      p_shipping_agent_id: updates.shippingAgentId ?? null,
+      p_shipping_cost: updates.shippingCost ?? null,
+      p_customs_cost: updates.customsCost ?? null,
+      p_port_cost: updates.portCost ?? null,
+      p_other_costs: updates.otherCosts ?? null,
+      p_container_price: updates.containerPrice ?? null,
+      p_glass_fees: updates.glassFees ?? null,
+      p_departure_date: updates.departureDate ?? null,
+      p_arrival_date: updates.arrivalDate ?? null,
+      p_clearance_date: updates.clearanceDate ?? null,
+      p_rental_date: updates.rentalDate ?? null,
+      p_notes: updates.notes ?? null,
+    });
+    if (error) { toast.error('خطأ في تحديث الحاوية'); console.error(error); return; }
+    // Update attachments separately (not in RPC)
+    if (updates.attachments !== undefined) {
+      await supabase.from('containers').update({ attachments: updates.attachments }).eq('id', id);
+    }
     toast.success('تم تحديث الحاوية بنجاح');
     realtimeRef.current.suppressNext();
     await fetchContainers(true);
