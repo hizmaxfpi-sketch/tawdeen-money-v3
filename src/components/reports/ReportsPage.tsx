@@ -75,18 +75,26 @@ export function ReportsPage({
 
   const previewRef = useRef<HTMLDivElement>(null);
 
-  // ============= Computed Stats =============
+  // ============= Computed Stats - RESPECT container filter =============
+  const filteredContainers = useMemo(() => {
+    if (filterContainerIds.size === 0) return containers;
+    return containers.filter(c => filterContainerIds.has(c.id));
+  }, [containers, filterContainerIds]);
+
   const shippingStats = useMemo(() => {
-    const totalShipments = shipments.length;
-    const totalRevenue = containers.reduce((s, c) => s + c.totalRevenue, 0);
-    const totalCosts = containers.reduce((s, c) => s + c.totalCost, 0);
+    const scopeShipments = filterContainerIds.size > 0
+      ? shipments.filter(s => filterContainerIds.has(s.containerId))
+      : shipments;
+    const totalShipments = scopeShipments.length;
+    const totalRevenue = filteredContainers.reduce((s, c) => s + c.totalRevenue, 0);
+    const totalCosts = filteredContainers.reduce((s, c) => s + c.totalCost, 0);
     const totalProfit = totalRevenue - totalCosts;
-    const totalCollected = shipments.reduce((s, sh) => s + sh.amountPaid, 0);
-    const totalRemaining = shipments.reduce((s, sh) => s + sh.remainingAmount, 0);
-    const totalPieces = shipments.reduce((s, sh) => s + sh.quantity, 0);
-    const totalWeight = shipments.reduce((s, sh) => s + (sh.weight || 0), 0);
+    const totalCollected = scopeShipments.reduce((s, sh) => s + sh.amountPaid, 0);
+    const totalRemaining = scopeShipments.reduce((s, sh) => s + sh.remainingAmount, 0);
+    const totalPieces = scopeShipments.reduce((s, sh) => s + sh.quantity, 0);
+    const totalWeight = scopeShipments.reduce((s, sh) => s + (sh.weight || 0), 0);
     return { totalShipments, totalRevenue, totalCosts, totalProfit, totalCollected, totalRemaining, totalPieces, totalWeight };
-  }, [containers, shipments]);
+  }, [filteredContainers, shipments, filterContainerIds]);
 
   const filteredShipments = useMemo(() => {
     return shipments.filter(s => {
