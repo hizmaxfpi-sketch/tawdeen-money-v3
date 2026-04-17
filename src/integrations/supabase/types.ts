@@ -371,43 +371,80 @@ export type Database = {
       container_expenses: {
         Row: {
           amount: number
+          contact_id: string | null
           container_id: string
           created_at: string
           date: string
           description: string
+          fund_id: string | null
           id: string
           notes: string | null
+          transaction_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           amount?: number
+          contact_id?: string | null
           container_id: string
           created_at?: string
           date?: string
           description?: string
+          fund_id?: string | null
           id?: string
           notes?: string | null
+          transaction_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           amount?: number
+          contact_id?: string | null
           container_id?: string
           created_at?: string
           date?: string
           description?: string
+          fund_id?: string | null
           id?: string
           notes?: string | null
+          transaction_id?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
+            foreignKeyName: "container_expenses_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "container_expenses_container_id_fkey"
             columns: ["container_id"]
             isOneToOne: false
             referencedRelation: "containers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "container_expenses_fund_id_fkey"
+            columns: ["fund_id"]
+            isOneToOne: false
+            referencedRelation: "funds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "container_expenses_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "container_expenses_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_ledger"
             referencedColumns: ["id"]
           },
         ]
@@ -1442,6 +1479,17 @@ export type Database = {
       }
     }
     Functions: {
+      add_container_expense: {
+        Args: {
+          p_amount: number
+          p_contact_id: string
+          p_container_id: string
+          p_description: string
+          p_fund_id?: string
+          p_notes?: string
+        }
+        Returns: string
+      }
       company_user_ids: { Args: never; Returns: string[] }
       create_container_with_accounting: {
         Args: {
@@ -1545,6 +1593,10 @@ export type Database = {
             }
             Returns: string
           }
+      delete_container_expense: {
+        Args: { p_expense_id: string }
+        Returns: undefined
+      }
       delete_container_with_shipments: {
         Args: { p_container_id: string }
         Returns: undefined
@@ -1609,6 +1661,31 @@ export type Database = {
       track_shipment_public: {
         Args: { p_client_code: string; p_package_number: string }
         Returns: Json
+      }
+      update_container_with_accounting: {
+        Args: {
+          p_arrival_date?: string
+          p_capacity?: number
+          p_clearance_date?: string
+          p_container_id: string
+          p_container_number?: string
+          p_container_price?: number
+          p_customs_cost?: number
+          p_departure_date?: string
+          p_destination_country?: string
+          p_glass_fees?: number
+          p_notes?: string
+          p_origin_country?: string
+          p_other_costs?: number
+          p_port_cost?: number
+          p_rental_date?: string
+          p_route?: string
+          p_shipping_agent_id?: string
+          p_shipping_cost?: number
+          p_status?: string
+          p_type?: string
+        }
+        Returns: undefined
       }
       update_project_with_accounting: {
         Args: {

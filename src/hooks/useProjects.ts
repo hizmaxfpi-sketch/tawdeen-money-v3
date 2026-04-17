@@ -14,27 +14,24 @@ const logToActivity = async (userId: string, eventType: string, entityType: stri
 
 export function useProjects() {
   const { user } = useAuth();
-  const PAGE_SIZE = 20;
   const [projects, setProjects] = useState<Project[]>(() => cacheGet<Project[]>('projects') || []);
   const [loading, setLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [page, setPage] = useState(0);
-  const [loadingMore, setLoadingMore] = useState(false);
+  // Always-load-all: no pagination so stats and grouping are always accurate
+  const [hasMore] = useState(false);
+  const [loadingMore] = useState(false);
   const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
 
-  const fetchProjects = useCallback(async (reset = false) => {
+  const fetchProjects = useCallback(async (_reset = false) => {
     if (!user) return;
-    const currentPage = reset ? 0 : page;
     if (!initialLoaded) setLoading(true);
-    else if (!reset) setLoadingMore(true);
-    
+
+    // Fetch ALL projects in one go (up to 1000 default Supabase limit, sufficient for SMB)
     const { data, error } = await supabase
       .from('projects')
       .select('id, name, notes, client_id, vendor_id, contract_value, expenses, received_amount, commission, currency_difference, profit, status, start_date, end_date, attachments, created_at, updated_at, created_by_name, client:contacts!projects_client_id_fkey(name), vendor:contacts!projects_vendor_id_fkey(name)')
-      .order('created_at', { ascending: false })
-      .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
-    
+      .order('created_at', { ascending: false });
+
     if (error) { console.error('Error fetching projects:', error); }
     else {
       const mapped = (data || []).map(p => ({
@@ -60,19 +57,12 @@ export function useProjects() {
         createdAt: new Date(p.created_at),
         updatedAt: new Date(p.updated_at),
       }));
-      if (reset || currentPage === 0) {
-        setProjects(mapped);
-        cacheSet('projects', mapped);
-        setPage(0);
-      } else {
-        setProjects(prev => [...prev, ...mapped]);
-      }
-      setHasMore((data || []).length === PAGE_SIZE);
+      setProjects(mapped);
+      cacheSet('projects', mapped);
     }
     setLoading(false);
-    setLoadingMore(false);
     setInitialLoaded(true);
-  }, [user, page, initialLoaded]);
+  }, [user, initialLoaded]);
 
   useEffect(() => {
     if (user) fetchProjects(true);
@@ -84,13 +74,7 @@ export function useProjects() {
   });
   realtimeRef.current = rt;
 
-  const loadMore = useCallback(() => {
-    if (hasMore && !loadingMore) setPage(prev => prev + 1);
-  }, [hasMore, loadingMore]);
-
-  useEffect(() => {
-    if (page > 0) fetchProjects();
-  }, [page]);
+  const loadMore = useCallback(() => {}, []);
 
   const addProject = useCallback(async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'profit' | 'receivedAmount'>) => {
     if (!user) return;

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useSupabaseShipping } from '@/hooks/useSupabaseShipping';
+import { useSupabaseFinance } from '@/hooks/useSupabaseFinance';
 import { useScrollToTop } from '@/hooks/useScrollToTop';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,9 +34,12 @@ export default function EditContainer() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const shippingStore = useSupabaseShipping();
+  const financeStore = useSupabaseFinance();
   useScrollToTop();
 
   const container = shippingStore.containers.find(c => c.id === id);
+  const contactOptions = financeStore.getAccountOptions();
+  const fundOptions = financeStore.getFundOptions();
 
   // Form state - ALL fields
   const [containerNumber, setContainerNumber] = useState('');
@@ -62,6 +66,8 @@ export default function EditContainer() {
   const [showExpenses, setShowExpenses] = useState(true);
   const [newExpenseDesc, setNewExpenseDesc] = useState('');
   const [newExpenseAmount, setNewExpenseAmount] = useState('');
+  const [newExpenseContactId, setNewExpenseContactId] = useState('');
+  const [newExpenseFundId, setNewExpenseFundId] = useState('');
   const [addingExpense, setAddingExpense] = useState(false);
 
   // Load container data from DB directly to get ALL fields
@@ -124,30 +130,39 @@ export default function EditContainer() {
 
   const handleAddExpense = async () => {
     if (!user || !id || !newExpenseDesc.trim() || !(parseFloat(newExpenseAmount) > 0)) return;
+    if (!newExpenseContactId) { toast.error('يجب اختيار المستفيد'); return; }
     setAddingExpense(true);
-    const { data, error } = await supabase.from('container_expenses').insert({
-      container_id: id,
-      user_id: user.id,
-      amount: parseFloat(newExpenseAmount),
-      description: newExpenseDesc.trim(),
-    }).select().single();
-    if (error) { toast.error('خطأ في إضافة المصروف'); }
-    else {
-      setExpenses(prev => [...prev, { id: data.id, amount: Number(data.amount), description: data.description, date: data.date, notes: data.notes }]);
+    const { data, error } = await (supabase.rpc as any)('add_container_expense', {
+      p_container_id: id,
+      p_amount: parseFloat(newExpenseAmount),
+      p_description: newExpenseDesc.trim(),
+      p_contact_id: newExpenseContactId,
+      p_fund_id: newExpenseFundId || null,
+    });
+    if (error) { toast.error(error.message || 'خطأ في إضافة المصروف'); }
+    else if (data) {
+      // Reload expenses from DB to get fresh data
+      const { data: refreshed } = await supabase
+        .from('container_expenses')
+        .select('id, amount, description, date, notes')
+        .eq('container_id', id)
+        .order('created_at', { ascending: true });
+      if (refreshed) setExpenses(refreshed.map(e => ({ ...e, amount: Number(e.amount) })));
       setNewExpenseDesc('');
       setNewExpenseAmount('');
-      toast.success('تم إضافة المصروف');
-      // Refresh containers to update totals
+      setNewExpenseContactId('');
+      setNewExpenseFundId('');
+      toast.success('تم إضافة المصروف وتسجيل القيد المحاسبي');
       shippingStore.fetchContainers(true);
     }
     setAddingExpense(false);
   };
 
   const handleDeleteExpense = async (expenseId: string) => {
-    const { error } = await supabase.from('container_expenses').delete().eq('id', expenseId);
+    const { error } = await (supabase.rpc as any)('delete_container_expense', { p_expense_id: expenseId });
     if (error) { toast.error('خطأ في حذف المصروف'); return; }
     setExpenses(prev => prev.filter(e => e.id !== expenseId));
-    toast.success('تم حذف المصروف');
+    toast.success('تم حذف المصروف وعكس القيد');
     shippingStore.fetchContainers(true);
   };
 
@@ -367,16 +382,29 @@ export default function EditContainer() {
                   </div>
                 </div>
               ))}
-              {/* Add new expense */}
+              {/* Add new expense - requires beneficiary */}
               <div className="border-t border-border pt-3 space-y-2">
                 <p className="text-[11px] font-semibold">إضافة مصروف جديد</p>
                 <div className="grid grid-cols-2 gap-2">
                   <Input value={newExpenseDesc} onChange={(e) => setNewExpenseDesc(e.target.value)} placeholder="وصف المصروف" className="h-9 text-xs" />
                   <Input type="number" value={newExpenseAmount} onChange={(e) => setNewExpenseAmount(e.target.value)} placeholder="المبلغ" className="h-9 text-xs" />
                 </div>
+                <Select value={newExpenseContactId} onValueChange={setNewExpenseContactId}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="* المستفيد (إلزامي)" /></SelectTrigger>
+                  <SelectContent>
+                    {contactOptions.map(c => <SelectItem key={c.id} value={c.id} className="text-xs">{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={newExpenseFundId || 'none'} onValueChange={(v) => setNewExpenseFundId(v === 'none' ? '' : v)}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="الصندوق (اختياري - للسداد الفوري)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="text-xs">بدون سداد فوري (يبقى دين على المستفيد)</SelectItem>
+                    {fundOptions.map(f => <SelectItem key={f.id} value={f.id} className="text-xs">{f.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 <Button size="sm" className="w-full h-8 text-xs gap-1" onClick={handleAddExpense}
-                  disabled={addingExpense || !newExpenseDesc.trim() || !(parseFloat(newExpenseAmount) > 0)}>
-                  <Plus className="h-3 w-3" /> إضافة مصروف
+                  disabled={addingExpense || !newExpenseDesc.trim() || !(parseFloat(newExpenseAmount) > 0) || !newExpenseContactId}>
+                  {addingExpense ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Plus className="h-3 w-3" /> إضافة مصروف</>}
                 </Button>
               </div>
             </div>

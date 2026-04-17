@@ -9,22 +9,27 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Container, Shipment } from '@/types/finance';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Container, Shipment, AccountOption, FundOption } from '@/types/finance';
 import { ShipmentCard } from './ShipmentCard';
 import { VisualContainerLoader } from './VisualContainerLoader';
 import { StatusTimeline } from './StatusTimeline';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface ContainerExpense {
   id: string;
   amount: number;
   description: string;
   date: string;
+  contact_id?: string;
 }
 
 interface ContainerCardProps {
   container: Container;
   shipments: Shipment[];
+  contacts?: AccountOption[];
+  funds?: FundOption[];
   onEdit: (container: Container) => void;
   onDelete: (containerId: string) => void;
   onAddShipment: (containerId: string) => void;
@@ -32,6 +37,7 @@ interface ContainerCardProps {
   onDeleteShipment: (shipmentId: string) => void;
   onAddPayment: (shipmentId: string) => void;
   onToggleClosed?: (containerId: string, isClosed: boolean) => void;
+  onExpenseChanged?: () => void;
   canEdit?: boolean;
   canDelete?: boolean;
 }
@@ -46,6 +52,8 @@ const statusLabels: Record<string, { label: string; color: string }> = {
 export function ContainerCard({
   container,
   shipments,
+  contacts = [],
+  funds = [],
   onEdit,
   onDelete,
   onAddShipment,
@@ -53,6 +61,7 @@ export function ContainerCard({
   onDeleteShipment,
   onAddPayment,
   onToggleClosed,
+  onExpenseChanged,
   canEdit = true,
   canDelete = true,
 }: ContainerCardProps) {
@@ -62,6 +71,8 @@ export function ContainerCard({
   const [addingExpense, setAddingExpense] = useState(false);
   const [newExpDesc, setNewExpDesc] = useState('');
   const [newExpAmount, setNewExpAmount] = useState('');
+  const [newExpContactId, setNewExpContactId] = useState('');
+  const [newExpFundId, setNewExpFundId] = useState('');
   const [submittingExpense, setSubmittingExpense] = useState(false);
 
   const isOverCapacity = container.usedCapacity > container.capacity;
@@ -259,36 +270,63 @@ export function ContainerCard({
                   </div>
                 )}
 
-                {/* Add expense inline form */}
+                {/* Add expense inline form - requires beneficiary */}
                 {addingExpense && (
                   <div className="border-t border-border pt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex gap-2">
-                      <Input placeholder="وصف المصروف" value={newExpDesc} onChange={(e) => setNewExpDesc(e.target.value)} className="h-7 text-[11px] flex-1" />
-                      <Input type="number" placeholder="المبلغ" value={newExpAmount} onChange={(e) => setNewExpAmount(e.target.value)} className="h-7 text-[11px] w-24" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input placeholder="وصف المصروف" value={newExpDesc} onChange={(e) => setNewExpDesc(e.target.value)} className="h-7 text-[11px]" />
+                      <Input type="number" placeholder="المبلغ" value={newExpAmount} onChange={(e) => setNewExpAmount(e.target.value)} className="h-7 text-[11px]" />
                     </div>
+                    <Select value={newExpContactId} onValueChange={setNewExpContactId}>
+                      <SelectTrigger className="h-7 text-[11px]">
+                        <SelectValue placeholder="* المستفيد (إلزامي)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contacts.map(c => (
+                          <SelectItem key={c.id} value={c.id} className="text-[11px]">{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={newExpFundId || 'none'} onValueChange={(v) => setNewExpFundId(v === 'none' ? '' : v)}>
+                      <SelectTrigger className="h-7 text-[11px]">
+                        <SelectValue placeholder="الصندوق (اختياري - للسداد الفوري)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none" className="text-[11px]">بدون سداد فوري</SelectItem>
+                        {funds.map(f => (
+                          <SelectItem key={f.id} value={f.id} className="text-[11px]">{f.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Button
                       size="sm" className="w-full h-7 text-[10px]"
-                      disabled={submittingExpense || !newExpDesc.trim() || !(parseFloat(newExpAmount) > 0)}
+                      disabled={submittingExpense || !newExpDesc.trim() || !(parseFloat(newExpAmount) > 0) || !newExpContactId}
                       onClick={async (e) => {
                         e.stopPropagation();
+                        if (!newExpContactId) { toast.error('يجب اختيار المستفيد'); return; }
                         setSubmittingExpense(true);
-                        const { data, error } = await supabase.from('container_expenses').insert({
-                          container_id: container.id,
-                          user_id: (await supabase.auth.getUser()).data.user?.id || '',
-                          amount: parseFloat(newExpAmount),
-                          description: newExpDesc.trim(),
-                        }).select().single();
-                        if (!error && data) {
-                          setExtraExpenses(prev => [...prev, { id: data.id, amount: Number(data.amount), description: data.description, date: data.date }]);
-                          setNewExpDesc(''); setNewExpAmount(''); setAddingExpense(false);
-                          // The DB trigger will recalculate container totals
-                          // Force parent to refresh
-                          window.dispatchEvent(new CustomEvent('container-expense-added'));
+                        const { data, error } = await (supabase.rpc as any)('add_container_expense', {
+                          p_container_id: container.id,
+                          p_amount: parseFloat(newExpAmount),
+                          p_description: newExpDesc.trim(),
+                          p_contact_id: newExpContactId,
+                          p_fund_id: newExpFundId || null,
+                        });
+                        if (error) { toast.error(error.message || 'خطأ في إضافة المصروف'); }
+                        else if (data) {
+                          // Reload expenses
+                          const { data: refreshed } = await supabase.from('container_expenses')
+                            .select('id, amount, description, date, contact_id').eq('container_id', container.id).order('created_at', { ascending: true });
+                          if (refreshed) setExtraExpenses(refreshed.map(x => ({ ...x, amount: Number(x.amount) })));
+                          setNewExpDesc(''); setNewExpAmount(''); setNewExpContactId(''); setNewExpFundId('');
+                          setAddingExpense(false);
+                          toast.success('تم إضافة المصروف وتسجيل القيد المحاسبي');
+                          onExpenseChanged?.();
                         }
                         setSubmittingExpense(false);
                       }}
                     >
-                      {submittingExpense ? <Loader2 className="h-3 w-3 animate-spin" /> : 'إضافة'}
+                      {submittingExpense ? <Loader2 className="h-3 w-3 animate-spin" /> : 'إضافة المصروف'}
                     </Button>
                   </div>
                 )}
