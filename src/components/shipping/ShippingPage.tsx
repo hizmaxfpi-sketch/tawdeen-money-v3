@@ -193,11 +193,14 @@ export function ShippingPage() {
             filteredContainers.map(container => (
               <ContainerCard key={container.id} container={container}
                 shipments={shippingStore.getContainerShipments(container.id)}
+                contacts={financeStore.getAccountOptions()}
+                funds={financeStore.getFundOptions()}
                 onEdit={handleEditContainer} onDelete={handleDeleteContainer}
                 onAddShipment={handleNavigateAddShipment}
                 onEditShipment={(shipment) => navigate(`/shipping/edit-shipment/${shipment.id}`)}
                 onDeleteShipment={handleDeleteShipment} onAddPayment={handleAddPayment}
                 onToggleClosed={canEdit ? shippingStore.toggleContainerClosed : undefined}
+                onExpenseChanged={() => { shippingStore.fetchContainers(true); }}
                 canEdit={canEdit} canDelete={canDelete} />
             ))
           )}
