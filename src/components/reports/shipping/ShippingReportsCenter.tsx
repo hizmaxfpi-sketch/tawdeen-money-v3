@@ -292,7 +292,8 @@ export function ShippingReportsCenter({
   // ============================================================
   const handleExportPDF = async () => {
     const { default: jsPDF } = await import('jspdf');
-    await import('jspdf-autotable');
+    const autoTableMod = await import('jspdf-autotable');
+    const autoTable = (autoTableMod as any).default || (autoTableMod as any).autoTable || autoTableMod;
     const doc = new jsPDF('p', 'mm', 'a4');
     const pw = doc.internal.pageSize.getWidth();
     doc.setFillColor(25, 65, 120);
@@ -304,7 +305,7 @@ export function ShippingReportsCenter({
     doc.text(new Date().toLocaleDateString('en-US'), pw / 2, 25, { align: 'center' });
     let y = 45;
     doc.setTextColor(0);
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: y,
       head: [['Metric', 'Value']],
       body: [
@@ -325,7 +326,7 @@ export function ShippingReportsCenter({
     });
     y = (doc as any).lastAutoTable.finalY + 10;
     if (filteredShipments.length > 0) {
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: y,
         head: [['Customer', 'Goods', 'CBM', 'Revenue', 'Paid', 'Outstanding', 'Status']],
         body: filteredShipments.map(s => [
