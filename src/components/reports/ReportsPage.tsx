@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { BackupSection } from './BackupSection';
 import { ActivityLogReport } from './ActivityLogReport';
 import { AccountingLedgerReport } from './AccountingLedgerReport';
+import { ShippingReportsCenter } from './shipping/ShippingReportsCenter';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 import { Currency } from '@/hooks/useCurrencies';
