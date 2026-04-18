@@ -758,12 +758,17 @@ export function ShippingReportsCenter({
         fmt={fmt}
       />
 
-      {/* ========== CONTAINER DETAIL DIALOG ========== */}
+      {/* ========== CONTAINER DETAIL DIALOG (NEW) ========== */}
       <ContainerDetailDialog
         container={containerDetail}
         shipments={containerDetail ? shipments.filter(s => s.containerId === containerDetail.id) : []}
-        onClose={() => setContainerDetail(null)}
+        contacts={contacts}
+        contactsFull={contactsFull}
+        funds={funds}
         fmt={fmt}
+        onClose={() => setContainerDetail(null)}
+        onReceivePayment={onReceiveShipmentPayment}
+        onRefresh={onRefresh}
       />
     </div>
   );
