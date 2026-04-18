@@ -22,7 +22,8 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, LineChart, Line, Legend,
 } from 'recharts';
-import type { Container, Shipment, AccountOption, Fund, Currency } from '@/types/finance';
+import type { Container, Shipment, AccountOption, Fund } from '@/types/finance';
+import type { Currency } from '@/hooks/useCurrencies';
 import { convertForDisplay, getCurrencySymbol } from '@/components/shared/CurrencyDisplaySelector';
 
 // ============================================================
