@@ -70,15 +70,7 @@ export function ContainerDetailDialog({
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [expandedShipment, setExpandedShipment] = useState<string | null>(null);
 
-  if (!container) return null;
-
-  const showFinance = viewMode === 'full' || viewMode === 'financial';
-  const showOperational = viewMode !== 'financial'; // financial mode focuses on money
-
-  const fillRate = container.capacity > 0 ? (container.usedCapacity / container.capacity) * 100 : 0;
-  const remainingCap = Math.max(0, container.capacity - container.usedCapacity);
-
-  // Aggregate operational stats from shipments
+  // Aggregate operational stats from shipments (must run before any early return)
   const ops = useMemo(() => {
     const totalPieces = shipments.reduce((s, sh) => s + (sh.quantity || 0), 0);
     const totalWeight = shipments.reduce((s, sh) => s + (sh.weight || 0), 0);
@@ -89,6 +81,14 @@ export function ContainerDetailDialog({
     const uniqueClients = new Set(shipments.map(s => s.clientId || s.clientName)).size;
     return { totalPieces, totalWeight, totalCBM, totalRevenue, totalCollected, totalOutstanding, uniqueClients };
   }, [shipments]);
+
+  if (!container) return null;
+
+  const showFinance = viewMode === 'full' || viewMode === 'financial';
+  const showOperational = viewMode !== 'financial'; // financial mode focuses on money
+
+  const fillRate = container.capacity > 0 ? (container.usedCapacity / container.capacity) * 100 : 0;
+  const remainingCap = Math.max(0, container.capacity - container.usedCapacity);
 
   // Lookup helper for contact info (phone)
   const getContactInfo = (clientId?: string, fallbackName?: string): ContactInfo | null => {
