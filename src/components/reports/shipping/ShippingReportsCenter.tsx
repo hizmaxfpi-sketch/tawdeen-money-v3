@@ -1209,83 +1209,8 @@ function ShipmentDetailDialog({
   );
 }
 
-function ContainerDetailDialog({
-  container, shipments, onClose, fmt,
-}: { container: Container | null; shipments: Shipment[]; onClose: () => void; fmt: (v: number) => string }) {
-  if (!container) return null;
-  const fillRate = container.capacity > 0 ? (container.usedCapacity / container.capacity) * 100 : 0;
-  return (
-    <Dialog open={!!container} onOpenChange={onClose}>
-      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-sm">تفاصيل الحاوية</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="rounded-lg bg-gradient-to-br from-primary/10 to-transparent p-3 border border-primary/20">
-            <p className="text-[10px] text-muted-foreground">رقم الحاوية</p>
-            <p className="text-base font-bold">{container.containerNumber}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">{container.route}</p>
-          </div>
+// Old inline ContainerDetailDialog removed — replaced by ./ContainerDetailDialog
 
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <Stat label="السعة" value={`${container.usedCapacity.toFixed(1)}/${container.capacity}`} color="text-cyan-600" />
-            <Stat label="الإشغال" value={`${fillRate.toFixed(0)}%`} color={fillRate > 90 ? 'text-red-600' : 'text-green-600'} />
-            <Stat label="الشحنات" value={String(shipments.length)} color="text-purple-600" />
-          </div>
-
-          <div className="rounded-lg border border-border p-3 space-y-2">
-            <h4 className="text-xs font-bold">الأداء المالي</h4>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="p-2 rounded bg-blue-500/10">
-                <p className="text-[9px] text-muted-foreground">الإيراد</p>
-                <p className="text-xs font-bold text-blue-600">{fmt(container.totalRevenue)}</p>
-              </div>
-              <div className="p-2 rounded bg-red-500/10">
-                <p className="text-[9px] text-muted-foreground">التكلفة</p>
-                <p className="text-xs font-bold text-red-600">{fmt(container.totalCost)}</p>
-              </div>
-              <div className={cn('p-2 rounded', container.profit >= 0 ? 'bg-green-500/10' : 'bg-red-500/10')}>
-                <p className="text-[9px] text-muted-foreground">الربح</p>
-                <p className={cn('text-xs font-bold', container.profit >= 0 ? 'text-green-600' : 'text-red-600')}>
-                  {fmt(container.profit)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-border p-3">
-            <h4 className="text-xs font-bold mb-1.5">تفصيل التكاليف</h4>
-            <div className="text-[10px] space-y-1">
-              <Row label="سعر الحاوية" value={fmt(container.containerPrice || 0)} />
-              <Row label="الشحن" value={fmt(container.shippingCost)} />
-              <Row label="الجمارك" value={fmt(container.customsCost)} />
-              <Row label="الميناء" value={fmt(container.portCost)} />
-              <Row label="رسوم الزجاج" value={fmt(container.glassFees || 0)} />
-              <Row label="أخرى" value={fmt(container.otherCosts)} />
-              <div className="border-t border-border pt-1 mt-1">
-                <Row label="الإجمالي" value={fmt(container.totalCost)} bold />
-              </div>
-            </div>
-          </div>
-
-          {shipments.length > 0 && (
-            <div className="rounded-lg border border-border p-3">
-              <h4 className="text-xs font-bold mb-1.5">شحنات الحاوية ({shipments.length})</h4>
-              <div className="space-y-1">
-                {shipments.map(s => (
-                  <div key={s.id} className="flex justify-between text-[10px] p-1.5 rounded bg-muted/30">
-                    <span className="truncate">{s.clientName}</span>
-                    <span className="tabular-nums shrink-0">{fmt(s.contractPrice)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
