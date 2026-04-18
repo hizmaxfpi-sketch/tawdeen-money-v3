@@ -25,6 +25,7 @@ import {
 import type { Container, Shipment, AccountOption, Fund } from '@/types/finance';
 import type { Currency } from '@/hooks/useCurrencies';
 import { convertForDisplay, getCurrencySymbol } from '@/components/shared/CurrencyDisplaySelector';
+import { ContainerDetailDialog } from './ContainerDetailDialog';
 
 // ============================================================
 // TYPES
@@ -33,10 +34,12 @@ interface Props {
   containers: Container[];
   shipments: Shipment[];
   contacts: AccountOption[];
+  contactsFull?: { id: string; name: string; phone?: string; whatsapp?: string; email?: string }[];
   funds: Fund[];
   currencies: Currency[];
   displayCurrency: string;
   onRefresh?: () => void;
+  onReceiveShipmentPayment?: (shipmentId: string, amount: number, fundId: string, note?: string) => Promise<void> | void;
 }
 
 const STATUS_LABELS: Record<string, string> = {
