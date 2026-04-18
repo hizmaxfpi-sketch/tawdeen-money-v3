@@ -63,7 +63,7 @@ const STATUS_COLORS: Record<string, string> = {
 // MAIN COMPONENT
 // ============================================================
 export function ShippingReportsCenter({
-  containers, shipments, contacts, funds, currencies, displayCurrency, onRefresh,
+  containers, shipments, contacts, contactsFull = [], funds, currencies, displayCurrency, onRefresh, onReceiveShipmentPayment,
 }: Props) {
   // ----- Filters -----
   const [dateFrom, setDateFrom] = useState('');
