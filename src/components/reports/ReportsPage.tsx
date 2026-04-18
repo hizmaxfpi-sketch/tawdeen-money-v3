@@ -29,6 +29,7 @@ interface ReportsPageProps {
   transactions: Transaction[];
   funds: Fund[];
   contacts: AccountOption[];
+  contactsFull?: { id: string; name: string; phone?: string; whatsapp?: string; email?: string }[];
   exportData: () => object;
   importData?: (data: any) => Promise<any> | void;
   containers?: Container[];
@@ -37,6 +38,8 @@ interface ReportsPageProps {
   projectStats?: ProjectStats;
   stats?: FinanceStats;
   currencies?: Currency[];
+  onReceiveShipmentPayment?: (shipmentId: string, amount: number, fundId: string, note?: string) => Promise<void> | void;
+  onRefresh?: () => void;
 }
 
 const COLORS = ['hsl(215,70%,35%)', 'hsl(145,65%,42%)', 'hsl(0,72%,51%)', 'hsl(45,93%,47%)', 'hsl(280,60%,50%)', 'hsl(190,80%,42%)'];
@@ -49,8 +52,9 @@ const statusLabels: Record<string, string> = {
 };
 
 export function ReportsPage({
-  transactions, funds, contacts, exportData, importData,
+  transactions, funds, contacts, contactsFull = [], exportData, importData,
   containers = [], shipments = [], projects = [], projectStats, stats, currencies = [],
+  onReceiveShipmentPayment, onRefresh,
 }: ReportsPageProps) {
   const [activeTab, setActiveTab] = useState('shipping');
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -384,9 +388,12 @@ export function ReportsPage({
             containers={containers}
             shipments={shipments}
             contacts={contacts}
+            contactsFull={contactsFull}
             funds={funds}
             currencies={currencies}
             displayCurrency={displayCurrency}
+            onReceiveShipmentPayment={onReceiveShipmentPayment}
+            onRefresh={onRefresh}
           />
         </TabsContent>
 
