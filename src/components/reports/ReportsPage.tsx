@@ -746,9 +746,15 @@ export function ReportsPage({
               <DialogTitle className="text-sm">معاينة التقرير</DialogTitle>
               <div className="flex gap-1 items-center">
                 {(previewContent === 'shipping-summary' || previewContent === 'container-detail' || previewContent === 'shipment-detail') && (
-                  <button onClick={() => setShowFinancials(!showFinancials)} className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border">
+                  <button onClick={() => setShowFinancials(!showFinancials)} className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border" data-no-print>
                     {showFinancials ? <ToggleRight className="h-3.5 w-3.5 text-primary" /> : <ToggleLeft className="h-3.5 w-3.5" />}
                     {showFinancials ? 'إخفاء المالية' : 'عرض المالية'}
+                  </button>
+                )}
+                {previewContent === 'container-detail' && (
+                  <button onClick={() => setShowCostDetails(!showCostDetails)} className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border" data-no-print>
+                    {showCostDetails ? <ToggleRight className="h-3.5 w-3.5 text-primary" /> : <ToggleLeft className="h-3.5 w-3.5" />}
+                    {showCostDetails ? 'إخفاء التكاليف' : 'تفاصيل التكاليف'}
                   </button>
                 )}
                 <Button variant="outline" size="sm" className="h-7 text-[9px] gap-1" onClick={handlePrint} data-no-print>
