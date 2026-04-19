@@ -125,9 +125,9 @@ export function ProductionRunsTab({ products, bom, materials, services, fundOpti
   };
 
   // Filtered history
-  const applyFilter = <T extends { date: string; product_id: string; contact_id?: string | null }>(rows: T[]) => {
+  const applyFilter = <T extends { date: string; product_id?: string | null; material_id?: string | null; contact_id?: string | null }>(rows: T[]) => {
     return rows.filter(r => {
-      if (hProduct !== 'all' && r.product_id !== hProduct) return false;
+      if (hProduct !== 'all' && r.product_id !== hProduct && r.material_id !== hProduct) return false;
       if (hContact !== 'all' && (r.contact_id || '') !== hContact) return false;
       if (hFrom && r.date < hFrom) return false;
       if (hTo && r.date > hTo) return false;
@@ -151,7 +151,9 @@ export function ProductionRunsTab({ products, bom, materials, services, fundOpti
     return { qty, cost };
   }, [filteredRuns]);
 
-  const productName = (id: string) => products.find(p => p.id === id)?.name || '—';
+  const productName = (id: string | null | undefined) => id ? (products.find(p => p.id === id)?.name || '—') : '—';
+  const materialName = (id: string | null | undefined) => id ? (materials.find(m => m.id === id)?.name || '—') : '—';
+  const saleItemName = (s: SaleRow) => s.source_type === 'material' ? materialName(s.material_id) : productName(s.product_id);
   const contactName = (id: string | null | undefined) => id ? (contacts.find(c => c.id === id)?.name || '—') : '—';
   const hasFilters = hProduct !== 'all' || hContact !== 'all' || hFrom || hTo;
   const clearFilters = () => { setHProduct('all'); setHContact('all'); setHFrom(''); setHTo(''); };
@@ -273,9 +275,11 @@ export function ProductionRunsTab({ products, bom, materials, services, fundOpti
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <ShoppingCart className="h-3.5 w-3.5 text-income shrink-0" />
-                        <span className="text-sm font-semibold">{productName(s.product_id)}</span>
+                        {s.source_type === 'material' ? <Package className="h-3.5 w-3.5 text-primary shrink-0" /> : <ShoppingCart className="h-3.5 w-3.5 text-income shrink-0" />}
+                        <span className="text-sm font-semibold">{saleItemName(s)}</span>
                         <span className="text-[10px] text-muted-foreground">× {s.quantity}</span>
+                        {s.source_type === 'material' && <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">مادة خام</span>}
+                        {Number(s.services_total) > 0 && <span className="text-[9px] bg-accent/30 text-accent-foreground px-1.5 py-0.5 rounded">+خدمات ${Number(s.services_total).toFixed(2)}</span>}
                       </div>
                       <div className="flex gap-2 mt-1 text-[11px] flex-wrap">
                         <span>عميل: <strong>{contactName(s.contact_id)}</strong></span>
@@ -305,7 +309,7 @@ export function ProductionRunsTab({ products, bom, materials, services, fundOpti
                             <AlertDialogHeader>
                               <AlertDialogTitle>حذف عملية البيع؟</AlertDialogTitle>
                               <AlertDialogDescription>
-                                سيتم إرجاع {s.quantity} من {productName(s.product_id)} للمخزون، حذف القيد المحاسبي، وعكس مبلغ التحصيل ${Number(s.paid_amount).toFixed(2)} من الصندوق. هذا الإجراء لا يمكن التراجع عنه.
+                                سيتم إرجاع {s.quantity} من {saleItemName(s)} للمخزون، حذف القيد المحاسبي، وعكس مبلغ التحصيل ${Number(s.paid_amount).toFixed(2)} من الصندوق. هذا الإجراء لا يمكن التراجع عنه.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -400,7 +404,7 @@ export function ProductionRunsTab({ products, bom, materials, services, fundOpti
           {editSale && (
             <div className="space-y-2">
               <div className="text-[11px] bg-muted/40 p-2 rounded">
-                المنتج: <strong>{productName(editSale.product_id)}</strong>
+                المنتج: <strong>{saleItemName(editSale)}</strong>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div><Label className="text-xs">الكمية *</Label><Input type="number" value={eQty} onChange={e => setEQty(e.target.value)} className="h-9 text-sm" /></div>
