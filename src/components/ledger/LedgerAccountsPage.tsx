@@ -385,6 +385,27 @@ export function LedgerAccountsPage() {
             </span>
           )}
         </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" title="ترتيب">
+              <ArrowUpDown className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="text-xs">
+            <DropdownMenuItem onClick={() => setSortBy('updated_desc')} className={cn(sortBy === 'updated_desc' && 'bg-accent')}>تاريخ التعديل (الأحدث)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('updated_asc')} className={cn(sortBy === 'updated_asc' && 'bg-accent')}>تاريخ التعديل (الأقدم)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('created_desc')} className={cn(sortBy === 'created_desc' && 'bg-accent')}>تاريخ الإنشاء (الأحدث)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('created_asc')} className={cn(sortBy === 'created_asc' && 'bg-accent')}>تاريخ الإنشاء (الأقدم)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('name_asc')} className={cn(sortBy === 'name_asc' && 'bg-accent')}>الاسم (أ - ي)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('name_desc')} className={cn(sortBy === 'name_desc' && 'bg-accent')}>الاسم (ي - أ)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('most_active')} className={cn(sortBy === 'most_active' && 'bg-accent')}>الأكثر حركة</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('least_active')} className={cn(sortBy === 'least_active' && 'bg-accent')}>الأقل حركة</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('balance_desc')} className={cn(sortBy === 'balance_desc' && 'bg-accent')}>الرصيد (الأكبر)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('balance_asc')} className={cn(sortBy === 'balance_asc' && 'bg-accent')}>الرصيد (الأصغر)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('debit_desc')} className={cn(sortBy === 'debit_desc' && 'bg-accent')}>الأكبر مديناً</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('credit_desc')} className={cn(sortBy === 'credit_desc' && 'bg-accent')}>الأكبر دائناً</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <div className="flex h-8 rounded-md border border-border overflow-hidden shrink-0">
           <button
             onClick={() => setViewMode('grid')}
