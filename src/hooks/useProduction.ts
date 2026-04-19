@@ -210,11 +210,61 @@ export function useProduction() {
     return true;
   };
 
+  const updateSale = async (saleId: string, params: {
+    quantity: number;
+    unit_price: number;
+    contact_id?: string;
+    fund_id?: string;
+    paid_amount?: number;
+    date?: string;
+    notes?: string;
+  }) => {
+    const { error } = await (supabase.rpc as any)('update_production_sale', {
+      p_sale_id: saleId,
+      p_quantity: params.quantity,
+      p_unit_price: params.unit_price,
+      p_contact_id: params.contact_id || null,
+      p_fund_id: params.fund_id || null,
+      p_paid_amount: params.paid_amount || 0,
+      p_date: params.date || null,
+      p_notes: params.notes || null,
+    });
+    if (error) { toast.error(error.message || 'فشل التعديل'); return false; }
+    toast.success('تم تعديل البيع وعكس أثره');
+    loadAll();
+    return true;
+  };
+
+  const deleteSale = async (saleId: string) => {
+    const { error } = await (supabase.rpc as any)('reverse_production_sale', { p_sale_id: saleId });
+    if (error) { toast.error(error.message || 'فشل الحذف'); return false; }
+    toast.success('تم حذف البيع وإلغاء أثره بالكامل');
+    loadAll();
+    return true;
+  };
+
+  const deleteRun = async (runId: string) => {
+    const { error } = await (supabase.rpc as any)('reverse_production_run', { p_run_id: runId });
+    if (error) { toast.error(error.message || 'فشل الإلغاء'); return false; }
+    toast.success('تم إلغاء الإنتاج وإرجاع المواد');
+    loadAll();
+    return true;
+  };
+
+  const deletePurchase = async (purchaseId: string) => {
+    const { error } = await (supabase.rpc as any)('reverse_material_purchase', { p_purchase_id: purchaseId });
+    if (error) { toast.error(error.message || 'فشل الإلغاء'); return false; }
+    toast.success('تم إلغاء الشراء وعكس أثره');
+    loadAll();
+    return true;
+  };
+
   return {
     materials, products, bom, summary, loading,
     addMaterial, updateMaterial, deleteMaterial, purchaseMaterial,
     addProduct, updateProduct, deleteProduct, setProductBom,
     produceProduct, sellProduct,
+    updateSale, deleteSale, deleteRun, deletePurchase,
     refresh: loadAll,
   };
 }
