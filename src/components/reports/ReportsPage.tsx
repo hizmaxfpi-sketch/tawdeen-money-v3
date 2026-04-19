@@ -61,6 +61,25 @@ export function ReportsPage({
   const [displayCurrency, setDisplayCurrency] = useState('USD');
   const [showFinancials, setShowFinancials] = useState(true);
   const [costsDialogContainerId, setCostsDialogContainerId] = useState<string | null>(null);
+  const [extraExpensesByContainer, setExtraExpensesByContainer] = useState<Record<string, { id: string; description: string; amount: number; date: string }[]>>({});
+
+  // Load extra expenses when costs dialog opens
+  useEffect(() => {
+    if (!costsDialogContainerId || extraExpensesByContainer[costsDialogContainerId]) return;
+    supabase
+      .from('container_expenses')
+      .select('id, description, amount, date')
+      .eq('container_id', costsDialogContainerId)
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        if (data) {
+          setExtraExpensesByContainer(prev => ({
+            ...prev,
+            [costsDialogContainerId]: data.map(e => ({ ...e, amount: Number(e.amount) })),
+          }));
+        }
+      });
+  }, [costsDialogContainerId, extraExpensesByContainer]);
 
   // Currency helpers
   const conv = (v: number) => convertForDisplay(v, displayCurrency, currencies);
