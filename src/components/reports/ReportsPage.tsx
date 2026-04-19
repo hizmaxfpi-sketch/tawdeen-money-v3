@@ -62,6 +62,7 @@ export function ReportsPage({
   const [showFinancials, setShowFinancials] = useState(true);
   const [showCostDetails, setShowCostDetails] = useState(false);
   const [costsDialogContainerId, setCostsDialogContainerId] = useState<string | null>(null);
+  const [showCharts, setShowCharts] = useState(true);
   const [extraExpensesByContainer, setExtraExpensesByContainer] = useState<Record<string, { id: string; description: string; amount: number; date: string }[]>>({});
 
   // Auto-load extra expenses for inline cost details when previewing a container
@@ -98,27 +99,7 @@ export function ReportsPage({
 
   const previewRef = useRef<HTMLDivElement>(null);
 
-  // ============= Computed Stats - RESPECT container filter =============
-  const filteredContainers = useMemo(() => {
-    if (filterContainerIds.size === 0) return containers;
-    return containers.filter(c => filterContainerIds.has(c.id));
-  }, [containers, filterContainerIds]);
-
-  const shippingStats = useMemo(() => {
-    const scopeShipments = filterContainerIds.size > 0
-      ? shipments.filter(s => filterContainerIds.has(s.containerId))
-      : shipments;
-    const totalShipments = scopeShipments.length;
-    const totalRevenue = filteredContainers.reduce((s, c) => s + c.totalRevenue, 0);
-    const totalCosts = filteredContainers.reduce((s, c) => s + c.totalCost, 0);
-    const totalProfit = totalRevenue - totalCosts;
-    const totalCollected = scopeShipments.reduce((s, sh) => s + sh.amountPaid, 0);
-    const totalRemaining = scopeShipments.reduce((s, sh) => s + sh.remainingAmount, 0);
-    const totalPieces = scopeShipments.reduce((s, sh) => s + sh.quantity, 0);
-    const totalWeight = scopeShipments.reduce((s, sh) => s + (sh.weight || 0), 0);
-    return { totalShipments, totalRevenue, totalCosts, totalProfit, totalCollected, totalRemaining, totalPieces, totalWeight };
-  }, [filteredContainers, shipments, filterContainerIds]);
-
+  // ============= Computed Stats - RESPECT ALL filters =============
   const filteredShipments = useMemo(() => {
     return shipments.filter(s => {
       if (filterClient !== 'all' && s.clientId !== filterClient) return false;
@@ -130,25 +111,49 @@ export function ReportsPage({
     });
   }, [shipments, filterClient, filterStatus, filterContainerIds, dateFrom, dateTo]);
 
+  // Containers in scope: respect all filters
+  const filteredContainers = useMemo(() => {
+    const hasOtherFilters = filterClient !== 'all' || filterStatus !== 'all' || !!dateFrom || !!dateTo;
+    if (filterContainerIds.size === 0 && !hasOtherFilters) return containers;
+    const scopedIds = new Set(filteredShipments.map(s => s.containerId));
+    if (filterContainerIds.size > 0) {
+      return containers.filter(c => filterContainerIds.has(c.id) && (!hasOtherFilters || scopedIds.has(c.id)));
+    }
+    return containers.filter(c => scopedIds.has(c.id));
+  }, [containers, filteredShipments, filterContainerIds, filterClient, filterStatus, dateFrom, dateTo]);
+
+  const shippingStats = useMemo(() => {
+    // All numbers derived from FILTERED shipments + their in-scope containers' costs
+    const totalShipments = filteredShipments.length;
+    const totalRevenue = filteredShipments.reduce((s, sh) => s + sh.contractPrice, 0);
+    const totalCollected = filteredShipments.reduce((s, sh) => s + sh.amountPaid, 0);
+    const totalRemaining = filteredShipments.reduce((s, sh) => s + sh.remainingAmount, 0);
+    const totalPieces = filteredShipments.reduce((s, sh) => s + sh.quantity, 0);
+    const totalWeight = filteredShipments.reduce((s, sh) => s + (sh.weight || 0), 0);
+    const totalCosts = filteredContainers.reduce((s, c) => s + c.totalCost, 0);
+    const totalProfit = totalRevenue - totalCosts;
+    return { totalShipments, totalRevenue, totalCosts, totalProfit, totalCollected, totalRemaining, totalPieces, totalWeight };
+  }, [filteredShipments, filteredContainers]);
+
   const paymentDistribution = useMemo(() => {
-    const paid = shipments.filter(s => s.paymentStatus === 'paid').length;
-    const partial = shipments.filter(s => s.paymentStatus === 'partial').length;
-    const unpaid = shipments.filter(s => s.paymentStatus === 'unpaid').length;
+    const paid = filteredShipments.filter(s => s.paymentStatus === 'paid').length;
+    const partial = filteredShipments.filter(s => s.paymentStatus === 'partial').length;
+    const unpaid = filteredShipments.filter(s => s.paymentStatus === 'unpaid').length;
     return [
       { name: 'مدفوع', value: paid, color: 'hsl(145,65%,42%)' },
       { name: 'جزئي', value: partial, color: 'hsl(45,93%,47%)' },
       { name: 'غير مدفوع', value: unpaid, color: 'hsl(0,72%,51%)' },
     ].filter(d => d.value > 0);
-  }, [shipments]);
+  }, [filteredShipments]);
 
   const containerProfitChart = useMemo(() => {
-    return containers.slice(0, 6).map(c => ({
+    return filteredContainers.slice(0, 6).map(c => ({
       name: c.containerNumber.slice(-6),
       revenue: c.totalRevenue,
       cost: c.totalCost,
       profit: c.profit,
     }));
-  }, [containers]);
+  }, [filteredContainers]);
 
   // ============= Export Functions =============
   const handleExportImage = async () => {
@@ -421,36 +426,44 @@ export function ReportsPage({
           {/* الرسوم البيانية */}
           {(paymentDistribution.length > 0 || containerProfitChart.length > 0) && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl bg-card p-3 shadow-sm border border-border">
-              <h3 className="text-xs font-bold mb-3">التمثيل البياني</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {paymentDistribution.length > 0 && (
-                  <div>
-                    <p className="text-[9px] text-muted-foreground text-center mb-1">حالة الدفع</p>
-                    <ResponsiveContainer width="100%" height={120}>
-                      <PieChart>
-                        <Pie data={paymentDistribution} cx="50%" cy="50%" outerRadius={45} dataKey="value" label={({ name, value }) => `${name}(${value})`} labelLine={false}>
-                          {paymentDistribution.map((d, i) => <Cell key={i} fill={d.color} />)}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-                {containerProfitChart.length > 0 && (
-                  <div>
-                    <p className="text-[9px] text-muted-foreground text-center mb-1">أرباح الحاويات</p>
-                    <ResponsiveContainer width="100%" height={120}>
-                      <BarChart data={containerProfitChart}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                        <XAxis dataKey="name" tick={{ fontSize: 8 }} />
-                        <YAxis tick={{ fontSize: 8 }} />
-                        <Tooltip />
-                        <Bar dataKey="profit" fill="hsl(145,65%,42%)" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold">التمثيل البياني</h3>
+                <button onClick={() => setShowCharts(!showCharts)} className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors">
+                  {showCharts ? <ToggleRight className="h-4 w-4 text-primary" /> : <ToggleLeft className="h-4 w-4" />}
+                  {showCharts ? 'إخفاء التمثيل' : 'عرض التمثيل'}
+                </button>
               </div>
+              {showCharts && (
+                <div className="grid grid-cols-2 gap-3">
+                  {paymentDistribution.length > 0 && (
+                    <div>
+                      <p className="text-[9px] text-muted-foreground text-center mb-1">حالة الدفع</p>
+                      <ResponsiveContainer width="100%" height={120}>
+                        <PieChart>
+                          <Pie data={paymentDistribution} cx="50%" cy="50%" outerRadius={45} dataKey="value" label={({ name, value }) => `${name}(${value})`} labelLine={false}>
+                            {paymentDistribution.map((d, i) => <Cell key={i} fill={d.color} />)}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                  {containerProfitChart.length > 0 && (
+                    <div>
+                      <p className="text-[9px] text-muted-foreground text-center mb-1">أرباح الحاويات</p>
+                      <ResponsiveContainer width="100%" height={120}>
+                        <BarChart data={containerProfitChart}>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                          <XAxis dataKey="name" tick={{ fontSize: 8 }} />
+                          <YAxis tick={{ fontSize: 8 }} />
+                          <Tooltip />
+                          <Bar dataKey="profit" fill="hsl(145,65%,42%)" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
 
