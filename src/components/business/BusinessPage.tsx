@@ -46,9 +46,11 @@ export function BusinessPage({
   const { summary: productionSummary } = useProduction();
   const { isEnabled } = useEnabledModules();
   const productionEnabled = isEnabled('production');
+  // الأعمال = الإيرادات اليدوية فقط (لا تشمل مبيعات الإنتاج هنا)
+  // المصاريف = المصاريف اليدوية + تكلفة المواد المستهلكة + مصاريف البيع
   const { directRevenue, businessExpenses } = useBusinessTransactions(transactions, {
     extraRevenue: 0,
-    extraExpenses: productionEnabled ? productionSummary.totalCost : 0,
+    extraExpenses: productionEnabled ? (productionSummary.totalCost + productionSummary.totalExpenses) : 0,
   });
   const { contacts } = useSupabaseContacts();
 
