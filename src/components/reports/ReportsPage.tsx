@@ -426,36 +426,44 @@ export function ReportsPage({
           {/* الرسوم البيانية */}
           {(paymentDistribution.length > 0 || containerProfitChart.length > 0) && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl bg-card p-3 shadow-sm border border-border">
-              <h3 className="text-xs font-bold mb-3">التمثيل البياني</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {paymentDistribution.length > 0 && (
-                  <div>
-                    <p className="text-[9px] text-muted-foreground text-center mb-1">حالة الدفع</p>
-                    <ResponsiveContainer width="100%" height={120}>
-                      <PieChart>
-                        <Pie data={paymentDistribution} cx="50%" cy="50%" outerRadius={45} dataKey="value" label={({ name, value }) => `${name}(${value})`} labelLine={false}>
-                          {paymentDistribution.map((d, i) => <Cell key={i} fill={d.color} />)}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-                {containerProfitChart.length > 0 && (
-                  <div>
-                    <p className="text-[9px] text-muted-foreground text-center mb-1">أرباح الحاويات</p>
-                    <ResponsiveContainer width="100%" height={120}>
-                      <BarChart data={containerProfitChart}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                        <XAxis dataKey="name" tick={{ fontSize: 8 }} />
-                        <YAxis tick={{ fontSize: 8 }} />
-                        <Tooltip />
-                        <Bar dataKey="profit" fill="hsl(145,65%,42%)" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold">التمثيل البياني</h3>
+                <button onClick={() => setShowCharts(!showCharts)} className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors">
+                  {showCharts ? <ToggleRight className="h-4 w-4 text-primary" /> : <ToggleLeft className="h-4 w-4" />}
+                  {showCharts ? 'إخفاء التمثيل' : 'عرض التمثيل'}
+                </button>
               </div>
+              {showCharts && (
+                <div className="grid grid-cols-2 gap-3">
+                  {paymentDistribution.length > 0 && (
+                    <div>
+                      <p className="text-[9px] text-muted-foreground text-center mb-1">حالة الدفع</p>
+                      <ResponsiveContainer width="100%" height={120}>
+                        <PieChart>
+                          <Pie data={paymentDistribution} cx="50%" cy="50%" outerRadius={45} dataKey="value" label={({ name, value }) => `${name}(${value})`} labelLine={false}>
+                            {paymentDistribution.map((d, i) => <Cell key={i} fill={d.color} />)}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                  {containerProfitChart.length > 0 && (
+                    <div>
+                      <p className="text-[9px] text-muted-foreground text-center mb-1">أرباح الحاويات</p>
+                      <ResponsiveContainer width="100%" height={120}>
+                        <BarChart data={containerProfitChart}>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                          <XAxis dataKey="name" tick={{ fontSize: 8 }} />
+                          <YAxis tick={{ fontSize: 8 }} />
+                          <Tooltip />
+                          <Bar dataKey="profit" fill="hsl(145,65%,42%)" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
 
