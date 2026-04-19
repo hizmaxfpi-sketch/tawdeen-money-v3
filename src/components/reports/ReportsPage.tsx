@@ -355,7 +355,7 @@ export function ReportsPage({
     } else if (type === 'projects') {
       import('@/utils/excelExport').then(async ({ exportTransactionsToExcel }) => {
         const XLSX = await import('xlsx');
-        const data = projects.map(p => ({
+        const data = filteredProjects.map(p => ({
           'المشروع': p.name, 'العميل': p.clientName || '-', 'الحالة': statusLabels[p.status],
           'قيمة العقد': p.contractValue, 'المصروفات': p.expenses,
           'المستلم': p.receivedAmount, 'الربح': p.profit,
