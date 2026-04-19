@@ -1126,10 +1126,13 @@ export function ReportsPage({
             {previewContent === 'projects' && (
               <>
                 <h3 className="text-sm font-bold text-center">تقرير المشاريع</h3>
+                {filteredProjects.length !== projects.length && (
+                  <p className="text-[9px] text-center text-primary">عدد المشاريع المعروضة: {filteredProjects.length} من أصل {projects.length}</p>
+                )}
                 <table className="w-full text-[9px] border-collapse">
                   <thead><tr className="bg-[hsl(215,70%,35%)] text-white"><th className="p-1.5">المشروع</th><th className="p-1.5">الحالة</th><th className="p-1.5">العقد</th><th className="p-1.5">المصروفات</th><th className="p-1.5">الربح</th></tr></thead>
                   <tbody>
-                    {projects.map((p, i) => (
+                    {filteredProjects.map((p, i) => (
                       <tr key={p.id} className={i % 2 === 0 ? 'bg-muted/30' : ''}>
                         <td className="p-1.5 text-center">{p.name}</td>
                         <td className="p-1.5 text-center">{statusLabels[p.status]}</td>
@@ -1138,15 +1141,18 @@ export function ReportsPage({
                         <td className={cn("p-1.5 text-center font-bold", p.profit >= 0 ? "text-income" : "text-expense")}>{fmtC(p.profit)}</td>
                       </tr>
                     ))}
+                    {filteredProjects.length === 0 && (
+                      <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">لا توجد مشاريع مطابقة للفلتر</td></tr>
+                    )}
                   </tbody>
-                  {projects.length > 0 && (
+                  {filteredProjects.length > 0 && (
                     <tfoot>
                       <tr className="bg-muted font-bold border-t-2 border-primary">
                         <td className="p-1.5 text-center" colSpan={2}>الإجمالي</td>
-                        <td className="p-1.5 text-center">{fmtC(projects.reduce((s, p) => s + p.contractValue, 0))}</td>
-                        <td className="p-1.5 text-center text-expense">{fmtC(projects.reduce((s, p) => s + p.expenses, 0))}</td>
-                        <td className={cn("p-1.5 text-center", projects.reduce((s, p) => s + p.profit, 0) >= 0 ? "text-income" : "text-expense")}>
-                          {fmtC(projects.reduce((s, p) => s + p.profit, 0))}
+                        <td className="p-1.5 text-center">{fmtC(filteredProjects.reduce((s, p) => s + p.contractValue, 0))}</td>
+                        <td className="p-1.5 text-center text-expense">{fmtC(filteredProjects.reduce((s, p) => s + p.expenses, 0))}</td>
+                        <td className={cn("p-1.5 text-center", filteredProjects.reduce((s, p) => s + p.profit, 0) >= 0 ? "text-income" : "text-expense")}>
+                          {fmtC(filteredProjects.reduce((s, p) => s + p.profit, 0))}
                         </td>
                       </tr>
                     </tfoot>
