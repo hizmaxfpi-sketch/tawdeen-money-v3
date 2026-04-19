@@ -447,9 +447,32 @@ export function ProductionRunsTab({ products, bom, materials, fundOptions, conta
                         <span className="text-expense">الإجمالي: ${Number(r.total_cost).toFixed(2)}</span>
                       </div>
                     </div>
-                    <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 shrink-0">
-                      <Calendar className="h-2.5 w-2.5" />{r.date}
-                    </span>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                        <Calendar className="h-2.5 w-2.5" />{r.date}
+                      </span>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive hover:text-destructive">
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>إلغاء عملية التصنيع؟</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              سيتم إرجاع كل المواد الخام المستهلكة إلى المخزون وخصم {r.quantity} من {productName(r.product_id)}. لا يمكن الإلغاء إذا تم بيع جزء من الكمية.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>تراجع</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => onDeleteRun(r.id)} className="bg-destructive hover:bg-destructive/90">
+                              إلغاء وإرجاع المواد
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -457,6 +480,49 @@ export function ProductionRunsTab({ products, bom, materials, fundOptions, conta
           )}
         </TabsContent>
       </Tabs>
+
+      {/* ====== Edit Sale Dialog ====== */}
+      <Dialog open={!!editSale} onOpenChange={(o) => !o && setEditSale(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle className="text-sm">تعديل عملية البيع</DialogTitle></DialogHeader>
+          {editSale && (
+            <div className="space-y-2">
+              <div className="text-[11px] bg-muted/40 p-2 rounded">
+                المنتج: <strong>{productName(editSale.product_id)}</strong>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label className="text-xs">الكمية *</Label><Input type="number" value={eQty} onChange={e => setEQty(e.target.value)} className="h-9 text-sm" /></div>
+                <div><Label className="text-xs">سعر الوحدة *</Label><Input type="number" value={ePrice} onChange={e => setEPrice(e.target.value)} className="h-9 text-sm" /></div>
+              </div>
+              <div>
+                <Label className="text-xs">العميل</Label>
+                <Select value={eContact} onValueChange={setEContact}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="اختر العميل" /></SelectTrigger>
+                  <SelectContent>{contacts.map(c => <SelectItem key={c.id} value={c.id} className="text-sm">{c.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">الصندوق</Label>
+                  <Select value={eFund} onValueChange={setEFund}>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="اختياري" /></SelectTrigger>
+                    <SelectContent>{fundOptions.map(f => <SelectItem key={f.id} value={f.id} className="text-sm">{f.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div><Label className="text-xs">المحصّل</Label><Input type="number" value={ePaid} onChange={e => setEPaid(e.target.value)} className="h-9 text-sm" /></div>
+              </div>
+              <div><Label className="text-xs">التاريخ</Label><Input type="date" value={eDate} onChange={e => setEDate(e.target.value)} className="h-9 text-sm" /></div>
+              <div className="text-[11px] bg-warning/10 text-warning p-2 rounded">
+                ⚠️ سيتم عكس الأثر الكامل للبيعة الحالية ثم تطبيق القيم الجديدة (المخزون، القيود، الصندوق).
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSaveEdit} className="flex-1 h-9">حفظ التعديل</Button>
+                <Button variant="outline" onClick={() => setEditSale(null)} className="h-9">إلغاء</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
