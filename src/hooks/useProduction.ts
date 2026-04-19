@@ -11,8 +11,11 @@ export interface ProductionProduct {
   id: string; name: string; code?: string | null; unit: string;
   quantity: number; unit_cost: number; sell_price: number; notes?: string | null; created_at: string;
 }
+export type ServiceUnitType = 'piece' | 'hour' | 'day' | 'meter' | 'custom';
 export interface ProductionService {
-  id: string; name: string; code?: string | null; default_price: number; notes?: string | null; created_at: string;
+  id: string; name: string; code?: string | null; default_price: number;
+  unit_type: ServiceUnitType; custom_unit?: string | null;
+  notes?: string | null; created_at: string;
 }
 export interface BomEntry {
   id: string; product_id: string; material_id: string; qty_per_unit: number;
@@ -21,7 +24,7 @@ export interface ProductionSummary {
   materialsValue: number; productsValue: number; totalSales: number;
   totalCost: number; totalExpenses: number; netProfit: number;
 }
-export interface SaleService { service_id?: string; name: string; amount: number }
+export interface SaleService { service_id?: string; name: string; amount: number; quantity?: number; unit_price?: number; unit_type?: ServiceUnitType }
 export interface SaleExpense { description: string; amount: number; fund_id?: string; treat_as_business?: boolean }
 
 export function useProduction() {
@@ -115,9 +118,9 @@ export function useProduction() {
   };
 
   // Services
-  const addService = async (data: { name: string; code?: string; default_price: number; notes?: string }): Promise<void> => {
+  const addService = async (data: { name: string; code?: string; default_price: number; notes?: string; unit_type?: ServiceUnitType; custom_unit?: string }): Promise<void> => {
     if (!user) return;
-    const { error } = await (supabase as any).from('production_services').insert({ ...data, user_id: user.id });
+    const { error } = await (supabase as any).from('production_services').insert({ ...data, unit_type: data.unit_type || 'piece', user_id: user.id });
     if (error) { toast.error('فشل إضافة الخدمة'); return; }
     toast.success('تمت إضافة الخدمة'); loadAll();
   };
