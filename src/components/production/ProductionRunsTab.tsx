@@ -262,6 +262,7 @@ export function ProductionRunsTab({ products, bom, materials, services, fundOpti
           <Button size="sm" variant="outline" className="w-full gap-1 h-8" onClick={() => setOpenSalesPreview(true)} disabled={filteredSales.length === 0}>
             <Eye className="h-3.5 w-3.5" /> معاينة المبيعات
           </Button>
+          <div className="grid grid-cols-4 gap-1.5">
             <MiniStat label="مبيعات" value={`$${salesTotals.total.toFixed(2)}`} color="text-income" />
             <MiniStat label="تكلفة" value={`$${salesTotals.cost.toFixed(2)}`} color="text-expense" />
             <MiniStat label="ربح" value={`$${salesTotals.profit.toFixed(2)}`} color={salesTotals.profit >= 0 ? 'text-income' : 'text-expense'} />
