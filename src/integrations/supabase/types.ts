@@ -1977,6 +1977,15 @@ export type Database = {
         }
         Returns: string
       }
+      reverse_material_purchase: {
+        Args: { p_purchase_id: string }
+        Returns: undefined
+      }
+      reverse_production_run: { Args: { p_run_id: string }; Returns: undefined }
+      reverse_production_sale: {
+        Args: { p_sale_id: string }
+        Returns: undefined
+      }
       reverse_transaction: {
         Args: { p_transaction_id: string }
         Returns: undefined
@@ -2025,6 +2034,19 @@ export type Database = {
           p_shipping_cost?: number
           p_status?: string
           p_type?: string
+        }
+        Returns: undefined
+      }
+      update_production_sale: {
+        Args: {
+          p_contact_id?: string
+          p_date?: string
+          p_fund_id?: string
+          p_notes?: string
+          p_paid_amount?: number
+          p_quantity: number
+          p_sale_id: string
+          p_unit_price: number
         }
         Returns: undefined
       }
