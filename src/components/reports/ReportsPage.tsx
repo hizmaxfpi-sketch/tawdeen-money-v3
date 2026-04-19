@@ -77,11 +77,11 @@ export function ReportsPage({
         if (data) {
           setExtraExpensesByContainer(prev => ({
             ...prev,
-            [costsDialogContainerId]: data.map(e => ({ ...e, amount: Number(e.amount) })),
+            [targetId]: data.map(e => ({ ...e, amount: Number(e.amount) })),
           }));
         }
       });
-  }, [costsDialogContainerId, extraExpensesByContainer]);
+  }, [costsDialogContainerId, previewContent, selectedContainerId, extraExpensesByContainer]);
 
   // Currency helpers
   const conv = (v: number) => convertForDisplay(v, displayCurrency, currencies);
