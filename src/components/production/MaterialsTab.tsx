@@ -74,19 +74,25 @@ export function MaterialsTab({ materials, fundOptions, contacts, onAdd, onUpdate
               <Plus className="h-4 w-4" /> إضافة مادة خام
             </Button>
           </DialogTrigger>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle className="text-sm">مادة خام جديدة</DialogTitle></DialogHeader>
-          <div className="space-y-2">
-            <div><Label className="text-xs">الاسم *</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-9 text-sm" /></div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><Label className="text-xs">الكود</Label><Input value={code} onChange={e => setCode(e.target.value)} className="h-9 text-sm" /></div>
-              <div><Label className="text-xs">الوحدة *</Label><Input value={unit} onChange={e => setUnit(e.target.value)} className="h-9 text-sm" placeholder="kg, pcs, m..." /></div>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle className="text-sm">مادة خام جديدة</DialogTitle></DialogHeader>
+            <div className="space-y-2">
+              <div><Label className="text-xs">الاسم *</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-9 text-sm" /></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label className="text-xs">الكود</Label><Input value={code} onChange={e => setCode(e.target.value)} className="h-9 text-sm" /></div>
+                <div><Label className="text-xs">الوحدة *</Label><Input value={unit} onChange={e => setUnit(e.target.value)} className="h-9 text-sm" placeholder="kg, pcs, m..." /></div>
+              </div>
+              <div><Label className="text-xs">ملاحظات</Label><Input value={notes} onChange={e => setNotes(e.target.value)} className="h-9 text-sm" /></div>
+              <Button onClick={handleAdd} className="w-full h-9">حفظ</Button>
             </div>
-            <div><Label className="text-xs">ملاحظات</Label><Input value={notes} onChange={e => setNotes(e.target.value)} className="h-9 text-sm" /></div>
-            <Button onClick={handleAdd} className="w-full h-9">حفظ</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+        <Button size="sm" variant="outline" className="w-full gap-1 h-9" onClick={() => setOpenPreview(true)} disabled={materials.length === 0}>
+          <Eye className="h-4 w-4" /> معاينة
+        </Button>
+      </div>
+
+      <ProductionPreviewDialog open={openPreview} onOpenChange={setOpenPreview} kind="materials" materials={materials} />
 
       {materials.length === 0 ? (
         <div className="text-center py-8 text-xs text-muted-foreground">
