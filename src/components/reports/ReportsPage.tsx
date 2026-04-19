@@ -439,11 +439,12 @@ export function ReportsPage({
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList
           className="grid w-full h-9"
-          style={{ gridTemplateColumns: `repeat(${3 + (shippingOn ? 1 : 0) + (projectsOn ? 1 : 0) + (accountsOn ? 1 : 0)}, minmax(0, 1fr))` }}
+          style={{ gridTemplateColumns: `repeat(${3 + (shippingOn ? 1 : 0) + (projectsOn ? 1 : 0) + (accountsOn ? 1 : 0) + (productionOn ? 1 : 0)}, minmax(0, 1fr))` }}
         >
           {shippingOn && <TabsTrigger value="shipping" className="text-[10px] gap-1"><Ship className="h-3 w-3" />الشحنات</TabsTrigger>}
           {accountsOn && <TabsTrigger value="ledger" className="text-[10px] gap-1"><Users className="h-3 w-3" />الدفتر</TabsTrigger>}
           {projectsOn && <TabsTrigger value="projects" className="text-[10px] gap-1"><BarChart3 className="h-3 w-3" />المشاريع</TabsTrigger>}
+          {productionOn && <TabsTrigger value="production" className="text-[10px] gap-1"><Factory className="h-3 w-3" />الإنتاج</TabsTrigger>}
           <TabsTrigger value="general" className="text-[10px] gap-1"><TrendingUp className="h-3 w-3" />عام</TabsTrigger>
           <TabsTrigger value="activity" className="text-[10px] gap-1"><Clock className="h-3 w-3" />السجل</TabsTrigger>
           <TabsTrigger value="backup" className="text-[10px] gap-1"><Database className="h-3 w-3" />النسخ</TabsTrigger>
@@ -864,6 +865,13 @@ export function ReportsPage({
             </div>
           </div>
         </TabsContent>
+
+        {/* =============== تقارير الإنتاج =============== */}
+        {productionOn && (
+          <TabsContent value="production" className="space-y-3 mt-3">
+            <ProductionReport currencies={currencies} displayCurrency={displayCurrency} />
+          </TabsContent>
+        )}
 
         {/* =============== سجل نشاط النظام =============== */}
         <TabsContent value="activity" className="space-y-3 mt-3">
