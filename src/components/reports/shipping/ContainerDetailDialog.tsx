@@ -301,259 +301,342 @@ export function ContainerDetailDialog({
   // ============================================================
   // RENDER
   // ============================================================
+  const ModeIcon = viewMode === 'financial' ? DollarSign : viewMode === 'operational' ? Truck : viewMode === 'public' ? EyeOff : Eye;
+  const modeLabel = viewMode === 'full' ? 'كامل' : viewMode === 'financial' ? 'مالي' : viewMode === 'operational' ? 'تشغيلي' : 'عام';
+
   return (
     <>
       <Dialog open={!!container} onOpenChange={onClose}>
-        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto p-0">
-          {/* Header */}
-          <DialogHeader className="px-4 pt-4 pb-2 border-b border-border sticky top-0 bg-background z-10">
-            <div className="flex items-start justify-between gap-2 flex-wrap">
-              <div className="flex-1 min-w-0">
-                <DialogTitle className="text-base font-bold flex items-center gap-2">
-                  <Package className="h-4 w-4 text-primary" />
-                  حاوية {container.containerNumber}
-                </DialogTitle>
-                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  {container.route}
-                </p>
+        <DialogContent className="max-w-3xl max-h-[92vh] p-0 gap-0 flex flex-col overflow-hidden">
+          {/* ========== COMPACT HEADER (always visible) ========== */}
+          <DialogHeader className="px-4 pt-4 pb-3 border-b border-border bg-card/50">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Package className="h-4.5 w-4.5 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <DialogTitle className="text-sm font-bold truncate">
+                    {container.containerNumber}
+                  </DialogTitle>
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <MapPin className="h-2.5 w-2.5" />
+                      {container.route}
+                    </span>
+                    <span className={cn('inline-flex px-1.5 py-0.5 rounded-full text-[9px] border font-semibold', STATUS_COLORS[container.status])}>
+                      {STATUS_LABELS[container.status]}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <span className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] border font-semibold', STATUS_COLORS[container.status])}>
-                {STATUS_LABELS[container.status]}
-              </span>
             </div>
 
-            {/* View Mode Switcher */}
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)} className="mt-2">
-              <TabsList className="grid grid-cols-4 h-8 w-full">
-                <TabsTrigger value="full" className="text-[10px] gap-1">
-                  <Eye className="h-3 w-3" /> كامل
-                </TabsTrigger>
-                <TabsTrigger value="financial" className="text-[10px] gap-1">
-                  <DollarSign className="h-3 w-3" /> مالي
-                </TabsTrigger>
-                <TabsTrigger value="operational" className="text-[10px] gap-1">
-                  <Truck className="h-3 w-3" /> تشغيلي
-                </TabsTrigger>
-                <TabsTrigger value="public" className="text-[10px] gap-1">
-                  <EyeOff className="h-3 w-3" /> عام
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={handlePrint}>
-                <Printer className="h-3 w-3" /> طباعة
-              </Button>
-              <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={exportPDF}>
-                <FileText className="h-3 w-3" /> PDF
-              </Button>
-              <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={exportExcel}>
-                <FileSpreadsheet className="h-3 w-3" /> Excel
-              </Button>
-              {showFinance && onReceivePayment && (
-                <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={() => setExpenseOpen(true)}>
-                  <Plus className="h-3 w-3" /> مصروف
-                </Button>
+            {/* Compact summary chips */}
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mt-3">
+              <SummaryChip label="السعة" value={`${container.usedCapacity.toFixed(1)}/${container.capacity}`} />
+              <SummaryChip label="الإشغال" value={`${fillRate.toFixed(0)}%`} accent={fillRate > 90 ? 'red' : 'green'} />
+              <SummaryChip label="الشحنات" value={String(shipments.length)} />
+              <SummaryChip label="القطع" value={ops.totalPieces.toLocaleString()} />
+              <SummaryChip label="CBM" value={ops.totalCBM.toFixed(1)} />
+              {showFinance ? (
+                <SummaryChip label="الربح" value={fmt(container.profit)} accent={container.profit >= 0 ? 'green' : 'red'} />
+              ) : (
+                <SummaryChip label="الوزن" value={`${(ops.totalWeight / 1000).toFixed(1)}t`} />
               )}
             </div>
           </DialogHeader>
 
-          {/* Content */}
-          <div className="px-4 pb-4 space-y-3">
-            {/* ========== CONTAINER OVERVIEW ========== */}
-            <section className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <InfoTile icon={Package} label="السعة" value={`${container.usedCapacity.toFixed(1)}/${container.capacity}`} sub="CBM" color="cyan" />
-              <InfoTile icon={Box} label="نسبة الإشغال" value={`${fillRate.toFixed(0)}%`} sub={`متبقي ${remainingCap.toFixed(1)}`} color={fillRate > 90 ? 'red' : 'green'} />
-              <InfoTile icon={Layers} label="الشحنات" value={String(shipments.length)} sub={`${ops.uniqueClients} عميل`} color="purple" />
-              <InfoTile icon={Hash} label="القطع" value={ops.totalPieces.toLocaleString()} sub={`${ops.totalCBM.toFixed(1)} CBM`} color="blue" />
-            </section>
+          {/* ========== TABS ========== */}
+          <Tabs defaultValue="overview" className="flex-1 flex flex-col min-h-0">
+            <div className="border-b border-border bg-background sticky top-0 z-10 px-2">
+              <TabsList className="h-9 w-full justify-start gap-0.5 bg-transparent p-0 overflow-x-auto">
+                <TabsTrigger value="overview" className="text-[11px] gap-1 h-8 data-[state=active]:bg-muted">
+                  <LayoutGrid className="h-3 w-3" /> نظرة عامة
+                </TabsTrigger>
+                <TabsTrigger value="shipments" className="text-[11px] gap-1 h-8 data-[state=active]:bg-muted">
+                  <Package className="h-3 w-3" /> الشحنات ({shipments.length})
+                </TabsTrigger>
+                {showFinance && (
+                  <TabsTrigger value="finance" className="text-[11px] gap-1 h-8 data-[state=active]:bg-muted">
+                    <DollarSign className="h-3 w-3" /> المالية
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="documents" className="text-[11px] gap-1 h-8 data-[state=active]:bg-muted">
+                  <FileBox className="h-3 w-3" /> المستندات
+                </TabsTrigger>
+                <TabsTrigger value="activity" className="text-[11px] gap-1 h-8 data-[state=active]:bg-muted">
+                  <Activity className="h-3 w-3" /> النشاط
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-            {showOperational && (
-              <section className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <InfoTile icon={Weight} label="الوزن الكلي" value={`${ops.totalWeight.toLocaleString()}`} sub="كجم" color="purple" />
-                <InfoTile icon={MapPin} label="من" value={container.originCountry || '-'} sub={container.destinationCountry ? `إلى ${container.destinationCountry}` : ''} color="cyan" />
-                <InfoTile icon={Calendar} label="مغادرة" value={container.departureDate || '-'} sub={container.arrivalDate ? `وصول ${container.arrivalDate}` : ''} color="blue" />
-                <InfoTile icon={Truck} label="النوع" value={container.type} sub={container.clearanceDate ? `تخليص ${container.clearanceDate}` : ''} color="amber" />
-              </section>
-            )}
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              {/* ========== OVERVIEW TAB ========== */}
+              <TabsContent value="overview" className="mt-0 space-y-2.5">
+                <Collapsible defaultOpen>
+                  <CollapsibleTrigger className="flex items-center justify-between w-full p-2.5 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
+                    <span className="text-xs font-bold flex items-center gap-1.5">
+                      <Truck className="h-3.5 w-3.5 text-primary" /> معلومات اللوجستيات
+                    </span>
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <InfoTile icon={Box} label="نسبة الإشغال" value={`${fillRate.toFixed(0)}%`} sub={`متبقي ${remainingCap.toFixed(1)}`} color={fillRate > 90 ? 'red' : 'green'} />
+                      <InfoTile icon={Layers} label="العملاء" value={String(ops.uniqueClients)} sub="عميل" color="purple" />
+                      <InfoTile icon={Weight} label="الوزن" value={`${ops.totalWeight.toLocaleString()}`} sub="كجم" color="purple" />
+                      <InfoTile icon={Hash} label="القطع" value={ops.totalPieces.toLocaleString()} sub={`${ops.totalCBM.toFixed(1)} CBM`} color="blue" />
+                      <InfoTile icon={MapPin} label="من" value={container.originCountry || '-'} sub={container.destinationCountry ? `إلى ${container.destinationCountry}` : ''} color="cyan" />
+                      <InfoTile icon={Calendar} label="مغادرة" value={container.departureDate || '-'} sub={container.arrivalDate ? `وصول ${container.arrivalDate}` : ''} color="blue" />
+                      <InfoTile icon={Truck} label="النوع" value={container.type} sub={container.clearanceDate ? `تخليص ${container.clearanceDate}` : ''} color="amber" />
+                      <InfoTile icon={Package} label="السعة الكلية" value={`${container.capacity}`} sub="CBM" color="cyan" />
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
 
-            {/* ========== FINANCIAL OVERVIEW ========== */}
-            {showFinance && (
-              <section className="rounded-xl border border-border bg-card p-3">
-                <h3 className="text-xs font-bold mb-2 flex items-center gap-1.5">
-                  <DollarSign className="h-3.5 w-3.5 text-green-600" />
-                  الأداء المالي
-                </h3>
-                <div className="grid grid-cols-3 gap-2">
-                  <FinTile label="الإيراد" value={fmt(container.totalRevenue)} tone="blue" />
-                  <FinTile label="التكلفة" value={fmt(container.totalCost)} tone="red" />
-                  <FinTile label="الربح" value={fmt(container.profit)} tone={container.profit >= 0 ? 'green' : 'red'} />
-                </div>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <FinTile label="المحصل" value={fmt(ops.totalCollected)} tone="green" small />
-                  <FinTile label="المتبقي" value={fmt(ops.totalOutstanding)} tone="amber" small />
-                </div>
+                {container.notes && (
+                  <Collapsible defaultOpen>
+                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2.5 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
+                      <span className="text-xs font-bold">ملاحظات الحاوية</span>
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      <div className="p-2.5 rounded-lg bg-muted/30 border border-border">
+                        <p className="text-[11px] text-muted-foreground whitespace-pre-wrap">{container.notes}</p>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+              </TabsContent>
 
-                {/* Cost Breakdown */}
-                <details className="mt-2">
-                  <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground">
-                    تفصيل التكاليف
-                  </summary>
-                  <div className="mt-1.5 space-y-1 text-[10px] pr-2">
-                    {(container.containerPrice || 0) > 0 && <CostRow label="سعر الحاوية" value={fmt(container.containerPrice || 0)} />}
-                    {container.shippingCost > 0 && <CostRow label="الشحن" value={fmt(container.shippingCost)} />}
-                    {container.customsCost > 0 && <CostRow label="الجمارك" value={fmt(container.customsCost)} />}
-                    {container.portCost > 0 && <CostRow label="الميناء" value={fmt(container.portCost)} />}
-                    {(container.glassFees || 0) > 0 && <CostRow label="رسوم الزجاج" value={fmt(container.glassFees || 0)} />}
-                    {container.otherCosts > 0 && <CostRow label="أخرى" value={fmt(container.otherCosts)} />}
-                    <div className="border-t border-border pt-1 mt-1">
-                      <CostRow label="الإجمالي" value={fmt(container.totalCost)} bold />
+              {/* ========== SHIPMENTS TAB ========== */}
+              <TabsContent value="shipments" className="mt-0">
+                {shipments.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-xs">
+                    لا توجد شحنات في هذه الحاوية
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {shipments.map((s, idx) => {
+                      const info = getContactInfo(s.clientId, s.clientName);
+                      const expanded = expandedShipment === s.id;
+                      return (
+                        <div key={s.id} className="rounded-lg border border-border bg-card overflow-hidden">
+                          <button
+                            onClick={() => setExpandedShipment(expanded ? null : s.id)}
+                            className="w-full p-2.5 text-right hover:bg-muted/30 transition-colors"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-start gap-2 flex-1 min-w-0">
+                                <div className="h-6 w-6 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                                  {idx + 1}
+                                </div>
+                                <div className="flex-1 min-w-0 text-right">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-xs font-bold truncate">{s.clientName}</span>
+                                    <span className={cn('inline-flex px-1.5 py-0.5 rounded text-[9px] border', STATUS_COLORS[s.paymentStatus])}>
+                                      {STATUS_LABELS[s.paymentStatus]}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground truncate">
+                                    {s.goodsType} • {s.quantity || 0} قطعة • {s.cbm.toFixed(2)} CBM
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {showFinance && (
+                                  <span className="text-[10px] font-bold text-green-600 tabular-nums">
+                                    {fmt(s.contractPrice)}
+                                  </span>
+                                )}
+                                {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                              </div>
+                            </div>
+                          </button>
+
+                          {expanded && (
+                            <div className="border-t border-border bg-muted/10 p-2.5 space-y-2">
+                              {showOperational && (
+                                <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                                  <DetailRow label="رقم التتبع" value={s.trackingNumber || '-'} copyable />
+                                  <DetailRow label="كود البضاعة" value={(s as any).manualCargoCode || '-'} copyable />
+                                  <DetailRow label="الباكج" value={(s as any).packageNumber || '-'} copyable />
+                                  <DetailRow label="الأبعاد" value={`${s.length}×${s.width}×${s.height}`} />
+                                  <DetailRow label="الكمية" value={String(s.quantity || 0)} />
+                                  <DetailRow label="الوزن" value={`${(s.weight || 0).toLocaleString()} كغ`} />
+                                  <DetailRow label="CBM" value={s.cbm.toFixed(3)} />
+                                  <DetailRow label="تاريخ الإنشاء" value={new Date(s.createdAt).toLocaleDateString('en-GB')} />
+                                </div>
+                              )}
+
+                              {info?.phone && (
+                                <div className="flex items-center gap-1.5 text-[10px] p-1.5 rounded bg-background border border-border">
+                                  <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
+                                  <span className="font-medium tabular-nums flex-1 truncate">{info.phone}</span>
+                                  <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); copyText(info.phone!, 'الهاتف'); }}>
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); callPhone(info.phone!); }}>
+                                    <Phone className="h-3 w-3 text-blue-600" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); whatsapp(info.phone!); }}>
+                                    <MessageCircle className="h-3 w-3 text-green-600" />
+                                  </Button>
+                                </div>
+                              )}
+
+                              {showFinance && (
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  <MiniStat label="الإيراد" value={fmt(s.contractPrice)} tone="blue" />
+                                  <MiniStat label="المحصل" value={fmt(s.amountPaid)} tone="green" />
+                                  <MiniStat label="المتبقي" value={fmt(s.remainingAmount)} tone="red" />
+                                </div>
+                              )}
+
+                              {s.notes && (
+                                <div className="text-[10px] p-1.5 rounded bg-background border border-border">
+                                  <span className="text-muted-foreground">ملاحظات: </span>
+                                  <span>{s.notes}</span>
+                                </div>
+                              )}
+
+                              <div className="flex flex-wrap gap-1.5 pt-1">
+                                {s.trackingNumber && (
+                                  <Button size="sm" variant="outline" className="h-6 text-[10px] gap-1" onClick={() => copyText(s.trackingNumber!, 'رقم التتبع')}>
+                                    <Copy className="h-3 w-3" /> نسخ التتبع
+                                  </Button>
+                                )}
+                                {showFinance && onReceivePayment && s.remainingAmount > 0 && (
+                                  <Button size="sm" className="h-6 text-[10px] gap-1" onClick={() => setPaymentShipment(s)}>
+                                    <Wallet className="h-3 w-3" /> استلام دفعة
+                                  </Button>
+                                )}
+                                {info?.phone && (
+                                  <Button size="sm" variant="outline" className="h-6 text-[10px] gap-1" onClick={() => whatsapp(info.phone!)}>
+                                    <MessageCircle className="h-3 w-3 text-green-600" /> واتساب
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* ========== FINANCE TAB ========== */}
+              {showFinance && (
+                <TabsContent value="finance" className="mt-0 space-y-2.5">
+                  <div className="rounded-xl border border-border bg-card p-3">
+                    <h3 className="text-xs font-bold mb-2 flex items-center gap-1.5">
+                      <DollarSign className="h-3.5 w-3.5 text-green-600" /> الأداء المالي
+                    </h3>
+                    <div className="grid grid-cols-3 gap-2">
+                      <FinTile label="الإيراد" value={fmt(container.totalRevenue)} tone="blue" />
+                      <FinTile label="التكلفة" value={fmt(container.totalCost)} tone="red" />
+                      <FinTile label="الربح" value={fmt(container.profit)} tone={container.profit >= 0 ? 'green' : 'red'} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <FinTile label="المحصل" value={fmt(ops.totalCollected)} tone="green" small />
+                      <FinTile label="المتبقي" value={fmt(ops.totalOutstanding)} tone="amber" small />
                     </div>
                   </div>
-                </details>
-              </section>
-            )}
 
-            {/* ========== SHIPMENTS LIST ========== */}
-            <section>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-bold flex items-center gap-1.5">
-                  <Package className="h-3.5 w-3.5 text-primary" />
-                  محتويات الحاوية ({shipments.length})
-                </h3>
-              </div>
-
-              {shipments.length === 0 ? (
-                <div className="text-center py-6 text-muted-foreground text-xs">
-                  لا توجد شحنات في هذه الحاوية
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {shipments.map((s, idx) => {
-                    const info = getContactInfo(s.clientId, s.clientName);
-                    const expanded = expandedShipment === s.id;
-                    return (
-                      <div key={s.id} className="rounded-lg border border-border bg-card overflow-hidden">
-                        {/* Row header */}
-                        <button
-                          onClick={() => setExpandedShipment(expanded ? null : s.id)}
-                          className="w-full p-2.5 text-right hover:bg-muted/30 transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-start gap-2 flex-1 min-w-0">
-                              <div className="h-7 w-7 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
-                                {idx + 1}
-                              </div>
-                              <div className="flex-1 min-w-0 text-right">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-xs font-bold truncate">{s.clientName}</span>
-                                  <span className={cn('inline-flex px-1.5 py-0.5 rounded text-[9px] border', STATUS_COLORS[s.paymentStatus])}>
-                                    {STATUS_LABELS[s.paymentStatus]}
-                                  </span>
-                                </div>
-                                <p className="text-[10px] text-muted-foreground truncate">
-                                  {s.goodsType} • {s.quantity || 0} قطعة • {s.cbm.toFixed(2)} CBM
-                                  {(s.weight || 0) > 0 && ` • ${(s.weight || 0).toLocaleString()} كغ`}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {showFinance && (
-                                <span className="text-[10px] font-bold text-green-600 tabular-nums">
-                                  {fmt(s.contractPrice)}
-                                </span>
-                              )}
-                              {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                            </div>
-                          </div>
-                        </button>
-
-                        {/* Expanded details */}
-                        {expanded && (
-                          <div className="border-t border-border bg-muted/10 p-2.5 space-y-2">
-                            {/* Operational fields */}
-                            {showOperational && (
-                              <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-                                <DetailRow label="رقم التتبع" value={s.trackingNumber || '-'} copyable />
-                                <DetailRow label="كود البضاعة" value={(s as any).manualCargoCode || '-'} copyable />
-                                <DetailRow label="الباكج" value={(s as any).packageNumber || '-'} copyable />
-                                <DetailRow label="الأبعاد" value={`${s.length}×${s.width}×${s.height}`} />
-                                <DetailRow label="الكمية" value={String(s.quantity || 0)} />
-                                <DetailRow label="الوزن" value={`${(s.weight || 0).toLocaleString()} كغ`} />
-                                <DetailRow label="CBM" value={s.cbm.toFixed(3)} />
-                                <DetailRow label="تاريخ الإنشاء" value={new Date(s.createdAt).toLocaleDateString('en-GB')} />
-                              </div>
-                            )}
-
-                            {/* Contact info */}
-                            {info?.phone && (
-                              <div className="flex items-center gap-1.5 text-[10px] p-1.5 rounded bg-background border border-border">
-                                <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
-                                <span className="font-medium tabular-nums flex-1 truncate">{info.phone}</span>
-                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); copyText(info.phone!, 'الهاتف'); }}>
-                                  <Copy className="h-3 w-3" />
-                                </Button>
-                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); callPhone(info.phone!); }}>
-                                  <Phone className="h-3 w-3 text-blue-600" />
-                                </Button>
-                                <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={(e) => { e.stopPropagation(); whatsapp(info.phone!); }}>
-                                  <MessageCircle className="h-3 w-3 text-green-600" />
-                                </Button>
-                              </div>
-                            )}
-
-                            {/* Financial section */}
-                            {showFinance && (
-                              <div className="grid grid-cols-3 gap-1.5">
-                                <MiniStat label="الإيراد" value={fmt(s.contractPrice)} tone="blue" />
-                                <MiniStat label="المحصل" value={fmt(s.amountPaid)} tone="green" />
-                                <MiniStat label="المتبقي" value={fmt(s.remainingAmount)} tone="red" />
-                              </div>
-                            )}
-
-                            {/* Notes */}
-                            {s.notes && (
-                              <div className="text-[10px] p-1.5 rounded bg-background border border-border">
-                                <span className="text-muted-foreground">ملاحظات: </span>
-                                <span>{s.notes}</span>
-                              </div>
-                            )}
-
-                            {/* Action Buttons */}
-                            <div className="flex flex-wrap gap-1.5 pt-1">
-                              {s.trackingNumber && (
-                                <Button size="sm" variant="outline" className="h-6 text-[10px] gap-1" onClick={() => copyText(s.trackingNumber!, 'رقم التتبع')}>
-                                  <Copy className="h-3 w-3" /> نسخ التتبع
-                                </Button>
-                              )}
-                              {showFinance && onReceivePayment && s.remainingAmount > 0 && (
-                                <Button size="sm" className="h-6 text-[10px] gap-1" onClick={() => setPaymentShipment(s)}>
-                                  <Wallet className="h-3 w-3" /> استلام دفعة
-                                </Button>
-                              )}
-                              {info?.phone && (
-                                <Button size="sm" variant="outline" className="h-6 text-[10px] gap-1" onClick={() => whatsapp(info.phone!)}>
-                                  <MessageCircle className="h-3 w-3 text-green-600" /> واتساب
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        )}
+                  <Collapsible>
+                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2.5 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors">
+                      <span className="text-xs font-bold">تفصيل التكاليف</span>
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      <div className="p-2.5 rounded-lg border border-border bg-card space-y-1 text-[11px]">
+                        {(container.containerPrice || 0) > 0 && <CostRow label="سعر الحاوية" value={fmt(container.containerPrice || 0)} />}
+                        {container.shippingCost > 0 && <CostRow label="الشحن" value={fmt(container.shippingCost)} />}
+                        {container.customsCost > 0 && <CostRow label="الجمارك" value={fmt(container.customsCost)} />}
+                        {container.portCost > 0 && <CostRow label="الميناء" value={fmt(container.portCost)} />}
+                        {(container.glassFees || 0) > 0 && <CostRow label="رسوم الزجاج" value={fmt(container.glassFees || 0)} />}
+                        {container.otherCosts > 0 && <CostRow label="أخرى" value={fmt(container.otherCosts)} />}
+                        <div className="border-t border-border pt-1 mt-1">
+                          <CostRow label="الإجمالي" value={fmt(container.totalCost)} bold />
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </TabsContent>
               )}
-            </section>
 
-            {container.notes && (
-              <section className="rounded-lg border border-border bg-card p-3">
-                <h4 className="text-xs font-bold mb-1">ملاحظات الحاوية</h4>
-                <p className="text-[11px] text-muted-foreground whitespace-pre-wrap">{container.notes}</p>
-              </section>
-            )}
+              {/* ========== DOCUMENTS TAB ========== */}
+              <TabsContent value="documents" className="mt-0">
+                {(container.attachments && container.attachments.length > 0) ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {container.attachments.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noreferrer" className="p-2 rounded-lg border border-border bg-card hover:bg-muted/30 flex items-center gap-2 text-[11px]">
+                        <FileBox className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span className="truncate">مستند {i + 1}</span>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-xs">
+                    لا توجد مستندات مرفقة
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* ========== ACTIVITY TAB ========== */}
+              <TabsContent value="activity" className="mt-0 space-y-1.5">
+                <ActivityRow label="إنشاء الحاوية" date={new Date(container.createdAt).toLocaleString('en-GB')} />
+                {container.departureDate && <ActivityRow label="مغادرة" date={container.departureDate} />}
+                {container.arrivalDate && <ActivityRow label="الوصول" date={container.arrivalDate} />}
+                {container.clearanceDate && <ActivityRow label="التخليص" date={container.clearanceDate} />}
+                <ActivityRow label="آخر تحديث" date={new Date(container.updatedAt).toLocaleString('en-GB')} />
+              </TabsContent>
+            </div>
+          </Tabs>
+
+          {/* ========== STICKY ACTION BAR ========== */}
+          <div className="border-t border-border bg-card/80 backdrop-blur px-3 py-2 flex items-center gap-1.5">
+            <Button size="sm" variant="outline" className="h-8 text-[11px] gap-1 flex-1 sm:flex-initial" onClick={handlePrint}>
+              <Printer className="h-3.5 w-3.5" /> طباعة
+            </Button>
+
+            {/* Finance Toggle */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="h-8 text-[11px] gap-1">
+                  <ModeIcon className="h-3.5 w-3.5" /> {modeLabel}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel className="text-[11px]">وضع العرض</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setViewMode('full')} className="text-xs gap-2"><Eye className="h-3.5 w-3.5" /> كامل</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewMode('financial')} className="text-xs gap-2"><DollarSign className="h-3.5 w-3.5" /> مالي فقط</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewMode('operational')} className="text-xs gap-2"><Truck className="h-3.5 w-3.5" /> تشغيلي</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewMode('public')} className="text-xs gap-2"><EyeOff className="h-3.5 w-3.5" /> عام (بدون مالية)</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* More Actions */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="h-8 text-[11px] gap-1">
+                  <MoreHorizontal className="h-3.5 w-3.5" /> المزيد
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={exportPDF} className="text-xs gap-2"><FileText className="h-3.5 w-3.5" /> تصدير PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={exportExcel} className="text-xs gap-2"><FileSpreadsheet className="h-3.5 w-3.5" /> تصدير Excel</DropdownMenuItem>
+                {showFinance && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setExpenseOpen(true)} className="text-xs gap-2"><Receipt className="h-3.5 w-3.5" /> إضافة مصروف</DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </DialogContent>
       </Dialog>
@@ -584,6 +667,34 @@ export function ContainerDetailDialog({
         />
       )}
     </>
+  );
+}
+
+// ============================================================
+// SUMMARY CHIP (compact header)
+// ============================================================
+function SummaryChip({ label, value, accent }: { label: string; value: string; accent?: 'green' | 'red' }) {
+  const accentClass =
+    accent === 'green' ? 'text-green-600 dark:text-green-400'
+    : accent === 'red' ? 'text-red-600 dark:text-red-400'
+    : 'text-foreground';
+  return (
+    <div className="rounded-md bg-muted/50 border border-border px-1.5 py-1 text-center min-w-0">
+      <p className="text-[9px] text-muted-foreground truncate leading-none">{label}</p>
+      <p className={cn('text-[11px] font-bold tabular-nums truncate mt-0.5', accentClass)}>{value}</p>
+    </div>
+  );
+}
+
+// ============================================================
+// ACTIVITY ROW
+// ============================================================
+function ActivityRow({ label, date }: { label: string; date: string }) {
+  return (
+    <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-card text-[11px]">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium tabular-nums">{date}</span>
+    </div>
   );
 }
 
