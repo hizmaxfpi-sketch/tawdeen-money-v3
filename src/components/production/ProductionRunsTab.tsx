@@ -236,79 +236,13 @@ export function ProductionRunsTab({ products, bom, materials, services, fundOpti
               </DialogContent>
             </Dialog>
 
-            <Dialog open={openSell} onOpenChange={setOpenSell}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="h-10 gap-1" variant="secondary" disabled={products.length === 0}>
-                  <ShoppingCart className="h-4 w-4" /> بيع منتج
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-sm">
-                <DialogHeader><DialogTitle className="text-sm">بيع منتج</DialogTitle></DialogHeader>
-                <div className="space-y-2">
-                  <div>
-                    <Label className="text-xs">المنتج *</Label>
-                    <Select value={sellPid} onValueChange={(v) => { setSellPid(v); const p = products.find(pp => pp.id === v); if (p) setSellPrice(p.sell_price.toString()); }}>
-                      <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="اختر المنتج" /></SelectTrigger>
-                      <SelectContent>
-                        {products.length === 0 && <div className="px-2 py-3 text-xs text-muted-foreground text-center">لا توجد منتجات. أضِف منتجاً من تبويب "المنتجات".</div>}
-                        {products.map(p => (
-                          <SelectItem key={p.id} value={p.id} className="text-sm" disabled={p.quantity <= 0}>
-                            <span className="flex items-center justify-between gap-3 w-full">
-                              <span>{p.name}</span>
-                              <span className={p.quantity > 0 ? 'text-income text-[10px]' : 'text-destructive text-[10px]'}>
-                                {p.quantity > 0 ? `متاح: ${p.quantity}` : 'نفد المخزون'}
-                              </span>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {selectedSellProduct && selectedSellProduct.quantity <= 0 && (
-                      <p className="text-[10px] text-destructive mt-1 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" /> لا يوجد مخزون. نفّذ "تصنيع منتج" أولاً.
-                      </p>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">الكمية *</Label>
-                      <Input type="number" value={sellQty} onChange={e => setSellQty(e.target.value)} className="h-9 text-sm" />
-                      {stockShort && <p className="text-[10px] text-destructive mt-0.5">أكبر من المتاح</p>}
-                    </div>
-                    <div><Label className="text-xs">سعر الوحدة *</Label><Input type="number" value={sellPrice} onChange={e => setSellPrice(e.target.value)} className="h-9 text-sm" /></div>
-                  </div>
-                  <div>
-                    <Label className="text-xs">العميل</Label>
-                    <Select value={sellContact} onValueChange={setSellContact}>
-                      <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="اختر العميل" /></SelectTrigger>
-                      <SelectContent>{contacts.map(c => <SelectItem key={c.id} value={c.id} className="text-sm">{c.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">الصندوق (للتحصيل)</Label>
-                      <Select value={sellFund} onValueChange={setSellFund}>
-                        <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="اختياري" /></SelectTrigger>
-                        <SelectContent>{fundOptions.map(f => <SelectItem key={f.id} value={f.id} className="text-sm">{f.name}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div><Label className="text-xs">المحصّل</Label><Input type="number" value={sellPaid} onChange={e => setSellPaid(e.target.value)} className="h-9 text-sm" /></div>
-                  </div>
-                  {sellPid && sellQty && sellPrice && selectedSellProduct && (
-                    <div className="text-[11px] bg-muted/40 p-2 rounded space-y-0.5">
-                      <div className="flex justify-between">إجمالي البيع: <strong>${(parseFloat(sellQty) * parseFloat(sellPrice)).toFixed(2)}</strong></div>
-                      <div className="flex justify-between text-muted-foreground">التكلفة: ${(parseFloat(sellQty) * selectedSellProduct.unit_cost).toFixed(2)}</div>
-                      <div className="flex justify-between text-income">الربح المتوقع: ${(parseFloat(sellQty) * (parseFloat(sellPrice) - selectedSellProduct.unit_cost)).toFixed(2)}</div>
-                    </div>
-                  )}
-                  <Button onClick={handleSell} disabled={stockShort || !selectedSellProduct || selectedSellProduct.quantity <= 0} className="w-full h-9">تنفيذ البيع</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" className="h-10 gap-1" variant="secondary" onClick={() => setOpenSell(true)} disabled={products.length === 0 && materials.length === 0}>
+              <ShoppingCart className="h-4 w-4" /> بيع
+            </Button>
           </div>
 
           <div className="text-[11px] text-muted-foreground text-center pt-2">
-            التصنيع يخصم المواد تلقائياً ويحسب التكلفة. البيع يولّد قيداً محاسبياً للعميل.
+            البيع يدعم المنتجات الجاهزة أو المواد الخام مباشرة، مع إضافة الخدمات والمصاريف.
           </div>
         </TabsContent>
 
