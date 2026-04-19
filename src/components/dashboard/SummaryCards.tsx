@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { BookOpen, TrendingUp, TrendingDown, Wallet, ArrowDownLeft, ArrowUpRight, DollarSign, Calculator, Factory, ShoppingBag } from 'lucide-react';
+import { BookOpen, TrendingUp, TrendingDown, Wallet, ArrowDownLeft, ArrowUpRight, DollarSign, Calculator, Package, ShoppingBag, Boxes } from 'lucide-react';
 import { FinanceStats, Transaction } from '@/types/finance';
 import { Currency } from '@/hooks/useCurrencies';
 import { cn } from '@/lib/utils';
@@ -25,9 +25,9 @@ interface SummaryCardsProps {
   showProjects?: boolean;
   showShipping?: boolean;
   showProduction?: boolean;
-  productionProfit?: number;
   productionSales?: number;
-  productionCost?: number;
+  productionMaterialsValue?: number;
+  productionProductsValue?: number;
 }
 
 export function SummaryCards({
@@ -39,7 +39,7 @@ export function SummaryCards({
   onExpensesClick,
   showLedger = true, showFunds = true, showBusiness = true,
   showProjects = true, showShipping = true,
-  showProduction = false, productionProfit = 0, productionSales = 0, productionCost = 0,
+  showProduction = false, productionSales = 0, productionMaterialsValue = 0, productionProductsValue = 0,
 }: SummaryCardsProps) {
   const cashTxs = fundTransactions || [];
   const fundIn = cashTxs.reduce((sum, tx) => tx.type === 'in' ? sum + tx.amount : sum, 0);
@@ -49,8 +49,9 @@ export function SummaryCards({
   // Exclude profits from disabled modules
   const effectiveProjectProfit = showProjects ? projectProfit : 0;
   const effectiveContainerProfit = showShipping ? containerProfit : 0;
-  const effectiveProductionProfit = showProduction ? productionProfit : 0;
-  const totalRevenue = directRevenue + effectiveProjectProfit + effectiveContainerProfit + effectiveProductionProfit;
+  // الإيرادات الكلية = الإيرادات اليدوية + مبيعات الإنتاج (إن مفعّل) + أرباح المشاريع/الحاويات
+  const totalRevenue = directRevenue + effectiveProjectProfit + effectiveContainerProfit;
+  // المصاريف الكلية = مصاريف الأعمال (تشمل تلقائياً تكلفة المواد المستهلكة عبر useBusinessTransactions)
   const netProfit = totalRevenue - businessExpenses;
 
   const conv = (v: number) => convertForDisplay(v, displayCurrency, currencies);
@@ -84,9 +85,9 @@ export function SummaryCards({
     showProduction && {
       label: 'الإنتاج',
       cards: [
+        { key: 'prod-materials', label: 'مخزون المواد', value: conv(productionMaterialsValue), icon: Boxes, colorClass: 'text-primary', gradient: 'bg-gradient-primary' },
+        { key: 'prod-products', label: 'مخزون المنتجات', value: conv(productionProductsValue), icon: Package, colorClass: 'text-primary', gradient: 'bg-gradient-primary' },
         { key: 'prod-sales', label: 'المبيعات', value: conv(productionSales), icon: ShoppingBag, colorClass: 'text-income', gradient: 'bg-gradient-income' },
-        { key: 'prod-cost', label: 'التكلفة', value: conv(productionCost), icon: TrendingDown, colorClass: 'text-expense', gradient: 'bg-gradient-expense' },
-        { key: 'prod-profit', label: 'صافي ربح الإنتاج', value: conv(productionProfit), icon: Factory, colorClass: productionProfit >= 0 ? 'text-income' : 'text-expense', gradient: 'bg-gradient-primary' },
       ],
     },
   ];
