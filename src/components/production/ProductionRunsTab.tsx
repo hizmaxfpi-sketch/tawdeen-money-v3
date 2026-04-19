@@ -375,9 +375,37 @@ export function ProductionRunsTab({ products, bom, materials, fundOptions, conta
                         <span className={Number(s.profit) >= 0 ? 'text-income' : 'text-expense'}>ربح: ${Number(s.profit).toFixed(2)}</span>
                       </div>
                     </div>
-                    <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 shrink-0">
-                      <Calendar className="h-2.5 w-2.5" />{s.date}
-                    </span>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                        <Calendar className="h-2.5 w-2.5" />{s.date}
+                      </span>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => openEditSale(s)}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive hover:text-destructive">
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>حذف عملية البيع؟</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                سيتم إرجاع {s.quantity} من {productName(s.product_id)} للمخزون، حذف القيد المحاسبي، وعكس مبلغ التحصيل ${Number(s.paid_amount).toFixed(2)} من الصندوق. هذا الإجراء لا يمكن التراجع عنه.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => onDeleteSale(s.id)} className="bg-destructive hover:bg-destructive/90">
+                                حذف وعكس الأثر
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
