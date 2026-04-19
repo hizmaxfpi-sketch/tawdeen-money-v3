@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Factory, ShoppingCart, AlertCircle, History, Filter, X, Calendar, Pencil, Trash2, Package } from 'lucide-react';
+import { Factory, ShoppingCart, AlertCircle, History, Filter, X, Calendar, Pencil, Trash2, Package, Eye } from 'lucide-react';
+import { ProductionPreviewDialog, type SaleRowPreview } from './ProductionPreviewDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,6 +62,7 @@ interface RunRow {
 export function ProductionRunsTab({ products, bom, materials, services, fundOptions, contacts, onProduce, onSell, onSellMaterial, onUpdateSale, onDeleteSale, onDeleteRun }: Props) {
   const [openProd, setOpenProd] = useState(false);
   const [openSell, setOpenSell] = useState(false);
+  const [openSalesPreview, setOpenSalesPreview] = useState(false);
   const [tab, setTab] = useState<'actions' | 'sales' | 'runs'>('actions');
 
   // Production form
@@ -257,7 +259,9 @@ export function ProductionRunsTab({ products, bom, materials, services, fundOpti
             hFrom={hFrom} setHFrom={setHFrom} hTo={hTo} setHTo={setHTo}
             hasFilters={!!hasFilters} onClear={clearFilters}
           />
-          <div className="grid grid-cols-4 gap-1.5">
+          <Button size="sm" variant="outline" className="w-full gap-1 h-8" onClick={() => setOpenSalesPreview(true)} disabled={filteredSales.length === 0}>
+            <Eye className="h-3.5 w-3.5" /> معاينة المبيعات
+          </Button>
             <MiniStat label="مبيعات" value={`$${salesTotals.total.toFixed(2)}`} color="text-income" />
             <MiniStat label="تكلفة" value={`$${salesTotals.cost.toFixed(2)}`} color="text-expense" />
             <MiniStat label="ربح" value={`$${salesTotals.profit.toFixed(2)}`} color={salesTotals.profit >= 0 ? 'text-income' : 'text-expense'} />
