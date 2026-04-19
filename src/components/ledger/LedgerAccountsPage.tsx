@@ -53,6 +53,7 @@ export function LedgerAccountsPage() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [tempSelectedTypes, setTempSelectedTypes] = useState<Set<ContactType>>(new Set());
   const [viewMode, setViewMode] = usePersistedFilter<ViewMode>('ledger-view', 'grid');
+  const [sortBy, setSortBy] = usePersistedFilter<string>('ledger-sort', 'updated_desc');
   const [isSyncing, setIsSyncing] = useState(false);
   const [statementContact, setStatementContact] = useState<Contact | null>(null);
   const [statementTxs, setStatementTxs] = useState<Transaction[]>([]);
