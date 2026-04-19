@@ -242,7 +242,7 @@ export function CompanyDetailsDialog({ open, onOpenChange, companyId, companyNam
             </Card>
 
             {/* Enabled Modules */}
-            <CompanyModulesEditor companyId={companyId} onRefresh={onRefresh} onSaved={() => onRefresh?.()} />
+            <CompanyModulesEditor companyId={companyId} onSaved={() => onRefresh?.()} />
 
             {/* Users */}
             <div className="flex items-center justify-between">
