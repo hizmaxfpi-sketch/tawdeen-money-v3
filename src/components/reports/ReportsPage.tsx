@@ -99,27 +99,7 @@ export function ReportsPage({
 
   const previewRef = useRef<HTMLDivElement>(null);
 
-  // ============= Computed Stats - RESPECT container filter =============
-  const filteredContainers = useMemo(() => {
-    if (filterContainerIds.size === 0) return containers;
-    return containers.filter(c => filterContainerIds.has(c.id));
-  }, [containers, filterContainerIds]);
-
-  const shippingStats = useMemo(() => {
-    const scopeShipments = filterContainerIds.size > 0
-      ? shipments.filter(s => filterContainerIds.has(s.containerId))
-      : shipments;
-    const totalShipments = scopeShipments.length;
-    const totalRevenue = filteredContainers.reduce((s, c) => s + c.totalRevenue, 0);
-    const totalCosts = filteredContainers.reduce((s, c) => s + c.totalCost, 0);
-    const totalProfit = totalRevenue - totalCosts;
-    const totalCollected = scopeShipments.reduce((s, sh) => s + sh.amountPaid, 0);
-    const totalRemaining = scopeShipments.reduce((s, sh) => s + sh.remainingAmount, 0);
-    const totalPieces = scopeShipments.reduce((s, sh) => s + sh.quantity, 0);
-    const totalWeight = scopeShipments.reduce((s, sh) => s + (sh.weight || 0), 0);
-    return { totalShipments, totalRevenue, totalCosts, totalProfit, totalCollected, totalRemaining, totalPieces, totalWeight };
-  }, [filteredContainers, shipments, filterContainerIds]);
-
+  // ============= Computed Stats - RESPECT ALL filters =============
   const filteredShipments = useMemo(() => {
     return shipments.filter(s => {
       if (filterClient !== 'all' && s.clientId !== filterClient) return false;
@@ -130,6 +110,30 @@ export function ReportsPage({
       return true;
     });
   }, [shipments, filterClient, filterStatus, filterContainerIds, dateFrom, dateTo]);
+
+  // Containers in scope: respect all filters
+  const filteredContainers = useMemo(() => {
+    const hasOtherFilters = filterClient !== 'all' || filterStatus !== 'all' || !!dateFrom || !!dateTo;
+    if (filterContainerIds.size === 0 && !hasOtherFilters) return containers;
+    const scopedIds = new Set(filteredShipments.map(s => s.containerId));
+    if (filterContainerIds.size > 0) {
+      return containers.filter(c => filterContainerIds.has(c.id) && (!hasOtherFilters || scopedIds.has(c.id)));
+    }
+    return containers.filter(c => scopedIds.has(c.id));
+  }, [containers, filteredShipments, filterContainerIds, filterClient, filterStatus, dateFrom, dateTo]);
+
+  const shippingStats = useMemo(() => {
+    // All numbers derived from FILTERED shipments + their in-scope containers' costs
+    const totalShipments = filteredShipments.length;
+    const totalRevenue = filteredShipments.reduce((s, sh) => s + sh.contractPrice, 0);
+    const totalCollected = filteredShipments.reduce((s, sh) => s + sh.amountPaid, 0);
+    const totalRemaining = filteredShipments.reduce((s, sh) => s + sh.remainingAmount, 0);
+    const totalPieces = filteredShipments.reduce((s, sh) => s + sh.quantity, 0);
+    const totalWeight = filteredShipments.reduce((s, sh) => s + (sh.weight || 0), 0);
+    const totalCosts = filteredContainers.reduce((s, c) => s + c.totalCost, 0);
+    const totalProfit = totalRevenue - totalCosts;
+    return { totalShipments, totalRevenue, totalCosts, totalProfit, totalCollected, totalRemaining, totalPieces, totalWeight };
+  }, [filteredShipments, filteredContainers]);
 
   const paymentDistribution = useMemo(() => {
     const paid = shipments.filter(s => s.paymentStatus === 'paid').length;
