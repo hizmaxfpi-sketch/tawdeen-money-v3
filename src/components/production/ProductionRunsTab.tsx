@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Factory, ShoppingCart, AlertCircle, History, Filter, X, Calendar, Pencil, Trash2 } from 'lucide-react';
+import { Factory, ShoppingCart, AlertCircle, History, Filter, X, Calendar, Pencil, Trash2, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,18 +9,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { ProductionMaterial, ProductionProduct, BomEntry } from '@/hooks/useProduction';
+import type { ProductionMaterial, ProductionProduct, ProductionService, BomEntry } from '@/hooks/useProduction';
 import type { FundOption } from '@/types/finance';
 import type { Contact } from '@/types/contacts';
+import { UnifiedSellDialog } from './UnifiedSellDialog';
 
 interface Props {
   products: ProductionProduct[];
   bom: BomEntry[];
   materials: ProductionMaterial[];
+  services: ProductionService[];
   fundOptions: FundOption[];
   contacts: Contact[];
   onProduce: (params: { product_id: string; quantity: number; notes?: string }) => Promise<boolean>;
   onSell: (params: any) => Promise<boolean>;
+  onSellMaterial: (params: any) => Promise<boolean>;
   onUpdateSale: (saleId: string, params: any) => Promise<boolean>;
   onDeleteSale: (saleId: string) => Promise<boolean>;
   onDeleteRun: (runId: string) => Promise<boolean>;
@@ -29,11 +32,15 @@ interface Props {
 interface SaleRow {
   id: string;
   date: string;
-  product_id: string;
+  source_type: 'product' | 'material';
+  product_id: string | null;
+  material_id: string | null;
   quantity: number;
   unit_price: number;
   total_amount: number;
   cost_at_sale: number;
+  services_total: number;
+  expenses_total: number;
   profit: number;
   paid_amount: number;
   contact_id: string | null;
@@ -51,7 +58,7 @@ interface RunRow {
   notes: string | null;
 }
 
-export function ProductionRunsTab({ products, bom, materials, fundOptions, contacts, onProduce, onSell, onUpdateSale, onDeleteSale, onDeleteRun }: Props) {
+export function ProductionRunsTab({ products, bom, materials, services, fundOptions, contacts, onProduce, onSell, onSellMaterial, onUpdateSale, onDeleteSale, onDeleteRun }: Props) {
   const [openProd, setOpenProd] = useState(false);
   const [openSell, setOpenSell] = useState(false);
   const [tab, setTab] = useState<'actions' | 'sales' | 'runs'>('actions');
@@ -59,14 +66,6 @@ export function ProductionRunsTab({ products, bom, materials, fundOptions, conta
   // Production form
   const [prodPid, setProdPid] = useState('');
   const [prodQty, setProdQty] = useState('');
-
-  // Sell form
-  const [sellPid, setSellPid] = useState('');
-  const [sellQty, setSellQty] = useState('');
-  const [sellPrice, setSellPrice] = useState('');
-  const [sellContact, setSellContact] = useState('');
-  const [sellFund, setSellFund] = useState('');
-  const [sellPaid, setSellPaid] = useState('');
 
   // Edit sale
   const [editSale, setEditSale] = useState<SaleRow | null>(null);
@@ -119,37 +118,16 @@ export function ProductionRunsTab({ products, bom, materials, fundOptions, conta
   });
   const hasShortage = requirements.some(r => r.shortage > 0);
 
-  const selectedSellProduct = products.find(p => p.id === sellPid);
-  const sellQtyNum = parseFloat(sellQty) || 0;
-  const stockShort = selectedSellProduct ? sellQtyNum > selectedSellProduct.quantity : false;
-
   const handleProduce = async () => {
     if (!prodPid || !parseFloat(prodQty)) return;
     const ok = await onProduce({ product_id: prodPid, quantity: parseFloat(prodQty) });
     if (ok) { setProdPid(''); setProdQty(''); setOpenProd(false); }
   };
 
-  const handleSell = async () => {
-    if (!sellPid || !parseFloat(sellQty) || !parseFloat(sellPrice)) return;
-    if (stockShort) { toast.error('الكمية المطلوبة أكبر من المخزون المتاح'); return; }
-    const ok = await onSell({
-      product_id: sellPid,
-      quantity: parseFloat(sellQty),
-      unit_price: parseFloat(sellPrice),
-      contact_id: sellContact || undefined,
-      fund_id: sellFund || undefined,
-      paid_amount: parseFloat(sellPaid) || 0,
-    });
-    if (ok) {
-      setSellPid(''); setSellQty(''); setSellPrice(''); setSellContact(''); setSellFund(''); setSellPaid('');
-      setOpenSell(false);
-    }
-  };
-
   // Filtered history
-  const applyFilter = <T extends { date: string; product_id: string; contact_id?: string | null }>(rows: T[]) => {
+  const applyFilter = <T extends { date: string; product_id?: string | null; material_id?: string | null; contact_id?: string | null }>(rows: T[]) => {
     return rows.filter(r => {
-      if (hProduct !== 'all' && r.product_id !== hProduct) return false;
+      if (hProduct !== 'all' && r.product_id !== hProduct && r.material_id !== hProduct) return false;
       if (hContact !== 'all' && (r.contact_id || '') !== hContact) return false;
       if (hFrom && r.date < hFrom) return false;
       if (hTo && r.date > hTo) return false;
@@ -173,7 +151,9 @@ export function ProductionRunsTab({ products, bom, materials, fundOptions, conta
     return { qty, cost };
   }, [filteredRuns]);
 
-  const productName = (id: string) => products.find(p => p.id === id)?.name || '—';
+  const productName = (id: string | null | undefined) => id ? (products.find(p => p.id === id)?.name || '—') : '—';
+  const materialName = (id: string | null | undefined) => id ? (materials.find(m => m.id === id)?.name || '—') : '—';
+  const saleItemName = (s: SaleRow) => s.source_type === 'material' ? materialName(s.material_id) : productName(s.product_id);
   const contactName = (id: string | null | undefined) => id ? (contacts.find(c => c.id === id)?.name || '—') : '—';
   const hasFilters = hProduct !== 'all' || hContact !== 'all' || hFrom || hTo;
   const clearFilters = () => { setHProduct('all'); setHContact('all'); setHFrom(''); setHTo(''); };
@@ -258,79 +238,13 @@ export function ProductionRunsTab({ products, bom, materials, fundOptions, conta
               </DialogContent>
             </Dialog>
 
-            <Dialog open={openSell} onOpenChange={setOpenSell}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="h-10 gap-1" variant="secondary" disabled={products.length === 0}>
-                  <ShoppingCart className="h-4 w-4" /> بيع منتج
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-sm">
-                <DialogHeader><DialogTitle className="text-sm">بيع منتج</DialogTitle></DialogHeader>
-                <div className="space-y-2">
-                  <div>
-                    <Label className="text-xs">المنتج *</Label>
-                    <Select value={sellPid} onValueChange={(v) => { setSellPid(v); const p = products.find(pp => pp.id === v); if (p) setSellPrice(p.sell_price.toString()); }}>
-                      <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="اختر المنتج" /></SelectTrigger>
-                      <SelectContent>
-                        {products.length === 0 && <div className="px-2 py-3 text-xs text-muted-foreground text-center">لا توجد منتجات. أضِف منتجاً من تبويب "المنتجات".</div>}
-                        {products.map(p => (
-                          <SelectItem key={p.id} value={p.id} className="text-sm" disabled={p.quantity <= 0}>
-                            <span className="flex items-center justify-between gap-3 w-full">
-                              <span>{p.name}</span>
-                              <span className={p.quantity > 0 ? 'text-income text-[10px]' : 'text-destructive text-[10px]'}>
-                                {p.quantity > 0 ? `متاح: ${p.quantity}` : 'نفد المخزون'}
-                              </span>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {selectedSellProduct && selectedSellProduct.quantity <= 0 && (
-                      <p className="text-[10px] text-destructive mt-1 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" /> لا يوجد مخزون. نفّذ "تصنيع منتج" أولاً.
-                      </p>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">الكمية *</Label>
-                      <Input type="number" value={sellQty} onChange={e => setSellQty(e.target.value)} className="h-9 text-sm" />
-                      {stockShort && <p className="text-[10px] text-destructive mt-0.5">أكبر من المتاح</p>}
-                    </div>
-                    <div><Label className="text-xs">سعر الوحدة *</Label><Input type="number" value={sellPrice} onChange={e => setSellPrice(e.target.value)} className="h-9 text-sm" /></div>
-                  </div>
-                  <div>
-                    <Label className="text-xs">العميل</Label>
-                    <Select value={sellContact} onValueChange={setSellContact}>
-                      <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="اختر العميل" /></SelectTrigger>
-                      <SelectContent>{contacts.map(c => <SelectItem key={c.id} value={c.id} className="text-sm">{c.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">الصندوق (للتحصيل)</Label>
-                      <Select value={sellFund} onValueChange={setSellFund}>
-                        <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="اختياري" /></SelectTrigger>
-                        <SelectContent>{fundOptions.map(f => <SelectItem key={f.id} value={f.id} className="text-sm">{f.name}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div><Label className="text-xs">المحصّل</Label><Input type="number" value={sellPaid} onChange={e => setSellPaid(e.target.value)} className="h-9 text-sm" /></div>
-                  </div>
-                  {sellPid && sellQty && sellPrice && selectedSellProduct && (
-                    <div className="text-[11px] bg-muted/40 p-2 rounded space-y-0.5">
-                      <div className="flex justify-between">إجمالي البيع: <strong>${(parseFloat(sellQty) * parseFloat(sellPrice)).toFixed(2)}</strong></div>
-                      <div className="flex justify-between text-muted-foreground">التكلفة: ${(parseFloat(sellQty) * selectedSellProduct.unit_cost).toFixed(2)}</div>
-                      <div className="flex justify-between text-income">الربح المتوقع: ${(parseFloat(sellQty) * (parseFloat(sellPrice) - selectedSellProduct.unit_cost)).toFixed(2)}</div>
-                    </div>
-                  )}
-                  <Button onClick={handleSell} disabled={stockShort || !selectedSellProduct || selectedSellProduct.quantity <= 0} className="w-full h-9">تنفيذ البيع</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" className="h-10 gap-1" variant="secondary" onClick={() => setOpenSell(true)} disabled={products.length === 0 && materials.length === 0}>
+              <ShoppingCart className="h-4 w-4" /> بيع
+            </Button>
           </div>
 
           <div className="text-[11px] text-muted-foreground text-center pt-2">
-            التصنيع يخصم المواد تلقائياً ويحسب التكلفة. البيع يولّد قيداً محاسبياً للعميل.
+            البيع يدعم المنتجات الجاهزة أو المواد الخام مباشرة، مع إضافة الخدمات والمصاريف.
           </div>
         </TabsContent>
 
@@ -361,9 +275,11 @@ export function ProductionRunsTab({ products, bom, materials, fundOptions, conta
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <ShoppingCart className="h-3.5 w-3.5 text-income shrink-0" />
-                        <span className="text-sm font-semibold">{productName(s.product_id)}</span>
+                        {s.source_type === 'material' ? <Package className="h-3.5 w-3.5 text-primary shrink-0" /> : <ShoppingCart className="h-3.5 w-3.5 text-income shrink-0" />}
+                        <span className="text-sm font-semibold">{saleItemName(s)}</span>
                         <span className="text-[10px] text-muted-foreground">× {s.quantity}</span>
+                        {s.source_type === 'material' && <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">مادة خام</span>}
+                        {Number(s.services_total) > 0 && <span className="text-[9px] bg-accent/30 text-accent-foreground px-1.5 py-0.5 rounded">+خدمات ${Number(s.services_total).toFixed(2)}</span>}
                       </div>
                       <div className="flex gap-2 mt-1 text-[11px] flex-wrap">
                         <span>عميل: <strong>{contactName(s.contact_id)}</strong></span>
@@ -393,7 +309,7 @@ export function ProductionRunsTab({ products, bom, materials, fundOptions, conta
                             <AlertDialogHeader>
                               <AlertDialogTitle>حذف عملية البيع؟</AlertDialogTitle>
                               <AlertDialogDescription>
-                                سيتم إرجاع {s.quantity} من {productName(s.product_id)} للمخزون، حذف القيد المحاسبي، وعكس مبلغ التحصيل ${Number(s.paid_amount).toFixed(2)} من الصندوق. هذا الإجراء لا يمكن التراجع عنه.
+                                سيتم إرجاع {s.quantity} من {saleItemName(s)} للمخزون، حذف القيد المحاسبي، وعكس مبلغ التحصيل ${Number(s.paid_amount).toFixed(2)} من الصندوق. هذا الإجراء لا يمكن التراجع عنه.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -481,6 +397,19 @@ export function ProductionRunsTab({ products, bom, materials, fundOptions, conta
         </TabsContent>
       </Tabs>
 
+      {/* ====== Unified Sell Dialog ====== */}
+      <UnifiedSellDialog
+        open={openSell}
+        onOpenChange={setOpenSell}
+        products={products}
+        materials={materials}
+        services={services}
+        fundOptions={fundOptions}
+        contacts={contacts}
+        onSellProduct={onSell}
+        onSellMaterial={onSellMaterial}
+      />
+
       {/* ====== Edit Sale Dialog ====== */}
       <Dialog open={!!editSale} onOpenChange={(o) => !o && setEditSale(null)}>
         <DialogContent className="max-w-sm">
@@ -488,7 +417,7 @@ export function ProductionRunsTab({ products, bom, materials, fundOptions, conta
           {editSale && (
             <div className="space-y-2">
               <div className="text-[11px] bg-muted/40 p-2 rounded">
-                المنتج: <strong>{productName(editSale.product_id)}</strong>
+                المنتج: <strong>{saleItemName(editSale)}</strong>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div><Label className="text-xs">الكمية *</Label><Input type="number" value={eQty} onChange={e => setEQty(e.target.value)} className="h-9 text-sm" /></div>
