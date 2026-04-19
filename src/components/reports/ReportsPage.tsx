@@ -60,16 +60,18 @@ export function ReportsPage({
   const [expandedContainers, setExpandedContainers] = useState<Set<string>>(new Set());
   const [displayCurrency, setDisplayCurrency] = useState('USD');
   const [showFinancials, setShowFinancials] = useState(true);
+  const [showCostDetails, setShowCostDetails] = useState(false);
   const [costsDialogContainerId, setCostsDialogContainerId] = useState<string | null>(null);
   const [extraExpensesByContainer, setExtraExpensesByContainer] = useState<Record<string, { id: string; description: string; amount: number; date: string }[]>>({});
 
-  // Load extra expenses when costs dialog opens
+  // Auto-load extra expenses for inline cost details when previewing a container
   useEffect(() => {
-    if (!costsDialogContainerId || extraExpensesByContainer[costsDialogContainerId]) return;
+    const targetId = costsDialogContainerId || (previewContent === 'container-detail' ? selectedContainerId : null);
+    if (!targetId || extraExpensesByContainer[targetId]) return;
     supabase
       .from('container_expenses')
       .select('id, description, amount, date')
-      .eq('container_id', costsDialogContainerId)
+      .eq('container_id', targetId)
       .order('created_at', { ascending: true })
       .then(({ data }) => {
         if (data) {
