@@ -69,20 +69,20 @@ export function useProduction() {
   }, [user, loadAll]);
 
   // Materials
-  const addMaterial = async (data: { name: string; code?: string; unit: string; notes?: string }) => {
+  const addMaterial = async (data: { name: string; code?: string; unit: string; notes?: string }): Promise<void> => {
     if (!user) return;
     const { error } = await supabase.from('production_materials').insert({ ...data, user_id: user.id, quantity: 0, avg_cost: 0 });
-    if (error) return toast.error('فشل إضافة المادة');
+    if (error) { toast.error('فشل إضافة المادة'); return; }
     toast.success('تمت إضافة المادة'); loadAll();
   };
-  const updateMaterial = async (id: string, patch: Partial<ProductionMaterial>) => {
+  const updateMaterial = async (id: string, patch: Partial<ProductionMaterial>): Promise<void> => {
     const { error } = await supabase.from('production_materials').update(patch).eq('id', id);
-    if (error) return toast.error('فشل التحديث');
+    if (error) { toast.error('فشل التحديث'); return; }
     toast.success('تم التحديث'); loadAll();
   };
-  const deleteMaterial = async (id: string) => {
+  const deleteMaterial = async (id: string): Promise<void> => {
     const { error } = await supabase.from('production_materials').delete().eq('id', id);
-    if (error) return toast.error('فشل الحذف');
+    if (error) { toast.error('فشل الحذف'); return; }
     toast.success('تم الحذف'); loadAll();
   };
   const purchaseMaterial = async (params: any) => {
@@ -97,49 +97,49 @@ export function useProduction() {
   };
 
   // Products
-  const addProduct = async (data: any) => {
+  const addProduct = async (data: any): Promise<void> => {
     if (!user) return;
     const { error } = await supabase.from('production_products').insert({ ...data, user_id: user.id, quantity: 0, unit_cost: 0 });
-    if (error) return toast.error('فشل الإضافة');
+    if (error) { toast.error('فشل الإضافة'); return; }
     toast.success('تمت الإضافة'); loadAll();
   };
-  const updateProduct = async (id: string, patch: Partial<ProductionProduct>) => {
+  const updateProduct = async (id: string, patch: Partial<ProductionProduct>): Promise<void> => {
     const { error } = await supabase.from('production_products').update(patch).eq('id', id);
-    if (error) return toast.error('فشل التحديث');
+    if (error) { toast.error('فشل التحديث'); return; }
     toast.success('تم التحديث'); loadAll();
   };
-  const deleteProduct = async (id: string) => {
+  const deleteProduct = async (id: string): Promise<void> => {
     const { error } = await supabase.from('production_products').delete().eq('id', id);
-    if (error) return toast.error('فشل الحذف');
+    if (error) { toast.error('فشل الحذف'); return; }
     toast.success('تم الحذف'); loadAll();
   };
 
   // Services
-  const addService = async (data: { name: string; code?: string; default_price: number; notes?: string }) => {
+  const addService = async (data: { name: string; code?: string; default_price: number; notes?: string }): Promise<void> => {
     if (!user) return;
     const { error } = await (supabase as any).from('production_services').insert({ ...data, user_id: user.id });
-    if (error) return toast.error('فشل إضافة الخدمة');
+    if (error) { toast.error('فشل إضافة الخدمة'); return; }
     toast.success('تمت إضافة الخدمة'); loadAll();
   };
-  const updateService = async (id: string, patch: Partial<ProductionService>) => {
+  const updateService = async (id: string, patch: Partial<ProductionService>): Promise<void> => {
     const { error } = await (supabase as any).from('production_services').update(patch).eq('id', id);
-    if (error) return toast.error('فشل التحديث');
+    if (error) { toast.error('فشل التحديث'); return; }
     toast.success('تم التحديث'); loadAll();
   };
-  const deleteService = async (id: string) => {
+  const deleteService = async (id: string): Promise<void> => {
     const { error } = await (supabase as any).from('production_services').delete().eq('id', id);
-    if (error) return toast.error('فشل الحذف');
+    if (error) { toast.error('فشل الحذف'); return; }
     toast.success('تم الحذف'); loadAll();
   };
 
   // BOM
-  const setProductBom = async (productId: string, entries: { material_id: string; qty_per_unit: number }[]) => {
+  const setProductBom = async (productId: string, entries: { material_id: string; qty_per_unit: number }[]): Promise<void> => {
     if (!user) return;
     await supabase.from('product_bom').delete().eq('product_id', productId);
     if (entries.length > 0) {
       const rows = entries.map(e => ({ ...e, product_id: productId, user_id: user.id }));
       const { error } = await supabase.from('product_bom').insert(rows);
-      if (error) return toast.error('فشل حفظ المكونات');
+      if (error) { toast.error('فشل حفظ المكونات'); return; }
     }
     toast.success('تم حفظ مكونات المنتج'); loadAll();
   };
