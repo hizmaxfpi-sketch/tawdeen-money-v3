@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import type { ProductionMaterial, ProductionProduct, ProductionService, SaleService, SaleExpense } from '@/hooks/useProduction';
+import { unitLabel } from './ServicesTab';
 import type { FundOption } from '@/types/finance';
 import type { Contact } from '@/types/contacts';
 
@@ -94,7 +95,26 @@ export function UnifiedSellDialog({ open, onOpenChange, products, materials, ser
   const removeSvcLine = (i: number) => setSvcLines(svcLines.filter((_, idx) => idx !== i));
   const pickService = (i: number, sid: string) => {
     const sv = services.find(s => s.id === sid);
-    if (sv) updateSvcLine(i, { service_id: sid, name: sv.name, amount: sv.default_price });
+    if (sv) updateSvcLine(i, {
+      service_id: sid,
+      name: sv.name,
+      quantity: 1,
+      unit_price: sv.default_price,
+      unit_type: sv.unit_type,
+      amount: sv.default_price,
+    });
+  };
+  const updateSvcQty = (i: number, qtyStr: string) => {
+    const q = parseFloat(qtyStr) || 0;
+    const line = svcLines[i];
+    const up = Number(line.unit_price) || 0;
+    updateSvcLine(i, { quantity: q, amount: q * up });
+  };
+  const updateSvcUnitPrice = (i: number, upStr: string) => {
+    const up = parseFloat(upStr) || 0;
+    const line = svcLines[i];
+    const q = Number(line.quantity) || 0;
+    updateSvcLine(i, { unit_price: up, amount: q * up });
   };
 
   const addExpLine = () => setExpLines([...expLines, { description: '', amount: 0, treat_as_business: true }]);
@@ -218,23 +238,46 @@ export function UnifiedSellDialog({ open, onOpenChange, products, materials, ser
             </div>
             {svcLines.length === 0 ? (
               <p className="text-[10px] text-muted-foreground text-center py-1">لا توجد خدمات (مثل: قص، تركيب، اجور...)</p>
-            ) : svcLines.map((l, i) => (
-              <div key={i} className="flex gap-1 items-end">
-                <div className="flex-1">
-                  {services.length > 0 && (
-                    <Select value={l.service_id || ''} onValueChange={(v) => pickService(i, v)}>
-                      <SelectTrigger className="h-8 text-[11px]"><SelectValue placeholder="اختر خدمة" /></SelectTrigger>
-                      <SelectContent>{services.map(s => <SelectItem key={s.id} value={s.id} className="text-xs">{s.name} (${s.default_price})</SelectItem>)}</SelectContent>
-                    </Select>
+            ) : svcLines.map((l, i) => {
+              const picked = services.find(s => s.id === l.service_id);
+              const unitName = picked ? unitLabel(picked) : (l.unit_type ? l.unit_type : 'وحدة');
+              return (
+                <div key={i} className="bg-muted/30 p-1.5 rounded space-y-1">
+                  <div className="flex gap-1 items-center">
+                    {services.length > 0 ? (
+                      <Select value={l.service_id || ''} onValueChange={(v) => pickService(i, v)}>
+                        <SelectTrigger className="h-8 text-[11px] flex-1"><SelectValue placeholder="اختر خدمة" /></SelectTrigger>
+                        <SelectContent>{services.map(s => <SelectItem key={s.id} value={s.id} className="text-xs">{s.name} (${s.default_price}/{unitLabel(s)})</SelectItem>)}</SelectContent>
+                      </Select>
+                    ) : (
+                      <Input value={l.name} onChange={e => updateSvcLine(i, { name: e.target.value })} placeholder="اسم الخدمة" className="h-8 text-[11px] flex-1" />
+                    )}
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 shrink-0" onClick={() => removeSvcLine(i)}>
+                      <X className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                  {l.service_id && (
+                    <div className="grid grid-cols-3 gap-1 items-end">
+                      <div>
+                        <span className="text-[9px] text-muted-foreground">الكمية ({unitName})</span>
+                        <Input type="number" value={l.quantity ?? ''} onChange={e => updateSvcQty(i, e.target.value)} placeholder="0" className="h-7 text-[11px]" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-muted-foreground">سعر الوحدة</span>
+                        <Input type="number" value={l.unit_price ?? ''} onChange={e => updateSvcUnitPrice(i, e.target.value)} placeholder="0" className="h-7 text-[11px]" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-muted-foreground">الإجمالي</span>
+                        <Input type="number" value={l.amount || 0} readOnly className="h-7 text-[11px] bg-muted/60 font-semibold" />
+                      </div>
+                    </div>
                   )}
-                  <Input value={l.name} onChange={e => updateSvcLine(i, { name: e.target.value, service_id: undefined })} placeholder="اسم الخدمة" className="h-8 text-[11px] mt-1" />
+                  {!l.service_id && (
+                    <Input type="number" value={l.amount || ''} onChange={e => updateSvcLine(i, { amount: parseFloat(e.target.value) || 0 })} placeholder="المبلغ" className="h-7 text-[11px]" />
+                  )}
                 </div>
-                <Input type="number" value={l.amount || ''} onChange={e => updateSvcLine(i, { amount: parseFloat(e.target.value) || 0 })} placeholder="المبلغ" className="h-8 text-[11px] w-20" />
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => removeSvcLine(i)}>
-                  <X className="h-3.5 w-3.5 text-destructive" />
-                </Button>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Direct expenses */}

@@ -1242,10 +1242,12 @@ export type Database = {
           code: string | null
           created_at: string
           created_by_name: string | null
+          custom_unit: string | null
           default_price: number
           id: string
           name: string
           notes: string | null
+          unit_type: string
           updated_at: string
           user_id: string
         }
@@ -1253,10 +1255,12 @@ export type Database = {
           code?: string | null
           created_at?: string
           created_by_name?: string | null
+          custom_unit?: string | null
           default_price?: number
           id?: string
           name: string
           notes?: string | null
+          unit_type?: string
           updated_at?: string
           user_id: string
         }
@@ -1264,10 +1268,12 @@ export type Database = {
           code?: string | null
           created_at?: string
           created_by_name?: string | null
+          custom_unit?: string | null
           default_price?: number
           id?: string
           name?: string
           notes?: string | null
+          unit_type?: string
           updated_at?: string
           user_id?: string
         }

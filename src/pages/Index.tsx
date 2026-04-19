@@ -107,8 +107,11 @@ const Index = () => {
   const { currencies, updateExchangeRate } = useCurrencies();
   const { containers, shipments } = useSupabaseShipping();
   const { contacts } = useSupabaseContacts();
-  const { directRevenue, businessExpenses } = useBusinessTransactions(transactions);
   const { summary: productionSummary } = useProduction();
+  const { directRevenue, businessExpenses } = useBusinessTransactions(transactions, {
+    extraRevenue: productionSummary.totalSales,
+    extraExpenses: productionSummary.totalCost,
+  });
 
   const fundLinkedTransactions = transactions.filter(t => t.fundId && t.fundId !== '');
 
@@ -211,9 +214,9 @@ const Index = () => {
             showBusiness={isEnabled('business')}
             showFunds={isEnabled('funds')}
             showProduction={isEnabled('production')}
-            productionProfit={productionSummary.netProfit}
             productionSales={productionSummary.totalSales}
-            productionCost={productionSummary.totalCost}
+            productionMaterialsValue={productionSummary.materialsValue}
+            productionProductsValue={productionSummary.productsValue}
           />
         );
       case 'funds':

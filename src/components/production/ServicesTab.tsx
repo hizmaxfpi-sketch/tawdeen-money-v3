@@ -4,11 +4,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import type { ProductionService } from '@/hooks/useProduction';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { ProductionService, ServiceUnitType } from '@/hooks/useProduction';
+
+const UNIT_OPTIONS: { value: ServiceUnitType; label: string }[] = [
+  { value: 'piece', label: 'قطعة / عدد' },
+  { value: 'hour', label: 'ساعة' },
+  { value: 'day', label: 'يوم' },
+  { value: 'meter', label: 'متر / كم' },
+  { value: 'custom', label: 'مخصص...' },
+];
+
+export function unitLabel(s: { unit_type: ServiceUnitType; custom_unit?: string | null }): string {
+  if (s.unit_type === 'custom') return s.custom_unit || 'وحدة';
+  return UNIT_OPTIONS.find(u => u.value === s.unit_type)?.label || 'وحدة';
+}
 
 interface Props {
   services: ProductionService[];
-  onAdd: (data: { name: string; code?: string; default_price: number; notes?: string }) => Promise<void>;
+  onAdd: (data: { name: string; code?: string; default_price: number; notes?: string; unit_type?: ServiceUnitType; custom_unit?: string }) => Promise<void>;
   onUpdate: (id: string, patch: Partial<ProductionService>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }
@@ -20,13 +34,22 @@ export function ServicesTab({ services, onAdd, onUpdate, onDelete }: Props) {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [price, setPrice] = useState('');
+  const [unitType, setUnitType] = useState<ServiceUnitType>('piece');
+  const [customUnit, setCustomUnit] = useState('');
   const [notes, setNotes] = useState('');
 
-  const reset = () => { setName(''); setCode(''); setPrice(''); setNotes(''); };
+  const reset = () => { setName(''); setCode(''); setPrice(''); setUnitType('piece'); setCustomUnit(''); setNotes(''); };
 
   const handleAdd = async () => {
     if (!name.trim()) return;
-    await onAdd({ name: name.trim(), code: code.trim() || undefined, default_price: parseFloat(price) || 0, notes: notes.trim() || undefined });
+    await onAdd({
+      name: name.trim(),
+      code: code.trim() || undefined,
+      default_price: parseFloat(price) || 0,
+      notes: notes.trim() || undefined,
+      unit_type: unitType,
+      custom_unit: unitType === 'custom' ? (customUnit.trim() || undefined) : undefined,
+    });
     reset();
     setOpenAdd(false);
   };
@@ -44,10 +67,22 @@ export function ServicesTab({ services, onAdd, onUpdate, onDelete }: Props) {
           <div className="space-y-2">
             <div><Label className="text-xs">اسم الخدمة *</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-9 text-sm" placeholder="قص، تركيب، نقل..." /></div>
             <div className="grid grid-cols-2 gap-2">
-              <div><Label className="text-xs">الكود</Label><Input value={code} onChange={e => setCode(e.target.value)} className="h-9 text-sm" /></div>
-              <div><Label className="text-xs">السعر الافتراضي</Label><Input type="number" value={price} onChange={e => setPrice(e.target.value)} className="h-9 text-sm" /></div>
+              <div>
+                <Label className="text-xs">وحدة القياس</Label>
+                <Select value={unitType} onValueChange={(v) => setUnitType(v as ServiceUnitType)}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>{UNIT_OPTIONS.map(u => <SelectItem key={u.value} value={u.value} className="text-sm">{u.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div><Label className="text-xs">سعر الوحدة</Label><Input type="number" value={price} onChange={e => setPrice(e.target.value)} className="h-9 text-sm" /></div>
             </div>
-            <div><Label className="text-xs">ملاحظات</Label><Input value={notes} onChange={e => setNotes(e.target.value)} className="h-9 text-sm" /></div>
+            {unitType === 'custom' && (
+              <div><Label className="text-xs">اسم الوحدة</Label><Input value={customUnit} onChange={e => setCustomUnit(e.target.value)} className="h-9 text-sm" placeholder="مثل: زيارة، دورة..." /></div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-xs">الكود</Label><Input value={code} onChange={e => setCode(e.target.value)} className="h-9 text-sm" /></div>
+              <div><Label className="text-xs">ملاحظات</Label><Input value={notes} onChange={e => setNotes(e.target.value)} className="h-9 text-sm" /></div>
+            </div>
             <Button onClick={handleAdd} className="w-full h-9">حفظ</Button>
           </div>
         </DialogContent>
@@ -71,7 +106,7 @@ export function ServicesTab({ services, onAdd, onUpdate, onDelete }: Props) {
                     {s.code && <span className="text-[10px] text-muted-foreground">[{s.code}]</span>}
                   </div>
                   <div className="flex gap-3 mt-1 text-[11px]">
-                    <span className="text-income">السعر الافتراضي: <strong>${s.default_price.toFixed(2)}</strong></span>
+                    <span className="text-income">${s.default_price.toFixed(2)} / {unitLabel(s)}</span>
                     {s.notes && <span className="text-muted-foreground truncate">{s.notes}</span>}
                   </div>
                 </div>
@@ -96,9 +131,19 @@ export function ServicesTab({ services, onAdd, onUpdate, onDelete }: Props) {
             <div className="space-y-2">
               <div><Label className="text-xs">الاسم</Label><Input defaultValue={openEdit.name} onBlur={e => onUpdate(openEdit.id, { name: e.target.value })} className="h-9 text-sm" /></div>
               <div className="grid grid-cols-2 gap-2">
-                <div><Label className="text-xs">الكود</Label><Input defaultValue={openEdit.code || ''} onBlur={e => onUpdate(openEdit.id, { code: e.target.value })} className="h-9 text-sm" /></div>
-                <div><Label className="text-xs">السعر</Label><Input type="number" defaultValue={openEdit.default_price} onBlur={e => onUpdate(openEdit.id, { default_price: parseFloat(e.target.value) || 0 })} className="h-9 text-sm" /></div>
+                <div>
+                  <Label className="text-xs">وحدة القياس</Label>
+                  <Select defaultValue={openEdit.unit_type} onValueChange={(v) => onUpdate(openEdit.id, { unit_type: v as ServiceUnitType })}>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>{UNIT_OPTIONS.map(u => <SelectItem key={u.value} value={u.value} className="text-sm">{u.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div><Label className="text-xs">سعر الوحدة</Label><Input type="number" defaultValue={openEdit.default_price} onBlur={e => onUpdate(openEdit.id, { default_price: parseFloat(e.target.value) || 0 })} className="h-9 text-sm" /></div>
               </div>
+              {openEdit.unit_type === 'custom' && (
+                <div><Label className="text-xs">اسم الوحدة</Label><Input defaultValue={openEdit.custom_unit || ''} onBlur={e => onUpdate(openEdit.id, { custom_unit: e.target.value })} className="h-9 text-sm" /></div>
+              )}
+              <div><Label className="text-xs">الكود</Label><Input defaultValue={openEdit.code || ''} onBlur={e => onUpdate(openEdit.id, { code: e.target.value })} className="h-9 text-sm" /></div>
               <div><Label className="text-xs">ملاحظات</Label><Input defaultValue={openEdit.notes || ''} onBlur={e => onUpdate(openEdit.id, { notes: e.target.value })} className="h-9 text-sm" /></div>
               <Button size="sm" variant="secondary" className="w-full h-9" onClick={() => setOpenEdit(null)}>إغلاق</Button>
             </div>
