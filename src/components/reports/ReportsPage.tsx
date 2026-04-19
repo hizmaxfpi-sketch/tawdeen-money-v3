@@ -97,6 +97,30 @@ export function ReportsPage({
   const [filterFund, setFilterFund] = useState('all');
   const [filterContainerIds, setFilterContainerIds] = useState<Set<string>>(new Set());
 
+  // Project-specific filters
+  const [projectFilterClient, setProjectFilterClient] = useState<string>('all');
+  const [projectFilterStatus, setProjectFilterStatus] = useState<string>('all');
+  const [projectDateFrom, setProjectDateFrom] = useState('');
+  const [projectDateTo, setProjectDateTo] = useState('');
+  const [projectFilterIds, setProjectFilterIds] = useState<Set<string>>(new Set());
+
+  const filteredProjects = useMemo(() => {
+    return projects.filter(p => {
+      if (projectFilterIds.size > 0 && !projectFilterIds.has(p.id)) return false;
+      if (projectFilterClient !== 'all' && (p as any).clientId !== projectFilterClient) return false;
+      if (projectFilterStatus !== 'all' && p.status !== projectFilterStatus) return false;
+      if (projectDateFrom) {
+        const pd = p.startDate ? new Date(p.startDate) : null;
+        if (!pd || pd < new Date(projectDateFrom)) return false;
+      }
+      if (projectDateTo) {
+        const pd = p.startDate ? new Date(p.startDate) : null;
+        if (!pd || pd > new Date(projectDateTo)) return false;
+      }
+      return true;
+    });
+  }, [projects, projectFilterIds, projectFilterClient, projectFilterStatus, projectDateFrom, projectDateTo]);
+
   const previewRef = useRef<HTMLDivElement>(null);
 
   // ============= Computed Stats - RESPECT ALL filters =============
@@ -271,22 +295,23 @@ export function ReportsPage({
     } else if (type === 'projects') {
       doc.text('تقرير المشاريع', pw / 2, y, { align: 'center' });
       y += 15;
-      if (projects.length > 0) {
-        const totalContract = projects.reduce((s, p) => s + p.contractValue, 0);
-        const totalExpenses = projects.reduce((s, p) => s + p.expenses, 0);
-        const totalProfit = projects.reduce((s, p) => s + p.profit, 0);
+      const projList = filteredProjects;
+      if (projList.length > 0) {
+        const totalContract = projList.reduce((s, p) => s + p.contractValue, 0);
+        const totalExpenses = projList.reduce((s, p) => s + p.expenses, 0);
+        const totalProfit = projList.reduce((s, p) => s + p.profit, 0);
         (doc as any).autoTable({
           startY: y,
           head: [['المشروع', 'الحالة', 'قيمة العقد', 'المصروفات', 'الربح']],
           body: [
-            ...projects.map(p => [p.name, statusLabels[p.status] || p.status, `$${p.contractValue.toLocaleString()}`, `$${p.expenses.toLocaleString()}`, `$${p.profit.toLocaleString()}`]),
+            ...projList.map(p => [p.name, statusLabels[p.status] || p.status, `$${p.contractValue.toLocaleString()}`, `$${p.expenses.toLocaleString()}`, `$${p.profit.toLocaleString()}`]),
             ['الإجمالي', '', `$${totalContract.toLocaleString()}`, `$${totalExpenses.toLocaleString()}`, `$${totalProfit.toLocaleString()}`],
           ],
           styles: { font: 'Helvetica', fontSize: 9, halign: 'center' },
           headStyles: { fillColor: [25, 65, 120], textColor: 255 },
           margin: { left: 10, right: 10 },
           didParseCell: function(data: any) {
-            if (data.row.index === projects.length) {
+            if (data.row.index === projList.length) {
               data.cell.styles.fontStyle = 'bold';
               data.cell.styles.fillColor = [230, 235, 245];
             }
@@ -330,7 +355,7 @@ export function ReportsPage({
     } else if (type === 'projects') {
       import('@/utils/excelExport').then(async ({ exportTransactionsToExcel }) => {
         const XLSX = await import('xlsx');
-        const data = projects.map(p => ({
+        const data = filteredProjects.map(p => ({
           'المشروع': p.name, 'العميل': p.clientName || '-', 'الحالة': statusLabels[p.status],
           'قيمة العقد': p.contractValue, 'المصروفات': p.expenses,
           'المستلم': p.receivedAmount, 'الربح': p.profit,
@@ -624,12 +649,93 @@ export function ReportsPage({
 
         {/* =============== تقارير المشاريع =============== */}
         <TabsContent value="projects" className="space-y-3 mt-3">
+          {/* Filters */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl bg-card p-3 shadow-sm border border-border">
-            <h3 className="text-xs font-bold mb-3">ملخص المشاريع</h3>
+            <div className="flex items-center gap-1 mb-2">
+              <Filter className="h-3 w-3 text-primary" />
+              <h3 className="text-xs font-bold">فلترة المشاريع</h3>
+              {(projectFilterClient !== 'all' || projectFilterStatus !== 'all' || projectDateFrom || projectDateTo || projectFilterIds.size > 0) && (
+                <button
+                  className="ml-auto text-[9px] text-destructive"
+                  onClick={() => {
+                    setProjectFilterClient('all');
+                    setProjectFilterStatus('all');
+                    setProjectDateFrom('');
+                    setProjectDateTo('');
+                    setProjectFilterIds(new Set());
+                  }}
+                >
+                  مسح الكل
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Select value={projectFilterClient} onValueChange={setProjectFilterClient}>
+                <SelectTrigger className="h-8 text-[10px]"><SelectValue placeholder="العميل" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[10px]">كل العملاء</SelectItem>
+                  {Array.from(new Set(projects.map(p => (p as any).clientId).filter(Boolean))).map(cid => {
+                    const name = projects.find(p => (p as any).clientId === cid)?.clientName || contacts.find(c => c.id === cid)?.name || '—';
+                    return <SelectItem key={cid as string} value={cid as string} className="text-[10px]">{name}</SelectItem>;
+                  })}
+                </SelectContent>
+              </Select>
+              <Select value={projectFilterStatus} onValueChange={setProjectFilterStatus}>
+                <SelectTrigger className="h-8 text-[10px]"><SelectValue placeholder="الحالة" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[10px]">كل الحالات</SelectItem>
+                  <SelectItem value="active" className="text-[10px]">نشط</SelectItem>
+                  <SelectItem value="completed" className="text-[10px]">مكتمل</SelectItem>
+                  <SelectItem value="paused" className="text-[10px]">متوقف</SelectItem>
+                  <SelectItem value="cancelled" className="text-[10px]">ملغي</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input type="date" value={projectDateFrom} onChange={e => setProjectDateFrom(e.target.value)} className="h-8 text-[10px]" />
+              <Input type="date" value={projectDateTo} onChange={e => setProjectDateTo(e.target.value)} className="h-8 text-[10px]" />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-8 text-[10px] justify-between relative col-span-2">
+                    {projectFilterIds.size > 0 ? `${projectFilterIds.size} مشروع محدد` : 'اختر مشاريع محددة'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-2 max-h-60 overflow-y-auto">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-medium">اختر المشاريع</span>
+                    {projectFilterIds.size > 0 && (
+                      <button className="text-[9px] text-destructive" onClick={() => setProjectFilterIds(new Set())}>مسح</button>
+                    )}
+                  </div>
+                  {projects.map(p => (
+                    <label key={p.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer">
+                      <Checkbox
+                        checked={projectFilterIds.has(p.id)}
+                        onCheckedChange={(checked) => {
+                          setProjectFilterIds(prev => {
+                            const next = new Set(prev);
+                            checked ? next.add(p.id) : next.delete(p.id);
+                            return next;
+                          });
+                        }}
+                      />
+                      <span className="text-[10px] flex-1 truncate">{p.name}</span>
+                    </label>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            </div>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl bg-card p-3 shadow-sm border border-border">
+            <h3 className="text-xs font-bold mb-3">
+              ملخص المشاريع
+              {filteredProjects.length !== projects.length && (
+                <span className="text-[9px] text-primary font-normal mr-1">(مفلتر: {filteredProjects.length}/{projects.length})</span>
+              )}
+            </h3>
             <div className="grid grid-cols-3 gap-2">
-              <StatCard icon={BarChart3} label="إجمالي المشاريع" value={(projectStats?.totalProjects || projects.length).toString()} color="text-primary" bg="bg-accent" />
-              <StatCard icon={TrendingUp} label="نشطة" value={(projectStats?.activeProjects || projects.filter(p => p.status === 'active').length).toString()} color="text-income" bg="bg-income/10" />
-              <StatCard icon={DollarSign} label="الربح المحقق" value={fmtC(projectStats?.realizedProfit || projects.filter(p => p.status === 'completed').reduce((s, p) => s + p.profit, 0))} color="text-income" bg="bg-income/10" />
+              <StatCard icon={BarChart3} label="إجمالي المشاريع" value={filteredProjects.length.toString()} color="text-primary" bg="bg-accent" />
+              <StatCard icon={TrendingUp} label="نشطة" value={filteredProjects.filter(p => p.status === 'active').length.toString()} color="text-income" bg="bg-income/10" />
+              <StatCard icon={DollarSign} label="الربح المحقق" value={fmtC(filteredProjects.filter(p => p.status === 'completed').reduce((s, p) => s + p.profit, 0))} color="text-income" bg="bg-income/10" />
             </div>
           </motion.div>
 
@@ -637,7 +743,7 @@ export function ReportsPage({
           <div className="rounded-xl bg-card p-3 shadow-sm border border-border">
             <h3 className="text-xs font-bold mb-2">المشاريع</h3>
             <div className="space-y-2 max-h-[300px] overflow-y-auto scrollbar-hide">
-              {projects.map((p, i) => (
+              {filteredProjects.map((p, i) => (
                 <motion.div key={p.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border border-border/50">
                   <div>
                     <p className="text-[11px] font-bold">{p.name}</p>
@@ -650,24 +756,24 @@ export function ReportsPage({
                   </div>
                 </motion.div>
               ))}
-              {projects.length === 0 && <p className="text-center py-6 text-[10px] text-muted-foreground">لا توجد مشاريع</p>}
+              {filteredProjects.length === 0 && <p className="text-center py-6 text-[10px] text-muted-foreground">لا توجد مشاريع مطابقة للفلتر</p>}
             </div>
             {/* Totals Row */}
-            {projects.length > 0 && (
+            {filteredProjects.length > 0 && (
               <div className="mt-2 pt-2 border-t-2 border-primary/30">
                 <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
                   <div className="p-1.5 rounded bg-accent">
                     <p className="text-muted-foreground">إجمالي العقود</p>
-                    <p className="font-bold text-primary">{fmtC(projects.reduce((s, p) => s + p.contractValue, 0))}</p>
+                    <p className="font-bold text-primary">{fmtC(filteredProjects.reduce((s, p) => s + p.contractValue, 0))}</p>
                   </div>
                   <div className="p-1.5 rounded bg-expense/10">
                     <p className="text-muted-foreground">إجمالي المصروفات</p>
-                    <p className="font-bold text-expense">{fmtC(projects.reduce((s, p) => s + p.expenses, 0))}</p>
+                    <p className="font-bold text-expense">{fmtC(filteredProjects.reduce((s, p) => s + p.expenses, 0))}</p>
                   </div>
                   <div className="p-1.5 rounded bg-income/10">
                     <p className="text-muted-foreground">إجمالي الأرباح</p>
-                    <p className={cn("font-bold", projects.reduce((s, p) => s + p.profit, 0) >= 0 ? "text-income" : "text-expense")}>
-                      {fmtC(projects.reduce((s, p) => s + p.profit, 0))}
+                    <p className={cn("font-bold", filteredProjects.reduce((s, p) => s + p.profit, 0) >= 0 ? "text-income" : "text-expense")}>
+                      {fmtC(filteredProjects.reduce((s, p) => s + p.profit, 0))}
                     </p>
                   </div>
                 </div>
@@ -1021,10 +1127,13 @@ export function ReportsPage({
             {previewContent === 'projects' && (
               <>
                 <h3 className="text-sm font-bold text-center">تقرير المشاريع</h3>
+                {filteredProjects.length !== projects.length && (
+                  <p className="text-[9px] text-center text-primary">عدد المشاريع المعروضة: {filteredProjects.length} من أصل {projects.length}</p>
+                )}
                 <table className="w-full text-[9px] border-collapse">
                   <thead><tr className="bg-[hsl(215,70%,35%)] text-white"><th className="p-1.5">المشروع</th><th className="p-1.5">الحالة</th><th className="p-1.5">العقد</th><th className="p-1.5">المصروفات</th><th className="p-1.5">الربح</th></tr></thead>
                   <tbody>
-                    {projects.map((p, i) => (
+                    {filteredProjects.map((p, i) => (
                       <tr key={p.id} className={i % 2 === 0 ? 'bg-muted/30' : ''}>
                         <td className="p-1.5 text-center">{p.name}</td>
                         <td className="p-1.5 text-center">{statusLabels[p.status]}</td>
@@ -1033,15 +1142,18 @@ export function ReportsPage({
                         <td className={cn("p-1.5 text-center font-bold", p.profit >= 0 ? "text-income" : "text-expense")}>{fmtC(p.profit)}</td>
                       </tr>
                     ))}
+                    {filteredProjects.length === 0 && (
+                      <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">لا توجد مشاريع مطابقة للفلتر</td></tr>
+                    )}
                   </tbody>
-                  {projects.length > 0 && (
+                  {filteredProjects.length > 0 && (
                     <tfoot>
                       <tr className="bg-muted font-bold border-t-2 border-primary">
                         <td className="p-1.5 text-center" colSpan={2}>الإجمالي</td>
-                        <td className="p-1.5 text-center">{fmtC(projects.reduce((s, p) => s + p.contractValue, 0))}</td>
-                        <td className="p-1.5 text-center text-expense">{fmtC(projects.reduce((s, p) => s + p.expenses, 0))}</td>
-                        <td className={cn("p-1.5 text-center", projects.reduce((s, p) => s + p.profit, 0) >= 0 ? "text-income" : "text-expense")}>
-                          {fmtC(projects.reduce((s, p) => s + p.profit, 0))}
+                        <td className="p-1.5 text-center">{fmtC(filteredProjects.reduce((s, p) => s + p.contractValue, 0))}</td>
+                        <td className="p-1.5 text-center text-expense">{fmtC(filteredProjects.reduce((s, p) => s + p.expenses, 0))}</td>
+                        <td className={cn("p-1.5 text-center", filteredProjects.reduce((s, p) => s + p.profit, 0) >= 0 ? "text-income" : "text-expense")}>
+                          {fmtC(filteredProjects.reduce((s, p) => s + p.profit, 0))}
                         </td>
                       </tr>
                     </tfoot>
