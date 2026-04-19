@@ -397,6 +397,19 @@ export function ProductionRunsTab({ products, bom, materials, services, fundOpti
         </TabsContent>
       </Tabs>
 
+      {/* ====== Unified Sell Dialog ====== */}
+      <UnifiedSellDialog
+        open={openSell}
+        onOpenChange={setOpenSell}
+        products={products}
+        materials={materials}
+        services={services}
+        fundOptions={fundOptions}
+        contacts={contacts}
+        onSellProduct={onSell}
+        onSellMaterial={onSellMaterial}
+      />
+
       {/* ====== Edit Sale Dialog ====== */}
       <Dialog open={!!editSale} onOpenChange={(o) => !o && setEditSale(null)}>
         <DialogContent className="max-w-sm">
