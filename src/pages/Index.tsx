@@ -201,6 +201,11 @@ const Index = () => {
             directRevenue={directRevenue}
             businessExpenses={businessExpenses}
             onExpensesClick={() => handleNavigate('business')}
+            showLedger={isEnabled('accounts')}
+            showProjects={isEnabled('projects')}
+            showShipping={isEnabled('shipping')}
+            showBusiness={isEnabled('business')}
+            showFunds={isEnabled('funds')}
           />
         );
       case 'funds':
