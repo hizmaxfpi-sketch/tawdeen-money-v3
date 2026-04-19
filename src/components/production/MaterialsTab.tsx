@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, Package, Trash2, ShoppingCart, Edit2 } from 'lucide-react';
+import { Plus, Package, Trash2, ShoppingCart, Edit2, Eye } from 'lucide-react';
+import { ProductionPreviewDialog } from './ProductionPreviewDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +24,7 @@ export function MaterialsTab({ materials, fundOptions, contacts, onAdd, onUpdate
   const [openAdd, setOpenAdd] = useState(false);
   const [openPurchase, setOpenPurchase] = useState<ProductionMaterial | null>(null);
   const [openEdit, setOpenEdit] = useState<ProductionMaterial | null>(null);
+  const [openPreview, setOpenPreview] = useState(false);
 
   // Add form state
   const [name, setName] = useState('');
@@ -65,12 +67,13 @@ export function MaterialsTab({ materials, fundOptions, contacts, onAdd, onUpdate
 
   return (
     <div className="space-y-2">
-      <Dialog open={openAdd} onOpenChange={setOpenAdd}>
-        <DialogTrigger asChild>
-          <Button size="sm" className="w-full gap-1 h-9">
-            <Plus className="h-4 w-4" /> إضافة مادة خام
-          </Button>
-        </DialogTrigger>
+      <div className="grid grid-cols-2 gap-2">
+        <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="w-full gap-1 h-9">
+              <Plus className="h-4 w-4" /> إضافة مادة خام
+            </Button>
+          </DialogTrigger>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle className="text-sm">مادة خام جديدة</DialogTitle></DialogHeader>
           <div className="space-y-2">
