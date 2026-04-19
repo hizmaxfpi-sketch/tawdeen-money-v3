@@ -12,6 +12,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAssets, Asset } from '@/hooks/useAssets';
 import { useBusinessTransactions, isBusinessTransaction, REVENUE_CATEGORIES, EXPENSE_CATEGORIES } from '@/hooks/useBusinessTransactions';
+import { useProduction } from '@/hooks/useProduction';
+import { useEnabledModules } from '@/hooks/useEnabledModules';
 import { Transaction, FundOption, AccountOption } from '@/types/finance';
 import { Currency } from '@/hooks/useCurrencies';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -41,7 +43,13 @@ export function BusinessPage({
   const { assets, addAsset, updateAsset, deleteAsset, totalAssetValue, totalDepreciation,
     payments, improvements, payInstallment, addImprovement,
     getAssetPayments, getAssetImprovements } = useAssets();
-  const { directRevenue, businessExpenses } = useBusinessTransactions(transactions);
+  const { summary: productionSummary } = useProduction();
+  const { isEnabled } = useEnabledModules();
+  const productionEnabled = isEnabled('production');
+  const { directRevenue, businessExpenses } = useBusinessTransactions(transactions, {
+    extraRevenue: 0,
+    extraExpenses: productionEnabled ? productionSummary.totalCost : 0,
+  });
   const { contacts } = useSupabaseContacts();
 
   const [showAddForm, setShowAddForm] = useState(false);
