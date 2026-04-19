@@ -59,6 +59,7 @@ export function ReportsPage({
   const [expandedContainers, setExpandedContainers] = useState<Set<string>>(new Set());
   const [displayCurrency, setDisplayCurrency] = useState('USD');
   const [showFinancials, setShowFinancials] = useState(true);
+  const [costsDialogContainerId, setCostsDialogContainerId] = useState<string | null>(null);
 
   // Currency helpers
   const conv = (v: number) => convertForDisplay(v, displayCurrency, currencies);
