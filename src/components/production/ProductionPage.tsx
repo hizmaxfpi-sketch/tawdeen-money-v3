@@ -106,6 +106,9 @@ export function ProductionPage() {
             contacts={contacts}
             onProduce={prod.produceProduct}
             onSell={prod.sellProduct}
+            onUpdateSale={prod.updateSale}
+            onDeleteSale={prod.deleteSale}
+            onDeleteRun={prod.deleteRun}
           />
         </TabsContent>
       </Tabs>
