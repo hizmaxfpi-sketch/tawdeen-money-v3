@@ -14,6 +14,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'nav.reports': 'التقارير',
     'nav.shipping': 'الشحن',
     'nav.business': 'الأعمال',
+    'nav.production': 'الإنتاج',
     'nav.settings': 'الإعدادات',
     'nav.contacts': 'جهات الاتصال',
     'nav.debts': 'الديون',

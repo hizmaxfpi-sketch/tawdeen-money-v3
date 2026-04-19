@@ -13,6 +13,8 @@ import { ReportsPage } from '@/components/reports/ReportsPage';
 import { ShippingPage } from '@/components/shipping/ShippingPage';
 import { ProjectsPage } from '@/components/projects/ProjectsPage';
 import { BusinessPage } from '@/components/business/BusinessPage';
+import { ProductionPage } from '@/components/production/ProductionPage';
+import { useProduction } from '@/hooks/useProduction';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { CoachMarks } from '@/components/onboarding/CoachMarks';
 import { useSupabaseFinance } from '@/hooks/useSupabaseFinance';
@@ -28,7 +30,7 @@ import { TransactionType, Transaction } from '@/types/finance';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 
-type PageType = 'home' | 'funds' | 'accounts' | 'projects' | 'reports' | 'shipping' | 'business';
+type PageType = 'home' | 'funds' | 'accounts' | 'projects' | 'reports' | 'shipping' | 'business' | 'production';
 
 function StatsSkeleton() {
   return (
@@ -105,6 +107,7 @@ const Index = () => {
   const { containers, shipments } = useSupabaseShipping();
   const { contacts } = useSupabaseContacts();
   const { directRevenue, businessExpenses } = useBusinessTransactions(transactions);
+  const { summary: productionSummary } = useProduction();
 
   const fundLinkedTransactions = transactions.filter(t => t.fundId && t.fundId !== '');
 
@@ -206,6 +209,10 @@ const Index = () => {
             showShipping={isEnabled('shipping')}
             showBusiness={isEnabled('business')}
             showFunds={isEnabled('funds')}
+            showProduction={isEnabled('production')}
+            productionProfit={productionSummary.netProfit}
+            productionSales={productionSummary.totalSales}
+            productionCost={productionSummary.totalCost}
           />
         );
       case 'funds':
@@ -261,6 +268,8 @@ const Index = () => {
         );
       case 'shipping':
         return <ShippingPage />;
+      case 'production':
+        return <ProductionPage />;
       default:
         return <Dashboard stats={stats} transactions={fundLinkedTransactions} monthlyTrend={monthlyTrend} expenseBreakdown={expenseBreakdown} />;
     }

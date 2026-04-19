@@ -2,9 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
-export type ModuleKey = 'home' | 'funds' | 'accounts' | 'projects' | 'business' | 'shipping' | 'reports';
+export type ModuleKey = 'home' | 'funds' | 'accounts' | 'projects' | 'business' | 'shipping' | 'production' | 'reports';
 
-const ALL_MODULES: ModuleKey[] = ['home', 'funds', 'accounts', 'projects', 'business', 'shipping', 'reports'];
+const ALL_MODULES: ModuleKey[] = ['home', 'funds', 'accounts', 'projects', 'business', 'shipping', 'production', 'reports'];
 
 export const MODULE_LABELS: Record<ModuleKey, string> = {
   home: 'الرئيسية',
@@ -13,6 +13,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   projects: 'المشاريع',
   business: 'الأعمال',
   shipping: 'الشحن',
+  production: 'الإنتاج',
   reports: 'التقارير',
 };
 

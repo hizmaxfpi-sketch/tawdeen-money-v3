@@ -36,6 +36,10 @@ interface DashboardProps {
   showShipping?: boolean;
   showBusiness?: boolean;
   showFunds?: boolean;
+  showProduction?: boolean;
+  productionProfit?: number;
+  productionSales?: number;
+  productionCost?: number;
 }
 
 export function Dashboard({
@@ -47,6 +51,7 @@ export function Dashboard({
   directRevenue = 0, businessExpenses = 0, onExpensesClick,
   showLedger = true, showProjects = true, showShipping = true,
   showBusiness = true, showFunds = true,
+  showProduction = false, productionProfit = 0, productionSales = 0, productionCost = 0,
 }: DashboardProps) {
   const [chartType, setChartType] = useState<'line' | 'pie'>('line');
   const [displayCurrency, setDisplayCurrency] = useState('USD');
@@ -72,6 +77,10 @@ export function Dashboard({
         showBusiness={showBusiness}
         showProjects={showProjects}
         showShipping={showShipping}
+        showProduction={showProduction}
+        productionProfit={productionProfit}
+        productionSales={productionSales}
+        productionCost={productionCost}
       />
 
       {currencies && currencies.length > 1 && onUpdateRate && (

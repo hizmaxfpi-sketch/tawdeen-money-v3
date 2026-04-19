@@ -1,0 +1,181 @@
+import { useState } from 'react';
+import { Plus, Package, Trash2, ShoppingCart, Edit2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { ProductionMaterial } from '@/hooks/useProduction';
+import type { FundOption } from '@/types/finance';
+import type { Contact } from '@/types/contacts';
+
+interface Props {
+  materials: ProductionMaterial[];
+  fundOptions: FundOption[];
+  contacts: Contact[];
+  onAdd: (data: { name: string; code?: string; unit: string; notes?: string }) => Promise<void>;
+  onUpdate: (id: string, patch: Partial<ProductionMaterial>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onPurchase: (params: any) => Promise<boolean>;
+}
+
+export function MaterialsTab({ materials, fundOptions, contacts, onAdd, onUpdate, onDelete, onPurchase }: Props) {
+  const [openAdd, setOpenAdd] = useState(false);
+  const [openPurchase, setOpenPurchase] = useState<ProductionMaterial | null>(null);
+  const [openEdit, setOpenEdit] = useState<ProductionMaterial | null>(null);
+
+  // Add form state
+  const [name, setName] = useState('');
+  const [code, setCode] = useState('');
+  const [unit, setUnit] = useState('pcs');
+  const [notes, setNotes] = useState('');
+
+  // Purchase form
+  const [pQty, setPQty] = useState('');
+  const [pPrice, setPPrice] = useState('');
+  const [pContact, setPContact] = useState('');
+  const [pFund, setPFund] = useState('');
+  const [pPaid, setPPaid] = useState('');
+
+  const reset = () => { setName(''); setCode(''); setUnit('pcs'); setNotes(''); };
+  const resetP = () => { setPQty(''); setPPrice(''); setPContact(''); setPFund(''); setPPaid(''); };
+
+  const handleAdd = async () => {
+    if (!name.trim()) return;
+    await onAdd({ name: name.trim(), code: code.trim() || undefined, unit, notes: notes.trim() || undefined });
+    reset();
+    setOpenAdd(false);
+  };
+
+  const handlePurchase = async () => {
+    if (!openPurchase) return;
+    const qty = parseFloat(pQty);
+    const price = parseFloat(pPrice);
+    if (!qty || qty <= 0 || price < 0) return;
+    const ok = await onPurchase({
+      material_id: openPurchase.id,
+      quantity: qty,
+      unit_price: price,
+      contact_id: pContact || undefined,
+      fund_id: pFund || undefined,
+      paid_amount: parseFloat(pPaid) || 0,
+    });
+    if (ok) { resetP(); setOpenPurchase(null); }
+  };
+
+  return (
+    <div className="space-y-2">
+      <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+        <DialogTrigger asChild>
+          <Button size="sm" className="w-full gap-1 h-9">
+            <Plus className="h-4 w-4" /> إضافة مادة خام
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle className="text-sm">مادة خام جديدة</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <div><Label className="text-xs">الاسم *</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-9 text-sm" /></div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-xs">الكود</Label><Input value={code} onChange={e => setCode(e.target.value)} className="h-9 text-sm" /></div>
+              <div><Label className="text-xs">الوحدة *</Label><Input value={unit} onChange={e => setUnit(e.target.value)} className="h-9 text-sm" placeholder="kg, pcs, m..." /></div>
+            </div>
+            <div><Label className="text-xs">ملاحظات</Label><Input value={notes} onChange={e => setNotes(e.target.value)} className="h-9 text-sm" /></div>
+            <Button onClick={handleAdd} className="w-full h-9">حفظ</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {materials.length === 0 ? (
+        <div className="text-center py-8 text-xs text-muted-foreground">
+          <Package className="h-8 w-8 mx-auto mb-2 opacity-30" />
+          لا توجد مواد خام بعد
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {materials.map(m => (
+            <div key={m.id} className="rounded-lg bg-card border border-border p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <Package className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span className="text-sm font-semibold truncate">{m.name}</span>
+                    {m.code && <span className="text-[10px] text-muted-foreground">[{m.code}]</span>}
+                  </div>
+                  <div className="flex gap-3 mt-1 text-[11px]">
+                    <span className="text-foreground">المتوفر: <strong>{m.quantity}</strong> {m.unit}</span>
+                    <span className="text-muted-foreground">متوسط: ${m.avg_cost.toFixed(2)}</span>
+                    <span className="text-income">قيمة: ${(m.quantity * m.avg_cost).toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setOpenPurchase(m)} title="شراء">
+                    <ShoppingCart className="h-3.5 w-3.5 text-income" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setOpenEdit(m)}>
+                    <Edit2 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { if (confirm('حذف هذه المادة؟')) onDelete(m.id); }}>
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Purchase Dialog */}
+      <Dialog open={!!openPurchase} onOpenChange={(o) => !o && setOpenPurchase(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle className="text-sm">شراء: {openPurchase?.name}</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label className="text-xs">الكمية *</Label><Input type="number" value={pQty} onChange={e => setPQty(e.target.value)} className="h-9 text-sm" /></div>
+              <div><Label className="text-xs">سعر الوحدة *</Label><Input type="number" value={pPrice} onChange={e => setPPrice(e.target.value)} className="h-9 text-sm" /></div>
+            </div>
+            <div>
+              <Label className="text-xs">المورد</Label>
+              <Select value={pContact} onValueChange={setPContact}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="اختر المورد" /></SelectTrigger>
+                <SelectContent>{contacts.map(c => <SelectItem key={c.id} value={c.id} className="text-sm">{c.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">الصندوق (للسداد)</Label>
+                <Select value={pFund} onValueChange={setPFund}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="اختياري" /></SelectTrigger>
+                  <SelectContent>{fundOptions.map(f => <SelectItem key={f.id} value={f.id} className="text-sm">{f.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div><Label className="text-xs">المدفوع</Label><Input type="number" value={pPaid} onChange={e => setPPaid(e.target.value)} className="h-9 text-sm" /></div>
+            </div>
+            {pQty && pPrice && (
+              <div className="text-[11px] text-muted-foreground bg-muted/40 p-2 rounded">
+                الإجمالي: <strong className="text-foreground">${(parseFloat(pQty) * parseFloat(pPrice)).toFixed(2)}</strong>
+              </div>
+            )}
+            <Button onClick={handlePurchase} className="w-full h-9">تنفيذ الشراء</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!openEdit} onOpenChange={(o) => !o && setOpenEdit(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle className="text-sm">تعديل: {openEdit?.name}</DialogTitle></DialogHeader>
+          {openEdit && (
+            <div className="space-y-2">
+              <div><Label className="text-xs">الاسم</Label><Input defaultValue={openEdit.name} onBlur={e => onUpdate(openEdit.id, { name: e.target.value })} className="h-9 text-sm" /></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><Label className="text-xs">الكود</Label><Input defaultValue={openEdit.code || ''} onBlur={e => onUpdate(openEdit.id, { code: e.target.value })} className="h-9 text-sm" /></div>
+                <div><Label className="text-xs">الوحدة</Label><Input defaultValue={openEdit.unit} onBlur={e => onUpdate(openEdit.id, { unit: e.target.value })} className="h-9 text-sm" /></div>
+              </div>
+              <Button size="sm" variant="secondary" className="w-full h-9" onClick={() => setOpenEdit(null)}>إغلاق</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

@@ -812,6 +812,65 @@ export type Database = {
         }
         Relationships: []
       }
+      material_purchases: {
+        Row: {
+          contact_id: string | null
+          created_at: string
+          created_by_name: string | null
+          date: string
+          fund_id: string | null
+          id: string
+          material_id: string
+          notes: string | null
+          paid_amount: number
+          quantity: number
+          total_amount: number
+          transaction_id: string | null
+          unit_price: number
+          user_id: string
+        }
+        Insert: {
+          contact_id?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          date?: string
+          fund_id?: string | null
+          id?: string
+          material_id: string
+          notes?: string | null
+          paid_amount?: number
+          quantity: number
+          total_amount: number
+          transaction_id?: string | null
+          unit_price: number
+          user_id: string
+        }
+        Update: {
+          contact_id?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          date?: string
+          fund_id?: string | null
+          id?: string
+          material_id?: string
+          notes?: string | null
+          paid_amount?: number
+          quantity?: number
+          total_amount?: number
+          transaction_id?: string | null
+          unit_price?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_purchases_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "production_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_admins: {
         Row: {
           created_at: string
@@ -832,6 +891,247 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      product_bom: {
+        Row: {
+          created_at: string
+          id: string
+          material_id: string
+          product_id: string
+          qty_per_unit: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          material_id: string
+          product_id: string
+          qty_per_unit?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          material_id?: string
+          product_id?: string
+          qty_per_unit?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_bom_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "production_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_bom_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "production_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_materials: {
+        Row: {
+          avg_cost: number
+          code: string | null
+          created_at: string
+          created_by_name: string | null
+          id: string
+          name: string
+          notes: string | null
+          quantity: number
+          unit: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avg_cost?: number
+          code?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          quantity?: number
+          unit?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avg_cost?: number
+          code?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          quantity?: number
+          unit?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      production_products: {
+        Row: {
+          code: string | null
+          created_at: string
+          created_by_name: string | null
+          id: string
+          name: string
+          notes: string | null
+          quantity: number
+          sell_price: number
+          unit: string
+          unit_cost: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          quantity?: number
+          sell_price?: number
+          unit?: string
+          unit_cost?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          quantity?: number
+          sell_price?: number
+          unit?: string
+          unit_cost?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      production_runs: {
+        Row: {
+          created_at: string
+          created_by_name: string | null
+          date: string
+          id: string
+          notes: string | null
+          product_id: string
+          quantity: number
+          total_cost: number
+          unit_cost: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_name?: string | null
+          date?: string
+          id?: string
+          notes?: string | null
+          product_id: string
+          quantity: number
+          total_cost?: number
+          unit_cost?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by_name?: string | null
+          date?: string
+          id?: string
+          notes?: string | null
+          product_id?: string
+          quantity?: number
+          total_cost?: number
+          unit_cost?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_runs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "production_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_sales: {
+        Row: {
+          contact_id: string | null
+          cost_at_sale: number
+          created_at: string
+          created_by_name: string | null
+          date: string
+          fund_id: string | null
+          id: string
+          notes: string | null
+          paid_amount: number
+          product_id: string
+          profit: number
+          quantity: number
+          total_amount: number
+          transaction_id: string | null
+          unit_price: number
+          user_id: string
+        }
+        Insert: {
+          contact_id?: string | null
+          cost_at_sale?: number
+          created_at?: string
+          created_by_name?: string | null
+          date?: string
+          fund_id?: string | null
+          id?: string
+          notes?: string | null
+          paid_amount?: number
+          product_id: string
+          profit?: number
+          quantity: number
+          total_amount: number
+          transaction_id?: string | null
+          unit_price: number
+          user_id: string
+        }
+        Update: {
+          contact_id?: string | null
+          cost_at_sale?: number
+          created_at?: string
+          created_by_name?: string | null
+          date?: string
+          fund_id?: string | null
+          id?: string
+          notes?: string | null
+          paid_amount?: number
+          product_id?: string
+          profit?: number
+          quantity?: number
+          total_amount?: number
+          transaction_id?: string | null
+          unit_price?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_sales_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "production_products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -1616,6 +1916,7 @@ export type Database = {
       get_current_user_name: { Args: never; Returns: string }
       get_enabled_modules: { Args: never; Returns: string[] }
       get_financial_summary: { Args: never; Returns: Json }
+      get_production_summary: { Args: never; Returns: Json }
       get_user_company_id: { Args: never; Returns: string }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
@@ -1654,9 +1955,44 @@ export type Database = {
         }
         Returns: string
       }
+      produce_product: {
+        Args: {
+          p_date?: string
+          p_notes?: string
+          p_product_id: string
+          p_quantity: number
+        }
+        Returns: string
+      }
+      purchase_material: {
+        Args: {
+          p_contact_id?: string
+          p_date?: string
+          p_fund_id?: string
+          p_material_id: string
+          p_notes?: string
+          p_paid_amount?: number
+          p_quantity: number
+          p_unit_price: number
+        }
+        Returns: string
+      }
       reverse_transaction: {
         Args: { p_transaction_id: string }
         Returns: undefined
+      }
+      sell_product: {
+        Args: {
+          p_contact_id?: string
+          p_date?: string
+          p_fund_id?: string
+          p_notes?: string
+          p_paid_amount?: number
+          p_product_id: string
+          p_quantity: number
+          p_unit_price: number
+        }
+        Returns: string
       }
       sync_contact_balances: { Args: never; Returns: undefined }
       sync_contact_balances_admin: {
