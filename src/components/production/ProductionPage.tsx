@@ -6,12 +6,12 @@ import { useProduction } from '@/hooks/useProduction';
 import { useSupabaseFinance } from '@/hooks/useSupabaseFinance';
 import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
 import { MaterialsTab } from './MaterialsTab';
-import { ProductsTab } from './ProductsTab';
+import { ProductsServicesTab } from './ProductsServicesTab';
 import { ProductionRunsTab } from './ProductionRunsTab';
 import { cn } from '@/lib/utils';
 
 export function ProductionPage() {
-  const [tab, setTab] = useState<'materials' | 'products' | 'runs'>('materials');
+  const [tab, setTab] = useState<'materials' | 'catalog' | 'runs'>('materials');
   const prod = useProduction();
   const { getFundOptions } = useSupabaseFinance();
   const { contacts } = useSupabaseContacts();
@@ -65,11 +65,11 @@ export function ProductionPage() {
           <TabsTrigger value="materials" className="text-xs gap-1">
             <Package className="h-3.5 w-3.5" /> المواد الخام
           </TabsTrigger>
-          <TabsTrigger value="products" className="text-xs gap-1">
-            <Factory className="h-3.5 w-3.5" /> المنتجات
+          <TabsTrigger value="catalog" className="text-xs gap-1">
+            <Factory className="h-3.5 w-3.5" /> منتجات وخدمات
           </TabsTrigger>
           <TabsTrigger value="runs" className="text-xs gap-1">
-            <BarChart3 className="h-3.5 w-3.5" /> الإنتاج والبيع
+            <BarChart3 className="h-3.5 w-3.5" /> العمليات
           </TabsTrigger>
         </TabsList>
 
@@ -85,27 +85,33 @@ export function ProductionPage() {
           />
         </TabsContent>
 
-        <TabsContent value="products" className="mt-3">
-          <ProductsTab
+        <TabsContent value="catalog" className="mt-3">
+          <ProductsServicesTab
             products={prod.products}
             materials={prod.materials}
+            services={prod.services}
             bom={prod.bom}
-            onAdd={prod.addProduct}
-            onUpdate={prod.updateProduct}
-            onDelete={prod.deleteProduct}
+            onAddProduct={prod.addProduct}
+            onUpdateProduct={prod.updateProduct}
+            onDeleteProduct={prod.deleteProduct}
             onSetBom={prod.setProductBom}
+            onAddService={prod.addService}
+            onUpdateService={prod.updateService}
+            onDeleteService={prod.deleteService}
           />
         </TabsContent>
 
         <TabsContent value="runs" className="mt-3">
           <ProductionRunsTab
             products={prod.products}
-            bom={prod.bom}
             materials={prod.materials}
+            services={prod.services}
+            bom={prod.bom}
             fundOptions={fundOptions}
             contacts={contacts}
             onProduce={prod.produceProduct}
             onSell={prod.sellProduct}
+            onSellMaterial={prod.sellRawMaterial}
             onUpdateSale={prod.updateSale}
             onDeleteSale={prod.deleteSale}
             onDeleteRun={prod.deleteRun}
