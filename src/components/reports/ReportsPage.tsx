@@ -60,26 +60,28 @@ export function ReportsPage({
   const [expandedContainers, setExpandedContainers] = useState<Set<string>>(new Set());
   const [displayCurrency, setDisplayCurrency] = useState('USD');
   const [showFinancials, setShowFinancials] = useState(true);
+  const [showCostDetails, setShowCostDetails] = useState(false);
   const [costsDialogContainerId, setCostsDialogContainerId] = useState<string | null>(null);
   const [extraExpensesByContainer, setExtraExpensesByContainer] = useState<Record<string, { id: string; description: string; amount: number; date: string }[]>>({});
 
-  // Load extra expenses when costs dialog opens
+  // Auto-load extra expenses for inline cost details when previewing a container
   useEffect(() => {
-    if (!costsDialogContainerId || extraExpensesByContainer[costsDialogContainerId]) return;
+    const targetId = costsDialogContainerId || (previewContent === 'container-detail' ? selectedContainerId : null);
+    if (!targetId || extraExpensesByContainer[targetId]) return;
     supabase
       .from('container_expenses')
       .select('id, description, amount, date')
-      .eq('container_id', costsDialogContainerId)
+      .eq('container_id', targetId)
       .order('created_at', { ascending: true })
       .then(({ data }) => {
         if (data) {
           setExtraExpensesByContainer(prev => ({
             ...prev,
-            [costsDialogContainerId]: data.map(e => ({ ...e, amount: Number(e.amount) })),
+            [targetId]: data.map(e => ({ ...e, amount: Number(e.amount) })),
           }));
         }
       });
-  }, [costsDialogContainerId, extraExpensesByContainer]);
+  }, [costsDialogContainerId, previewContent, selectedContainerId, extraExpensesByContainer]);
 
   // Currency helpers
   const conv = (v: number) => convertForDisplay(v, displayCurrency, currencies);
@@ -744,9 +746,15 @@ export function ReportsPage({
               <DialogTitle className="text-sm">معاينة التقرير</DialogTitle>
               <div className="flex gap-1 items-center">
                 {(previewContent === 'shipping-summary' || previewContent === 'container-detail' || previewContent === 'shipment-detail') && (
-                  <button onClick={() => setShowFinancials(!showFinancials)} className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border">
+                  <button onClick={() => setShowFinancials(!showFinancials)} className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border" data-no-print>
                     {showFinancials ? <ToggleRight className="h-3.5 w-3.5 text-primary" /> : <ToggleLeft className="h-3.5 w-3.5" />}
                     {showFinancials ? 'إخفاء المالية' : 'عرض المالية'}
+                  </button>
+                )}
+                {previewContent === 'container-detail' && (
+                  <button onClick={() => setShowCostDetails(!showCostDetails)} className="flex items-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border" data-no-print>
+                    {showCostDetails ? <ToggleRight className="h-3.5 w-3.5 text-primary" /> : <ToggleLeft className="h-3.5 w-3.5" />}
+                    {showCostDetails ? 'إخفاء التكاليف' : 'تفاصيل التكاليف'}
                   </button>
                 )}
                 <Button variant="outline" size="sm" className="h-7 text-[9px] gap-1" onClick={handlePrint} data-no-print>
@@ -849,17 +857,68 @@ export function ReportsPage({
                         <div className="p-2 rounded bg-expense/10"><p className="text-muted-foreground">التكاليف</p><p className="font-bold text-expense">{fmtC(c.totalCost)}</p></div>
                         <div className="p-2 rounded bg-accent"><p className="text-muted-foreground">الربح</p><p className={cn("font-bold", c.profit >= 0 ? "text-income" : "text-expense")}>{fmtC(c.profit)}</p></div>
                       </div>
-                      <div className="flex justify-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-[10px] gap-1"
-                          onClick={() => setCostsDialogContainerId(c.id)}
-                        >
-                          <Eye className="h-3 w-3" />
-                          عرض تفاصيل التكاليف
-                        </Button>
-                      </div>
+                      {showCostDetails && (() => {
+                        const extras = extraExpensesByContainer[c.id] || [];
+                        const baseRows: { label: string; amount: number }[] = [];
+                        if ((c.containerPrice ?? 0) > 0) baseRows.push({ label: 'سعر الحاوية', amount: c.containerPrice ?? 0 });
+                        if (c.shippingCost > 0) baseRows.push({ label: 'تكلفة الشحن', amount: c.shippingCost });
+                        if (c.customsCost > 0) baseRows.push({ label: 'الجمارك', amount: c.customsCost });
+                        if (c.portCost > 0) baseRows.push({ label: 'رسوم الميناء', amount: c.portCost });
+                        if ((c.glassFees ?? 0) > 0) baseRows.push({ label: 'رسوم الزجاج', amount: c.glassFees ?? 0 });
+                        if (c.otherCosts > 0) baseRows.push({ label: 'تكاليف أخرى', amount: c.otherCosts });
+                        const baseTotal = baseRows.reduce((s, r) => s + r.amount, 0);
+                        const extrasTotal = extras.reduce((s, e) => s + e.amount, 0);
+                        return (
+                          <div className="space-y-2 border border-border rounded-lg p-2 bg-muted/20">
+                            <div className="text-[10px] font-bold text-center text-foreground border-b border-border pb-1">تفاصيل التكاليف</div>
+                            {baseRows.length > 0 && (
+                              <div className="rounded border border-border overflow-hidden">
+                                <div className="bg-muted/50 px-2 py-1 text-[9px] font-semibold">التكاليف الأساسية</div>
+                                <table className="w-full text-[10px]">
+                                  <tbody>
+                                    {baseRows.map((r, i) => (
+                                      <tr key={i} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
+                                        <td className="p-1 text-muted-foreground">{r.label}</td>
+                                        <td className="p-1 text-left font-medium">{fmtC(r.amount)}</td>
+                                      </tr>
+                                    ))}
+                                    <tr className="bg-muted/40 border-t border-border font-semibold">
+                                      <td className="p-1">مجموع الأساسية</td>
+                                      <td className="p-1 text-left">{fmtC(baseTotal)}</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                            {extras.length > 0 && (
+                              <div className="rounded border border-border overflow-hidden">
+                                <div className="bg-muted/50 px-2 py-1 text-[9px] font-semibold">المصاريف الإضافية</div>
+                                <table className="w-full text-[10px]">
+                                  <tbody>
+                                    {extras.map((e, i) => (
+                                      <tr key={e.id} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
+                                        <td className="p-1 text-muted-foreground">
+                                          {e.description}
+                                          <span className="text-[8px] text-muted-foreground/70 mr-1">({new Date(e.date).toLocaleDateString('en-GB')})</span>
+                                        </td>
+                                        <td className="p-1 text-left font-medium text-expense">{fmtC(e.amount)}</td>
+                                      </tr>
+                                    ))}
+                                    <tr className="bg-muted/40 border-t border-border font-semibold">
+                                      <td className="p-1">مجموع الإضافية</td>
+                                      <td className="p-1 text-left text-expense">{fmtC(extrasTotal)}</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                            <div className="rounded bg-expense/10 border border-expense/30 p-2 flex items-center justify-between">
+                              <span className="font-bold text-[10px]">الإجمالي النهائي</span>
+                              <span className="font-bold text-[11px] text-expense">{fmtC(c.totalCost)}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </>
                   )}
                   {cShipments.length > 0 && (
