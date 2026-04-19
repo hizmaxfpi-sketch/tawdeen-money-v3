@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Plus, Search, UserCheck, Truck, Ship, Briefcase, Handshake, User, ChevronLeft, Phone, MessageCircle, Building2, MoreVertical, TrendingUp, TrendingDown, ArrowRightLeft, Receipt, RefreshCw, Eye, FileText, FileSpreadsheet, Download, Filter, LayoutGrid, List, X, CheckSquare, ClipboardList } from 'lucide-react';
+import { BookOpen, Plus, Search, UserCheck, Truck, Ship, Briefcase, Handshake, User, ChevronLeft, Phone, MessageCircle, Building2, MoreVertical, TrendingUp, TrendingDown, ArrowRightLeft, Receipt, RefreshCw, Eye, FileText, FileSpreadsheet, Download, Filter, LayoutGrid, List, X, CheckSquare, ClipboardList, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +53,7 @@ export function LedgerAccountsPage() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [tempSelectedTypes, setTempSelectedTypes] = useState<Set<ContactType>>(new Set());
   const [viewMode, setViewMode] = usePersistedFilter<ViewMode>('ledger-view', 'grid');
+  const [sortBy, setSortBy] = usePersistedFilter<string>('ledger-sort', 'updated_desc');
   const [isSyncing, setIsSyncing] = useState(false);
   const [statementContact, setStatementContact] = useState<Contact | null>(null);
   const [statementTxs, setStatementTxs] = useState<Transaction[]>([]);
@@ -150,9 +151,39 @@ export function LedgerAccountsPage() {
         c.company?.toLowerCase().includes(query)
       );
     }
-    result.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    const getSummary = (id: string) => contactLedgerSummaries.get(id) || EMPTY_LEDGER_SUMMARY;
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'updated_desc':
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        case 'updated_asc':
+          return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+        case 'created_desc':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'created_asc':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case 'name_asc':
+          return a.name.localeCompare(b.name, 'ar');
+        case 'name_desc':
+          return b.name.localeCompare(a.name, 'ar');
+        case 'most_active':
+          return getSummary(b.id).transactionCount - getSummary(a.id).transactionCount;
+        case 'least_active':
+          return getSummary(a.id).transactionCount - getSummary(b.id).transactionCount;
+        case 'balance_desc':
+          return Math.abs(getSummary(b.id).balance) - Math.abs(getSummary(a.id).balance);
+        case 'balance_asc':
+          return Math.abs(getSummary(a.id).balance) - Math.abs(getSummary(b.id).balance);
+        case 'debit_desc':
+          return getSummary(b.id).totalDebit - getSummary(a.id).totalDebit;
+        case 'credit_desc':
+          return getSummary(b.id).totalCredit - getSummary(a.id).totalCredit;
+        default:
+          return 0;
+      }
+    });
     return result;
-  }, [contacts, selectedTypes, selectedCustomTypes, searchQuery]);
+  }, [contacts, selectedTypes, selectedCustomTypes, searchQuery, sortBy, contactLedgerSummaries]);
 
   const handleAddAccount = () => navigate('/contacts/add');
   const handleViewAccount = (contact: Contact) => navigate(`/ledger/${contact.id}`);
@@ -354,6 +385,27 @@ export function LedgerAccountsPage() {
             </span>
           )}
         </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" title="ترتيب">
+              <ArrowUpDown className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="text-xs">
+            <DropdownMenuItem onClick={() => setSortBy('updated_desc')} className={cn(sortBy === 'updated_desc' && 'bg-accent')}>تاريخ التعديل (الأحدث)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('updated_asc')} className={cn(sortBy === 'updated_asc' && 'bg-accent')}>تاريخ التعديل (الأقدم)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('created_desc')} className={cn(sortBy === 'created_desc' && 'bg-accent')}>تاريخ الإنشاء (الأحدث)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('created_asc')} className={cn(sortBy === 'created_asc' && 'bg-accent')}>تاريخ الإنشاء (الأقدم)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('name_asc')} className={cn(sortBy === 'name_asc' && 'bg-accent')}>الاسم (أ - ي)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('name_desc')} className={cn(sortBy === 'name_desc' && 'bg-accent')}>الاسم (ي - أ)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('most_active')} className={cn(sortBy === 'most_active' && 'bg-accent')}>الأكثر حركة</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('least_active')} className={cn(sortBy === 'least_active' && 'bg-accent')}>الأقل حركة</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('balance_desc')} className={cn(sortBy === 'balance_desc' && 'bg-accent')}>الرصيد (الأكبر)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('balance_asc')} className={cn(sortBy === 'balance_asc' && 'bg-accent')}>الرصيد (الأصغر)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('debit_desc')} className={cn(sortBy === 'debit_desc' && 'bg-accent')}>الأكبر مديناً</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortBy('credit_desc')} className={cn(sortBy === 'credit_desc' && 'bg-accent')}>الأكبر دائناً</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <div className="flex h-8 rounded-md border border-border overflow-hidden shrink-0">
           <button
             onClick={() => setViewMode('grid')}
