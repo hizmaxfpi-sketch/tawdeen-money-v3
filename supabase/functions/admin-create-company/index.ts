@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { companyName, ownerEmail, ownerPassword, ownerFullName, plan, maxUsers } = body;
+    const { companyName, ownerEmail, ownerPassword, ownerFullName, plan, maxUsers, enabledModules } = body;
 
     if (!companyName || !ownerEmail || !ownerPassword) {
       return new Response(JSON.stringify({ error: "اسم الشركة والبريد وكلمة المرور مطلوبة" }), {
@@ -59,6 +59,12 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const ALL_MODULES = ['home','funds','accounts','projects','business','shipping','reports'];
+    const modulesList: string[] = Array.isArray(enabledModules) && enabledModules.length > 0
+      ? enabledModules.filter((m: any) => ALL_MODULES.includes(m))
+      : ALL_MODULES;
+    if (!modulesList.includes('home')) modulesList.unshift('home');
 
     const { data: existingUsers } = await supabase.auth.admin.listUsers();
     const existingUser = existingUsers.users.find(
@@ -154,6 +160,7 @@ Deno.serve(async (req) => {
           status: "active",
           plan: plan || "basic",
           max_users: maxUsers || 5,
+          enabled_modules: modulesList,
         })
         .eq("id", existingCompany.id);
       companyId = existingCompany.id;
@@ -167,6 +174,7 @@ Deno.serve(async (req) => {
           status: "active",
           plan: plan || "basic",
           max_users: maxUsers || 5,
+          enabled_modules: modulesList,
         })
         .select("id")
         .single();

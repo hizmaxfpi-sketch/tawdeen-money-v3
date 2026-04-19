@@ -23,6 +23,7 @@ import { useScrollToTop } from '@/hooks/useScrollToTop';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useBusinessTransactions } from '@/hooks/useBusinessTransactions';
+import { useEnabledModules, ModuleKey } from '@/hooks/useEnabledModules';
 import { TransactionType, Transaction } from '@/types/finance';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
@@ -56,6 +57,7 @@ const Index = () => {
   const { user } = useAuth();
   const { canEdit: roleCanEdit, isViewer } = useUserRole();
   const perms = useUserPermissions();
+  const { isEnabled, enabled: enabledModules } = useEnabledModules();
   const [searchParams, setSearchParams] = useSearchParams();
   
   const pageFromUrl = searchParams.get('page') as PageType | null;
@@ -69,6 +71,14 @@ const Index = () => {
       setCurrentPage(pageFromUrl);
     }
   }, [pageFromUrl]);
+
+  // إذا كانت الصفحة الحالية معطّلة، نرجع للصفحة الرئيسية
+  useEffect(() => {
+    if (!isEnabled(currentPage as ModuleKey) && currentPage !== 'home') {
+      setCurrentPage('home');
+      setSearchParams({ page: 'home' });
+    }
+  }, [enabledModules, currentPage, isEnabled, setSearchParams]);
 
   useScrollToTop(currentPage);
 
@@ -159,6 +169,14 @@ const Index = () => {
   };
 
   const renderPage = () => {
+    // حماية إضافية: إن كان القسم معطّلاً، اعرض الرئيسية
+    if (currentPage !== 'home' && !isEnabled(currentPage as ModuleKey)) {
+      return (
+        <div className="text-center py-12 text-muted-foreground text-sm">
+          هذا القسم غير مفعّل لشركتك. تواصل مع المنصة للتفعيل.
+        </div>
+      );
+    }
     switch (currentPage) {
       case 'home':
         if (fundsLoading && transactionsLoading) return <StatsSkeleton />;

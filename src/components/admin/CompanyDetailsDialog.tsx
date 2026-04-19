@@ -13,6 +13,7 @@ import {
   MapPin, Save, RefreshCw
 } from 'lucide-react';
 import { PermissionsEditor } from './PermissionsEditor';
+import { CompanyModulesEditor } from './CompanyModulesEditor';
 
 type AppRole = 'owner' | 'admin' | 'accountant' | 'shipping_staff' | 'viewer';
 
@@ -239,6 +240,9 @@ export function CompanyDetailsDialog({ open, onOpenChange, companyId, companyNam
                 </div>
               </CardContent>
             </Card>
+
+            {/* Enabled Modules */}
+            <CompanyModulesEditor companyId={companyId} onSaved={() => onRefresh?.()} />
 
             {/* Users */}
             <div className="flex items-center justify-between">

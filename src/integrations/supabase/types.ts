@@ -212,6 +212,7 @@ export type Database = {
           address: string | null
           created_at: string
           email: string | null
+          enabled_modules: string[]
           id: string
           max_users: number
           name: string
@@ -226,6 +227,7 @@ export type Database = {
           address?: string | null
           created_at?: string
           email?: string | null
+          enabled_modules?: string[]
           id?: string
           max_users?: number
           name?: string
@@ -240,6 +242,7 @@ export type Database = {
           address?: string | null
           created_at?: string
           email?: string | null
+          enabled_modules?: string[]
           id?: string
           max_users?: number
           name?: string
@@ -1611,6 +1614,7 @@ export type Database = {
       }
       get_company_status: { Args: never; Returns: string }
       get_current_user_name: { Args: never; Returns: string }
+      get_enabled_modules: { Args: never; Returns: string[] }
       get_financial_summary: { Args: never; Returns: Json }
       get_user_company_id: { Args: never; Returns: string }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
@@ -1621,6 +1625,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_module_enabled: { Args: { _module: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       process_shipment_payment: {
         Args: {

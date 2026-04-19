@@ -4,9 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Building2, Plus } from 'lucide-react';
+import { Loader2, Building2, Plus, LayoutGrid } from 'lucide-react';
+import { ModuleKey, MODULE_LABELS } from '@/hooks/useEnabledModules';
+
+const ALL_MODULES: ModuleKey[] = ['home', 'funds', 'accounts', 'projects', 'business', 'shipping', 'reports'];
+const REQUIRED_MODULES: ModuleKey[] = ['home'];
 
 interface Props {
   open: boolean;
@@ -24,6 +29,17 @@ export function CreateCompanyDialog({ open, onOpenChange, onSuccess }: Props) {
     plan: 'basic',
     maxUsers: 5,
   });
+  const [modules, setModules] = useState<Set<ModuleKey>>(new Set(ALL_MODULES));
+
+  const toggleModule = (m: ModuleKey) => {
+    if (REQUIRED_MODULES.includes(m)) return;
+    setModules(prev => {
+      const next = new Set(prev);
+      if (next.has(m)) next.delete(m);
+      else next.add(m);
+      return next;
+    });
+  };
 
   const handleSubmit = async () => {
     if (!form.companyName || !form.ownerEmail || !form.ownerPassword) {
@@ -36,6 +52,7 @@ export function CreateCompanyDialog({ open, onOpenChange, onSuccess }: Props) {
     }
 
     setSaving(true);
+    const enabledList = ALL_MODULES.filter(m => modules.has(m) || REQUIRED_MODULES.includes(m));
     const { data, error } = await supabase.functions.invoke('admin-create-company', {
       body: {
         companyName: form.companyName,
@@ -44,6 +61,7 @@ export function CreateCompanyDialog({ open, onOpenChange, onSuccess }: Props) {
         ownerFullName: form.ownerFullName,
         plan: form.plan,
         maxUsers: form.maxUsers,
+        enabledModules: enabledList,
       },
     });
 
@@ -55,6 +73,7 @@ export function CreateCompanyDialog({ open, onOpenChange, onSuccess }: Props) {
 
     toast.success('تم إنشاء الشركة والحساب بنجاح');
     setForm({ companyName: '', ownerEmail: '', ownerPassword: '', ownerFullName: '', plan: 'basic', maxUsers: 5 });
+    setModules(new Set(ALL_MODULES));
     onOpenChange(false);
     onSuccess();
   };
@@ -139,6 +158,35 @@ export function CreateCompanyDialog({ open, onOpenChange, onSuccess }: Props) {
                 onChange={e => setForm(p => ({ ...p, maxUsers: parseInt(e.target.value) || 5 }))}
                 className="h-9 text-sm"
               />
+            </div>
+          </div>
+
+          <div className="space-y-1.5 pt-2 border-t">
+            <Label className="text-xs flex items-center gap-1.5">
+              <LayoutGrid className="h-3.5 w-3.5 text-primary" />
+              الأقسام المفعّلة للشركة
+            </Label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {ALL_MODULES.map(m => {
+                const isRequired = REQUIRED_MODULES.includes(m);
+                const checked = modules.has(m);
+                return (
+                  <label
+                    key={m}
+                    className={`flex items-center gap-1.5 p-1.5 rounded-md border text-xs cursor-pointer ${
+                      checked ? 'bg-primary/5 border-primary/30' : 'bg-card border-border'
+                    } ${isRequired ? 'opacity-70 cursor-not-allowed' : 'hover:bg-accent'}`}
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => toggleModule(m)}
+                      disabled={isRequired}
+                      className="h-3.5 w-3.5"
+                    />
+                    <span>{MODULE_LABELS[m]}</span>
+                  </label>
+                );
+              })}
             </div>
           </div>
         </div>

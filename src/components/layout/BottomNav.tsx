@@ -2,6 +2,7 @@ import { Home, Wallet, FileText, Ship, BookOpen, Briefcase, Store } from 'lucide
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { useEnabledModules, ModuleKey } from '@/hooks/useEnabledModules';
 
 type PageType = 'home' | 'funds' | 'accounts' | 'projects' | 'shipping' | 'reports' | 'business';
 
@@ -22,10 +23,12 @@ const navItemKeys: { id: PageType; icon: typeof Home; labelKey: string }[] = [
 
 export function BottomNav({ currentPage, onNavigate }: BottomNavProps) {
   const { t } = useLanguage();
+  const { isEnabled } = useEnabledModules();
+  const visibleItems = navItemKeys.filter(item => isEnabled(item.id as ModuleKey));
   return (
     <nav className="fixed bottom-0 left-0 right-0 w-full z-40 bg-card/95 backdrop-blur-xl border-t border-border shadow-lg">
       <div className="flex h-16 w-full items-center justify-around">
-        {navItemKeys.map((item) => {
+        {visibleItems.map((item) => {
           const isActive = currentPage === item.id;
           const Icon = item.icon;
           
