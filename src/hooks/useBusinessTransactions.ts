@@ -40,9 +40,11 @@ export function useBusinessTransactions(transactions: Transaction[], options: Op
 
     // أنواع المصادر الآلية الخاصة بالإنتاج — نستبعدها كاملاً من حسابات الأعمال اليدوية
     // ونعتمد على extraRevenue/extraExpenses القادمة من useProduction (مبيعات + تكلفة + مصاريف)
+    // ملاحظة: production_cogs نستبعده هنا أيضاً لأن extraExpenses يحوي totalCost أصلاً
     const PRODUCTION_SOURCES = new Set([
       'production_sale', 'production_sale_payment',
       'production_purchase', 'production_purchase_payment',
+      'production_cogs', 'production_sale_expense',
     ]);
 
     for (const tx of transactions) {
@@ -76,6 +78,7 @@ export function isBusinessTransaction(tx: Transaction): boolean {
   const PRODUCTION_SOURCES = new Set([
     'production_sale', 'production_sale_payment',
     'production_purchase', 'production_purchase_payment',
+    'production_cogs', 'production_sale_expense',
   ]);
   if (tx.sourceType && PRODUCTION_SOURCES.has(tx.sourceType)) return false;
 
