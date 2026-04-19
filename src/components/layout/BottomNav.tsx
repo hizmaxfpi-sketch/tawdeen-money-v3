@@ -1,10 +1,10 @@
-import { Home, Wallet, FileText, Ship, BookOpen, Briefcase, Store } from 'lucide-react';
+import { Home, Wallet, FileText, Ship, BookOpen, Briefcase, Store, Factory } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useEnabledModules, ModuleKey } from '@/hooks/useEnabledModules';
 
-type PageType = 'home' | 'funds' | 'accounts' | 'projects' | 'shipping' | 'reports' | 'business';
+type PageType = 'home' | 'funds' | 'accounts' | 'projects' | 'shipping' | 'reports' | 'business' | 'production';
 
 interface BottomNavProps {
   currentPage: string;
@@ -18,6 +18,7 @@ const navItemKeys: { id: PageType; icon: typeof Home; labelKey: string }[] = [
   { id: 'business', icon: Store, labelKey: 'nav.business' },
   { id: 'projects', icon: Briefcase, labelKey: 'nav.projects' },
   { id: 'shipping', icon: Ship, labelKey: 'nav.shipping' },
+  { id: 'production', icon: Factory, labelKey: 'nav.production' },
   { id: 'reports', icon: FileText, labelKey: 'nav.reports' },
 ];
 

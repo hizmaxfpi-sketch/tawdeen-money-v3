@@ -8,7 +8,7 @@ import { Loader2, Save, LayoutGrid } from 'lucide-react';
 import { toast } from 'sonner';
 import { ModuleKey, MODULE_LABELS } from '@/hooks/useEnabledModules';
 
-const MODULES: ModuleKey[] = ['home', 'funds', 'accounts', 'projects', 'business', 'shipping', 'reports'];
+const MODULES: ModuleKey[] = ['home', 'funds', 'accounts', 'projects', 'business', 'shipping', 'production', 'reports'];
 const REQUIRED: ModuleKey[] = ['home'];
 
 interface Props {
