@@ -132,9 +132,12 @@ const Index = () => {
   const projectProfit = useMemo(() =>
     projects.filter(p => p.status === 'completed').reduce((s, p) => s + (p.profit || 0), 0), [projects]);
 
-  // Compute container profit (sum of container profit)
+  // Compute container profit (only realized: status = 'delivered')
+  // الأرباح تُرحَّل كإيراد فقط عند تسليم الحاوية فعلياً
   const containerProfit = useMemo(() =>
-    containers.reduce((s, c) => s + (Number((c as any).profit || 0)), 0), [containers]);
+    containers
+      .filter(c => (c as any).status === 'delivered')
+      .reduce((s, c) => s + (Number((c as any).profit || 0)), 0), [containers]);
 
   const handleOpenForm = (type: TransactionType = 'in') => {
     setDefaultTransactionType(type);
