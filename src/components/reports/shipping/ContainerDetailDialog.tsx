@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import {
-  Printer, FileText, FileSpreadsheet, X, Plus, Wallet, Eye, EyeOff,
+  Printer, FileText, FileSpreadsheet, Plus, Wallet, Eye, EyeOff,
   Phone, Copy, Hash, Package, Weight, Box, MapPin, Calendar, Truck,
-  Users, ChevronDown, ChevronUp, MessageCircle, DollarSign, Layers,
-  CheckCircle2, Clock, AlertCircle, Receipt, Loader2,
+  ChevronDown, ChevronUp, MessageCircle, DollarSign, Layers,
+  CheckCircle2, Receipt, Loader2, MoreHorizontal, FileBox, Activity,
+  LayoutGrid,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -11,8 +12,12 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import type { Container, Shipment, AccountOption, Fund } from '@/types/finance';
 
