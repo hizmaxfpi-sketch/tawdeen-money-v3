@@ -295,22 +295,23 @@ export function ReportsPage({
     } else if (type === 'projects') {
       doc.text('تقرير المشاريع', pw / 2, y, { align: 'center' });
       y += 15;
-      if (projects.length > 0) {
-        const totalContract = projects.reduce((s, p) => s + p.contractValue, 0);
-        const totalExpenses = projects.reduce((s, p) => s + p.expenses, 0);
-        const totalProfit = projects.reduce((s, p) => s + p.profit, 0);
+      const projList = filteredProjects;
+      if (projList.length > 0) {
+        const totalContract = projList.reduce((s, p) => s + p.contractValue, 0);
+        const totalExpenses = projList.reduce((s, p) => s + p.expenses, 0);
+        const totalProfit = projList.reduce((s, p) => s + p.profit, 0);
         (doc as any).autoTable({
           startY: y,
           head: [['المشروع', 'الحالة', 'قيمة العقد', 'المصروفات', 'الربح']],
           body: [
-            ...projects.map(p => [p.name, statusLabels[p.status] || p.status, `$${p.contractValue.toLocaleString()}`, `$${p.expenses.toLocaleString()}`, `$${p.profit.toLocaleString()}`]),
+            ...projList.map(p => [p.name, statusLabels[p.status] || p.status, `$${p.contractValue.toLocaleString()}`, `$${p.expenses.toLocaleString()}`, `$${p.profit.toLocaleString()}`]),
             ['الإجمالي', '', `$${totalContract.toLocaleString()}`, `$${totalExpenses.toLocaleString()}`, `$${totalProfit.toLocaleString()}`],
           ],
           styles: { font: 'Helvetica', fontSize: 9, halign: 'center' },
           headStyles: { fillColor: [25, 65, 120], textColor: 255 },
           margin: { left: 10, right: 10 },
           didParseCell: function(data: any) {
-            if (data.row.index === projects.length) {
+            if (data.row.index === projList.length) {
               data.cell.styles.fontStyle = 'bold';
               data.cell.styles.fillColor = [230, 235, 245];
             }
