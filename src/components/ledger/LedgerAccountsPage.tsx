@@ -151,9 +151,39 @@ export function LedgerAccountsPage() {
         c.company?.toLowerCase().includes(query)
       );
     }
-    result.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    const getSummary = (id: string) => contactLedgerSummaries.get(id) || EMPTY_LEDGER_SUMMARY;
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'updated_desc':
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        case 'updated_asc':
+          return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+        case 'created_desc':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'created_asc':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case 'name_asc':
+          return a.name.localeCompare(b.name, 'ar');
+        case 'name_desc':
+          return b.name.localeCompare(a.name, 'ar');
+        case 'most_active':
+          return getSummary(b.id).transactionCount - getSummary(a.id).transactionCount;
+        case 'least_active':
+          return getSummary(a.id).transactionCount - getSummary(b.id).transactionCount;
+        case 'balance_desc':
+          return Math.abs(getSummary(b.id).balance) - Math.abs(getSummary(a.id).balance);
+        case 'balance_asc':
+          return Math.abs(getSummary(a.id).balance) - Math.abs(getSummary(b.id).balance);
+        case 'debit_desc':
+          return getSummary(b.id).totalDebit - getSummary(a.id).totalDebit;
+        case 'credit_desc':
+          return getSummary(b.id).totalCredit - getSummary(a.id).totalCredit;
+        default:
+          return 0;
+      }
+    });
     return result;
-  }, [contacts, selectedTypes, selectedCustomTypes, searchQuery]);
+  }, [contacts, selectedTypes, selectedCustomTypes, searchQuery, sortBy, contactLedgerSummaries]);
 
   const handleAddAccount = () => navigate('/contacts/add');
   const handleViewAccount = (contact: Contact) => navigate(`/ledger/${contact.id}`);
