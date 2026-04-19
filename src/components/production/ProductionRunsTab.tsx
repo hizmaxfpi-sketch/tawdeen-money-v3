@@ -177,6 +177,28 @@ export function ProductionRunsTab({ products, bom, materials, fundOptions, conta
   const hasFilters = hProduct !== 'all' || hContact !== 'all' || hFrom || hTo;
   const clearFilters = () => { setHProduct('all'); setHContact('all'); setHFrom(''); setHTo(''); };
 
+  const openEditSale = (s: SaleRow) => {
+    setEditSale(s);
+    setEQty(String(s.quantity));
+    setEPrice(String(s.unit_price));
+    setEContact(s.contact_id || '');
+    setEFund((s as any).fund_id || '');
+    setEPaid(String(s.paid_amount));
+    setEDate(s.date);
+  };
+  const handleSaveEdit = async () => {
+    if (!editSale || !parseFloat(eQty) || !parseFloat(ePrice)) return;
+    const ok = await onUpdateSale(editSale.id, {
+      quantity: parseFloat(eQty),
+      unit_price: parseFloat(ePrice),
+      contact_id: eContact || undefined,
+      fund_id: eFund || undefined,
+      paid_amount: parseFloat(ePaid) || 0,
+      date: eDate || undefined,
+    });
+    if (ok) setEditSale(null);
+  };
+
   return (
     <div className="space-y-2">
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
