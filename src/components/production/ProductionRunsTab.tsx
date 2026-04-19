@@ -118,31 +118,10 @@ export function ProductionRunsTab({ products, bom, materials, services, fundOpti
   });
   const hasShortage = requirements.some(r => r.shortage > 0);
 
-  const selectedSellProduct = products.find(p => p.id === sellPid);
-  const sellQtyNum = parseFloat(sellQty) || 0;
-  const stockShort = selectedSellProduct ? sellQtyNum > selectedSellProduct.quantity : false;
-
   const handleProduce = async () => {
     if (!prodPid || !parseFloat(prodQty)) return;
     const ok = await onProduce({ product_id: prodPid, quantity: parseFloat(prodQty) });
     if (ok) { setProdPid(''); setProdQty(''); setOpenProd(false); }
-  };
-
-  const handleSell = async () => {
-    if (!sellPid || !parseFloat(sellQty) || !parseFloat(sellPrice)) return;
-    if (stockShort) { toast.error('الكمية المطلوبة أكبر من المخزون المتاح'); return; }
-    const ok = await onSell({
-      product_id: sellPid,
-      quantity: parseFloat(sellQty),
-      unit_price: parseFloat(sellPrice),
-      contact_id: sellContact || undefined,
-      fund_id: sellFund || undefined,
-      paid_amount: parseFloat(sellPaid) || 0,
-    });
-    if (ok) {
-      setSellPid(''); setSellQty(''); setSellPrice(''); setSellContact(''); setSellFund(''); setSellPaid('');
-      setOpenSell(false);
-    }
   };
 
   // Filtered history
