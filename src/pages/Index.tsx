@@ -59,7 +59,7 @@ const Index = () => {
   const { user } = useAuth();
   const { canEdit: roleCanEdit, isViewer } = useUserRole();
   const perms = useUserPermissions();
-  const { isEnabled, enabled: enabledModules } = useEnabledModules();
+  const { isEnabled, enabled: enabledModules, loading: modulesLoading } = useEnabledModules();
   const [searchParams, setSearchParams] = useSearchParams();
   
   const pageFromUrl = searchParams.get('page') as PageType | null;
@@ -74,13 +74,14 @@ const Index = () => {
     }
   }, [pageFromUrl]);
 
-  // إذا كانت الصفحة الحالية معطّلة، نرجع للصفحة الرئيسية
+  // إذا كانت الصفحة الحالية معطّلة، نرجع للصفحة الرئيسية (بعد انتهاء التحميل)
   useEffect(() => {
+    if (modulesLoading) return;
     if (!isEnabled(currentPage as ModuleKey) && currentPage !== 'home') {
       setCurrentPage('home');
       setSearchParams({ page: 'home' });
     }
-  }, [enabledModules, currentPage, isEnabled, setSearchParams]);
+  }, [enabledModules, currentPage, isEnabled, setSearchParams, modulesLoading]);
 
   useScrollToTop(currentPage);
 
