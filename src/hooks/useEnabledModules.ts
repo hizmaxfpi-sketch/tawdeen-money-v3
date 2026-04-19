@@ -25,7 +25,8 @@ const MODULES_REQUIRED: ModuleKey[] = ['home']; // الرئيسية دائماً
  */
 export function useEnabledModules() {
   const { user } = useAuth();
-  const [enabled, setEnabled] = useState<ModuleKey[]>(ALL_MODULES);
+  // ابدأ بقائمة فارغة (فقط الرئيسية) حتى لا تظهر الأقسام المعطّلة قبل التحميل
+  const [enabled, setEnabled] = useState<ModuleKey[]>(MODULES_REQUIRED);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {

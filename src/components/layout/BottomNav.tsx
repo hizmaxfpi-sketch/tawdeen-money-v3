@@ -24,8 +24,11 @@ const navItemKeys: { id: PageType; icon: typeof Home; labelKey: string }[] = [
 
 export function BottomNav({ currentPage, onNavigate }: BottomNavProps) {
   const { t } = useLanguage();
-  const { isEnabled } = useEnabledModules();
-  const visibleItems = navItemKeys.filter(item => isEnabled(item.id as ModuleKey));
+  const { isEnabled, loading } = useEnabledModules();
+  // أثناء التحميل اعرض فقط الرئيسية لتجنّب وميض الأقسام المعطّلة
+  const visibleItems = loading
+    ? navItemKeys.filter(item => item.id === 'home')
+    : navItemKeys.filter(item => isEnabled(item.id as ModuleKey));
   return (
     <nav className="fixed bottom-0 left-0 right-0 w-full z-40 bg-card/95 backdrop-blur-xl border-t border-border shadow-lg">
       <div className="flex h-16 w-full items-center justify-around">
