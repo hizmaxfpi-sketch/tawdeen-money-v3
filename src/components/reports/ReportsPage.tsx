@@ -6,7 +6,7 @@ import {
   FileText, Download, Filter, Calendar, ArrowUpCircle, ArrowDownCircle,
   FileSpreadsheet, Share2, Receipt, Database, BarChart3, Users, Ship,
   Image, Eye, X, Printer, Package, TrendingUp, DollarSign, Clock,
-  ChevronDown, ChevronUp, AlertTriangle, Weight, Hash, ToggleLeft, ToggleRight
+  ChevronDown, ChevronUp, AlertTriangle, Weight, Hash, ToggleLeft, ToggleRight, Factory
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { BackupSection } from './BackupSection';
 import { ActivityLogReport } from './ActivityLogReport';
 import { AccountingLedgerReport } from './AccountingLedgerReport';
+import { ProductionReport } from './ProductionReport';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useEnabledModules } from '@/hooks/useEnabledModules';
 
@@ -57,15 +58,17 @@ export function ReportsPage({
   const shippingOn = isEnabled('shipping');
   const projectsOn = isEnabled('projects');
   const accountsOn = isEnabled('accounts');
-  const defaultTab = shippingOn ? 'shipping' : accountsOn ? 'ledger' : projectsOn ? 'projects' : 'general';
+  const productionOn = isEnabled('production');
+  const defaultTab = shippingOn ? 'shipping' : accountsOn ? 'ledger' : projectsOn ? 'projects' : productionOn ? 'production' : 'general';
   const [activeTab, setActiveTab] = useState(defaultTab);
   useEffect(() => {
     if ((activeTab === 'shipping' && !shippingOn) ||
         (activeTab === 'projects' && !projectsOn) ||
-        (activeTab === 'ledger' && !accountsOn)) {
+        (activeTab === 'ledger' && !accountsOn) ||
+        (activeTab === 'production' && !productionOn)) {
       setActiveTab(defaultTab);
     }
-  }, [shippingOn, projectsOn, accountsOn, activeTab, defaultTab]);
+  }, [shippingOn, projectsOn, accountsOn, productionOn, activeTab, defaultTab]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewContent, setPreviewContent] = useState<'shipping-summary' | 'container-detail' | 'shipment-detail' | 'projects' | 'general' | 'activity' | null>(null);
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
