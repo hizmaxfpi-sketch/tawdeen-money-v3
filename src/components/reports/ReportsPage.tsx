@@ -1003,6 +1003,91 @@ export function ReportsPage({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Costs Detail Dialog */}
+      <Dialog open={!!costsDialogContainerId} onOpenChange={(open) => !open && setCostsDialogContainerId(null)}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-sm">تفاصيل تكاليف الحاوية</DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const c = containers.find(ct => ct.id === costsDialogContainerId);
+            if (!c) return null;
+            const extras = extraExpensesByContainer[c.id] || [];
+            const baseRows: { label: string; amount: number }[] = [];
+            if ((c.containerPrice ?? 0) > 0) baseRows.push({ label: 'سعر الحاوية', amount: c.containerPrice ?? 0 });
+            if (c.shippingCost > 0) baseRows.push({ label: 'تكلفة الشحن', amount: c.shippingCost });
+            if (c.customsCost > 0) baseRows.push({ label: 'الجمارك', amount: c.customsCost });
+            if (c.portCost > 0) baseRows.push({ label: 'رسوم الميناء', amount: c.portCost });
+            if ((c.glassFees ?? 0) > 0) baseRows.push({ label: 'رسوم الزجاج', amount: c.glassFees ?? 0 });
+            if (c.otherCosts > 0) baseRows.push({ label: 'تكاليف أخرى', amount: c.otherCosts });
+            const baseTotal = baseRows.reduce((s, r) => s + r.amount, 0);
+            const extrasTotal = extras.reduce((s, e) => s + e.amount, 0);
+            return (
+              <div className="space-y-3 text-[11px]">
+                <div className="text-center text-muted-foreground text-[10px]">
+                  حاوية: <span className="font-bold text-foreground">{c.containerNumber}</span>
+                </div>
+
+                {/* Base costs */}
+                <div className="rounded border border-border overflow-hidden">
+                  <div className="bg-muted/50 px-2 py-1.5 text-[10px] font-semibold">التكاليف الأساسية</div>
+                  {baseRows.length === 0 ? (
+                    <div className="p-2 text-center text-muted-foreground text-[10px]">لا توجد تكاليف أساسية</div>
+                  ) : (
+                    <table className="w-full">
+                      <tbody>
+                        {baseRows.map((r, i) => (
+                          <tr key={i} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
+                            <td className="p-1.5 text-muted-foreground">{r.label}</td>
+                            <td className="p-1.5 text-left font-medium">{fmtC(r.amount)}</td>
+                          </tr>
+                        ))}
+                        <tr className="bg-muted/40 border-t border-border font-semibold">
+                          <td className="p-1.5">مجموع التكاليف الأساسية</td>
+                          <td className="p-1.5 text-left">{fmtC(baseTotal)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Extra expenses */}
+                <div className="rounded border border-border overflow-hidden">
+                  <div className="bg-muted/50 px-2 py-1.5 text-[10px] font-semibold">المصاريف الإضافية</div>
+                  {extras.length === 0 ? (
+                    <div className="p-2 text-center text-muted-foreground text-[10px]">لا توجد مصاريف إضافية</div>
+                  ) : (
+                    <table className="w-full">
+                      <tbody>
+                        {extras.map((e, i) => (
+                          <tr key={e.id} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
+                            <td className="p-1.5 text-muted-foreground">
+                              {e.description}
+                              <span className="text-[9px] text-muted-foreground/70 mr-1">({new Date(e.date).toLocaleDateString('en-GB')})</span>
+                            </td>
+                            <td className="p-1.5 text-left font-medium text-expense">{fmtC(e.amount)}</td>
+                          </tr>
+                        ))}
+                        <tr className="bg-muted/40 border-t border-border font-semibold">
+                          <td className="p-1.5">مجموع المصاريف الإضافية</td>
+                          <td className="p-1.5 text-left text-expense">{fmtC(extrasTotal)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Final total */}
+                <div className="rounded-lg bg-expense/10 border border-expense/30 p-3 flex items-center justify-between">
+                  <span className="font-bold text-xs">الإجمالي النهائي للتكاليف</span>
+                  <span className="font-bold text-sm text-expense">{fmtC(c.totalCost)}</span>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
