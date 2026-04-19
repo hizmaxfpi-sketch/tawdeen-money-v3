@@ -4,64 +4,50 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 export interface ProductionMaterial {
-  id: string;
-  name: string;
-  code?: string | null;
-  unit: string;
-  quantity: number;
-  avg_cost: number;
-  notes?: string | null;
-  created_at: string;
+  id: string; name: string; code?: string | null; unit: string;
+  quantity: number; avg_cost: number; notes?: string | null; created_at: string;
 }
-
 export interface ProductionProduct {
-  id: string;
-  name: string;
-  code?: string | null;
-  unit: string;
-  quantity: number;
-  unit_cost: number;
-  sell_price: number;
-  notes?: string | null;
-  created_at: string;
+  id: string; name: string; code?: string | null; unit: string;
+  quantity: number; unit_cost: number; sell_price: number; notes?: string | null; created_at: string;
 }
-
+export interface ProductionService {
+  id: string; name: string; code?: string | null; default_price: number; notes?: string | null; created_at: string;
+}
 export interface BomEntry {
-  id: string;
-  product_id: string;
-  material_id: string;
-  qty_per_unit: number;
+  id: string; product_id: string; material_id: string; qty_per_unit: number;
 }
-
 export interface ProductionSummary {
-  materialsValue: number;
-  productsValue: number;
-  totalSales: number;
-  totalCost: number;
-  netProfit: number;
+  materialsValue: number; productsValue: number; totalSales: number;
+  totalCost: number; totalExpenses: number; netProfit: number;
 }
+export interface SaleService { service_id?: string; name: string; amount: number }
+export interface SaleExpense { description: string; amount: number; fund_id?: string; treat_as_business?: boolean }
 
 export function useProduction() {
   const { user } = useAuth();
   const [materials, setMaterials] = useState<ProductionMaterial[]>([]);
   const [products, setProducts] = useState<ProductionProduct[]>([]);
+  const [services, setServices] = useState<ProductionService[]>([]);
   const [bom, setBom] = useState<BomEntry[]>([]);
   const [summary, setSummary] = useState<ProductionSummary>({
-    materialsValue: 0, productsValue: 0, totalSales: 0, totalCost: 0, netProfit: 0,
+    materialsValue: 0, productsValue: 0, totalSales: 0, totalCost: 0, totalExpenses: 0, netProfit: 0,
   });
   const [loading, setLoading] = useState(true);
 
   const loadAll = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const [mRes, pRes, bRes, sRes] = await Promise.all([
+    const [mRes, pRes, svRes, bRes, sRes] = await Promise.all([
       supabase.from('production_materials').select('*').order('name'),
       supabase.from('production_products').select('*').order('name'),
+      (supabase as any).from('production_services').select('*').order('name'),
       supabase.from('product_bom').select('*'),
       supabase.rpc('get_production_summary'),
     ]);
     setMaterials((mRes.data as ProductionMaterial[]) || []);
     setProducts((pRes.data as ProductionProduct[]) || []);
+    setServices((svRes.data as ProductionService[]) || []);
     setBom((bRes.data as BomEntry[]) || []);
     if (sRes.data) setSummary(sRes.data as unknown as ProductionSummary);
     setLoading(false);
@@ -69,7 +55,6 @@ export function useProduction() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  // Realtime
   useEffect(() => {
     if (!user) return;
     const ch = supabase
@@ -78,86 +63,77 @@ export function useProduction() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'production_products' }, () => loadAll())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'production_sales' }, () => loadAll())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'product_bom' }, () => loadAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_services' as any }, () => loadAll())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [user, loadAll]);
 
-  // ====== Materials ======
-  const addMaterial = async (data: { name: string; code?: string; unit: string; notes?: string }) => {
+  // Materials
+  const addMaterial = async (data: { name: string; code?: string; unit: string; notes?: string }): Promise<void> => {
     if (!user) return;
     const { error } = await supabase.from('production_materials').insert({ ...data, user_id: user.id, quantity: 0, avg_cost: 0 });
     if (error) { toast.error('فشل إضافة المادة'); return; }
-    toast.success('تمت إضافة المادة');
-    loadAll();
+    toast.success('تمت إضافة المادة'); loadAll();
   };
-
-  const updateMaterial = async (id: string, patch: Partial<ProductionMaterial>) => {
+  const updateMaterial = async (id: string, patch: Partial<ProductionMaterial>): Promise<void> => {
     const { error } = await supabase.from('production_materials').update(patch).eq('id', id);
     if (error) { toast.error('فشل التحديث'); return; }
-    toast.success('تم التحديث');
-    loadAll();
+    toast.success('تم التحديث'); loadAll();
   };
-
-  const deleteMaterial = async (id: string) => {
+  const deleteMaterial = async (id: string): Promise<void> => {
     const { error } = await supabase.from('production_materials').delete().eq('id', id);
-    if (error) { toast.error('فشل الحذف - تأكد من عدم وجود حركات مرتبطة'); return; }
-    toast.success('تم الحذف');
-    loadAll();
+    if (error) { toast.error('فشل الحذف'); return; }
+    toast.success('تم الحذف'); loadAll();
   };
-
-  const purchaseMaterial = async (params: {
-    material_id: string;
-    quantity: number;
-    unit_price: number;
-    contact_id?: string;
-    fund_id?: string;
-    paid_amount?: number;
-    date?: string;
-    notes?: string;
-  }) => {
+  const purchaseMaterial = async (params: any) => {
     const { error } = await supabase.rpc('purchase_material', {
-      p_material_id: params.material_id,
-      p_quantity: params.quantity,
-      p_unit_price: params.unit_price,
-      p_contact_id: params.contact_id || undefined,
-      p_fund_id: params.fund_id || undefined,
+      p_material_id: params.material_id, p_quantity: params.quantity, p_unit_price: params.unit_price,
+      p_contact_id: params.contact_id || undefined, p_fund_id: params.fund_id || undefined,
       p_paid_amount: params.paid_amount || 0,
-      p_date: params.date || new Date().toISOString().slice(0, 10),
-      p_notes: params.notes,
+      p_date: params.date || new Date().toISOString().slice(0, 10), p_notes: params.notes,
     });
     if (error) { toast.error(error.message || 'فشل الشراء'); return false; }
-    toast.success('تم تسجيل الشراء');
-    loadAll();
-    return true;
+    toast.success('تم تسجيل الشراء'); loadAll(); return true;
   };
 
-  // ====== Products ======
-  const addProduct = async (data: { name: string; code?: string; unit: string; sell_price: number; notes?: string }) => {
+  // Products
+  const addProduct = async (data: any): Promise<void> => {
     if (!user) return;
-    const { error } = await supabase.from('production_products').insert({
-      ...data, user_id: user.id, quantity: 0, unit_cost: 0,
-    });
+    const { error } = await supabase.from('production_products').insert({ ...data, user_id: user.id, quantity: 0, unit_cost: 0 });
     if (error) { toast.error('فشل الإضافة'); return; }
-    toast.success('تمت الإضافة');
-    loadAll();
+    toast.success('تمت الإضافة'); loadAll();
   };
-
-  const updateProduct = async (id: string, patch: Partial<ProductionProduct>) => {
+  const updateProduct = async (id: string, patch: Partial<ProductionProduct>): Promise<void> => {
     const { error } = await supabase.from('production_products').update(patch).eq('id', id);
     if (error) { toast.error('فشل التحديث'); return; }
-    toast.success('تم التحديث');
-    loadAll();
+    toast.success('تم التحديث'); loadAll();
   };
-
-  const deleteProduct = async (id: string) => {
+  const deleteProduct = async (id: string): Promise<void> => {
     const { error } = await supabase.from('production_products').delete().eq('id', id);
     if (error) { toast.error('فشل الحذف'); return; }
-    toast.success('تم الحذف');
-    loadAll();
+    toast.success('تم الحذف'); loadAll();
   };
 
-  // ====== BOM ======
-  const setProductBom = async (productId: string, entries: { material_id: string; qty_per_unit: number }[]) => {
+  // Services
+  const addService = async (data: { name: string; code?: string; default_price: number; notes?: string }): Promise<void> => {
+    if (!user) return;
+    const { error } = await (supabase as any).from('production_services').insert({ ...data, user_id: user.id });
+    if (error) { toast.error('فشل إضافة الخدمة'); return; }
+    toast.success('تمت إضافة الخدمة'); loadAll();
+  };
+  const updateService = async (id: string, patch: Partial<ProductionService>): Promise<void> => {
+    const { error } = await (supabase as any).from('production_services').update(patch).eq('id', id);
+    if (error) { toast.error('فشل التحديث'); return; }
+    toast.success('تم التحديث'); loadAll();
+  };
+  const deleteService = async (id: string): Promise<void> => {
+    const { error } = await (supabase as any).from('production_services').delete().eq('id', id);
+    if (error) { toast.error('فشل الحذف'); return; }
+    toast.success('تم الحذف'); loadAll();
+  };
+
+  // BOM
+  const setProductBom = async (productId: string, entries: { material_id: string; qty_per_unit: number }[]): Promise<void> => {
     if (!user) return;
     await supabase.from('product_bom').delete().eq('product_id', productId);
     if (entries.length > 0) {
@@ -165,105 +141,83 @@ export function useProduction() {
       const { error } = await supabase.from('product_bom').insert(rows);
       if (error) { toast.error('فشل حفظ المكونات'); return; }
     }
-    toast.success('تم حفظ مكونات المنتج');
-    loadAll();
+    toast.success('تم حفظ مكونات المنتج'); loadAll();
   };
 
-  // ====== Production Run ======
   const produceProduct = async (params: { product_id: string; quantity: number; date?: string; notes?: string }) => {
     const { error } = await supabase.rpc('produce_product', {
-      p_product_id: params.product_id,
-      p_quantity: params.quantity,
-      p_date: params.date || new Date().toISOString().slice(0, 10),
-      p_notes: params.notes,
+      p_product_id: params.product_id, p_quantity: params.quantity,
+      p_date: params.date || new Date().toISOString().slice(0, 10), p_notes: params.notes,
     });
     if (error) { toast.error(error.message || 'فشل التصنيع'); return false; }
-    toast.success('تم تسجيل عملية الإنتاج');
-    loadAll();
-    return true;
+    toast.success('تم تسجيل عملية الإنتاج'); loadAll(); return true;
   };
 
-  // ====== Sales ======
+  // Sell Product (with services & expenses)
   const sellProduct = async (params: {
-    product_id: string;
-    quantity: number;
-    unit_price: number;
-    contact_id?: string;
-    fund_id?: string;
-    paid_amount?: number;
-    date?: string;
-    notes?: string;
+    product_id: string; quantity: number; unit_price: number;
+    contact_id?: string; fund_id?: string; paid_amount?: number; date?: string; notes?: string;
+    services?: SaleService[]; expenses?: SaleExpense[];
   }) => {
-    const { error } = await supabase.rpc('sell_product', {
-      p_product_id: params.product_id,
-      p_quantity: params.quantity,
-      p_unit_price: params.unit_price,
-      p_contact_id: params.contact_id || undefined,
-      p_fund_id: params.fund_id || undefined,
+    const { error } = await (supabase.rpc as any)('sell_product', {
+      p_product_id: params.product_id, p_quantity: params.quantity, p_unit_price: params.unit_price,
+      p_contact_id: params.contact_id || undefined, p_fund_id: params.fund_id || undefined,
       p_paid_amount: params.paid_amount || 0,
-      p_date: params.date || new Date().toISOString().slice(0, 10),
-      p_notes: params.notes,
+      p_date: params.date || new Date().toISOString().slice(0, 10), p_notes: params.notes,
+      p_services: params.services || [], p_expenses: params.expenses || [],
     });
     if (error) { toast.error(error.message || 'فشل البيع'); return false; }
-    toast.success('تم تسجيل البيع');
-    loadAll();
-    return true;
+    toast.success('تم تسجيل البيع'); loadAll(); return true;
   };
 
-  const updateSale = async (saleId: string, params: {
-    quantity: number;
-    unit_price: number;
-    contact_id?: string;
-    fund_id?: string;
-    paid_amount?: number;
-    date?: string;
-    notes?: string;
+  // Sell Raw Material directly
+  const sellRawMaterial = async (params: {
+    material_id: string; quantity: number; unit_price: number;
+    contact_id?: string; fund_id?: string; paid_amount?: number; date?: string; notes?: string;
+    services?: SaleService[]; expenses?: SaleExpense[];
   }) => {
-    const { error } = await (supabase.rpc as any)('update_production_sale', {
-      p_sale_id: saleId,
-      p_quantity: params.quantity,
-      p_unit_price: params.unit_price,
-      p_contact_id: params.contact_id || null,
-      p_fund_id: params.fund_id || null,
+    const { error } = await (supabase.rpc as any)('sell_raw_material', {
+      p_material_id: params.material_id, p_quantity: params.quantity, p_unit_price: params.unit_price,
+      p_contact_id: params.contact_id || undefined, p_fund_id: params.fund_id || undefined,
       p_paid_amount: params.paid_amount || 0,
-      p_date: params.date || null,
-      p_notes: params.notes || null,
+      p_date: params.date || new Date().toISOString().slice(0, 10), p_notes: params.notes,
+      p_services: params.services || [], p_expenses: params.expenses || [],
+    });
+    if (error) { toast.error(error.message || 'فشل البيع المباشر'); return false; }
+    toast.success('تم تسجيل البيع المباشر'); loadAll(); return true;
+  };
+
+  const updateSale = async (saleId: string, params: any) => {
+    const { error } = await (supabase.rpc as any)('update_production_sale', {
+      p_sale_id: saleId, p_quantity: params.quantity, p_unit_price: params.unit_price,
+      p_contact_id: params.contact_id || null, p_fund_id: params.fund_id || null,
+      p_paid_amount: params.paid_amount || 0, p_date: params.date || null, p_notes: params.notes || null,
     });
     if (error) { toast.error(error.message || 'فشل التعديل'); return false; }
-    toast.success('تم تعديل البيع وعكس أثره');
-    loadAll();
-    return true;
+    toast.success('تم التعديل'); loadAll(); return true;
   };
-
   const deleteSale = async (saleId: string) => {
     const { error } = await (supabase.rpc as any)('reverse_production_sale', { p_sale_id: saleId });
     if (error) { toast.error(error.message || 'فشل الحذف'); return false; }
-    toast.success('تم حذف البيع وإلغاء أثره بالكامل');
-    loadAll();
-    return true;
+    toast.success('تم حذف البيع وعكس أثره'); loadAll(); return true;
   };
-
   const deleteRun = async (runId: string) => {
     const { error } = await (supabase.rpc as any)('reverse_production_run', { p_run_id: runId });
     if (error) { toast.error(error.message || 'فشل الإلغاء'); return false; }
-    toast.success('تم إلغاء الإنتاج وإرجاع المواد');
-    loadAll();
-    return true;
+    toast.success('تم الإلغاء'); loadAll(); return true;
   };
-
   const deletePurchase = async (purchaseId: string) => {
     const { error } = await (supabase.rpc as any)('reverse_material_purchase', { p_purchase_id: purchaseId });
     if (error) { toast.error(error.message || 'فشل الإلغاء'); return false; }
-    toast.success('تم إلغاء الشراء وعكس أثره');
-    loadAll();
-    return true;
+    toast.success('تم الإلغاء'); loadAll(); return true;
   };
 
   return {
-    materials, products, bom, summary, loading,
+    materials, products, services, bom, summary, loading,
     addMaterial, updateMaterial, deleteMaterial, purchaseMaterial,
     addProduct, updateProduct, deleteProduct, setProductBom,
-    produceProduct, sellProduct,
+    addService, updateService, deleteService,
+    produceProduct, sellProduct, sellRawMaterial,
     updateSale, deleteSale, deleteRun, deletePurchase,
     refresh: loadAll,
   };

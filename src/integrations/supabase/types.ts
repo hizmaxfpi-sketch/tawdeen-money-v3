@@ -1068,6 +1068,95 @@ export type Database = {
           },
         ]
       }
+      production_sale_expenses: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          fund_id: string | null
+          id: string
+          sale_id: string
+          transaction_id: string | null
+          treat_as_business: boolean
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          description: string
+          fund_id?: string | null
+          id?: string
+          sale_id: string
+          transaction_id?: string | null
+          treat_as_business?: boolean
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          fund_id?: string | null
+          id?: string
+          sale_id?: string
+          transaction_id?: string | null
+          treat_as_business?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_sale_expenses_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "production_sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_sale_services: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          name: string
+          sale_id: string
+          service_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          name: string
+          sale_id: string
+          service_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          name?: string
+          sale_id?: string
+          service_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_sale_services_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "production_sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_sale_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "production_services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_sales: {
         Row: {
           contact_id: string | null
@@ -1075,13 +1164,18 @@ export type Database = {
           created_at: string
           created_by_name: string | null
           date: string
+          expenses_as_business: boolean
+          expenses_total: number
           fund_id: string | null
           id: string
+          material_id: string | null
           notes: string | null
           paid_amount: number
-          product_id: string
+          product_id: string | null
           profit: number
           quantity: number
+          services_total: number
+          source_type: string
           total_amount: number
           transaction_id: string | null
           unit_price: number
@@ -1093,13 +1187,18 @@ export type Database = {
           created_at?: string
           created_by_name?: string | null
           date?: string
+          expenses_as_business?: boolean
+          expenses_total?: number
           fund_id?: string | null
           id?: string
+          material_id?: string | null
           notes?: string | null
           paid_amount?: number
-          product_id: string
+          product_id?: string | null
           profit?: number
           quantity: number
+          services_total?: number
+          source_type?: string
           total_amount: number
           transaction_id?: string | null
           unit_price: number
@@ -1111,13 +1210,18 @@ export type Database = {
           created_at?: string
           created_by_name?: string | null
           date?: string
+          expenses_as_business?: boolean
+          expenses_total?: number
           fund_id?: string | null
           id?: string
+          material_id?: string | null
           notes?: string | null
           paid_amount?: number
-          product_id?: string
+          product_id?: string | null
           profit?: number
           quantity?: number
+          services_total?: number
+          source_type?: string
           total_amount?: number
           transaction_id?: string | null
           unit_price?: number
@@ -1132,6 +1236,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      production_services: {
+        Row: {
+          code: string | null
+          created_at: string
+          created_by_name: string | null
+          default_price: number
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          default_price?: number
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          created_by_name?: string | null
+          default_price?: number
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -1994,11 +2134,28 @@ export type Database = {
         Args: {
           p_contact_id?: string
           p_date?: string
+          p_expenses?: Json
           p_fund_id?: string
           p_notes?: string
           p_paid_amount?: number
           p_product_id: string
           p_quantity: number
+          p_services?: Json
+          p_unit_price: number
+        }
+        Returns: string
+      }
+      sell_raw_material: {
+        Args: {
+          p_contact_id?: string
+          p_date?: string
+          p_expenses?: Json
+          p_fund_id?: string
+          p_material_id: string
+          p_notes?: string
+          p_paid_amount?: number
+          p_quantity: number
+          p_services?: Json
           p_unit_price: number
         }
         Returns: string
