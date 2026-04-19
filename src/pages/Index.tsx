@@ -108,9 +108,13 @@ const Index = () => {
   const { containers, shipments } = useSupabaseShipping();
   const { contacts } = useSupabaseContacts();
   const { summary: productionSummary } = useProduction();
+  const productionEnabled = isEnabled('production');
+  // ملاحظة: قسم الأعمال يعرض فقط إيرادات الأصول/الخدمات + المصاريف.
+  // لا تُضاف مبيعات الإنتاج كإيرادات هنا (تظهر مستقلة في كرت الإنتاج)،
+  // لكن تكلفة المواد المستهلكة (COGS) تُحسب كمصروف أعمال تلقائياً، وفقط حين يكون قسم الإنتاج مفعّلاً.
   const { directRevenue, businessExpenses } = useBusinessTransactions(transactions, {
-    extraRevenue: productionSummary.totalSales,
-    extraExpenses: productionSummary.totalCost,
+    extraRevenue: 0,
+    extraExpenses: productionEnabled ? productionSummary.totalCost : 0,
   });
 
   const fundLinkedTransactions = transactions.filter(t => t.fundId && t.fundId !== '');
