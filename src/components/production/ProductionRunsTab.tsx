@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Factory, ShoppingCart, AlertCircle, History, Filter, X, Calendar, Pencil, Trash2 } from 'lucide-react';
+import { Factory, ShoppingCart, AlertCircle, History, Filter, X, Calendar, Pencil, Trash2, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,18 +9,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { ProductionMaterial, ProductionProduct, BomEntry } from '@/hooks/useProduction';
+import type { ProductionMaterial, ProductionProduct, ProductionService, BomEntry } from '@/hooks/useProduction';
 import type { FundOption } from '@/types/finance';
 import type { Contact } from '@/types/contacts';
+import { UnifiedSellDialog } from './UnifiedSellDialog';
 
 interface Props {
   products: ProductionProduct[];
   bom: BomEntry[];
   materials: ProductionMaterial[];
+  services: ProductionService[];
   fundOptions: FundOption[];
   contacts: Contact[];
   onProduce: (params: { product_id: string; quantity: number; notes?: string }) => Promise<boolean>;
   onSell: (params: any) => Promise<boolean>;
+  onSellMaterial: (params: any) => Promise<boolean>;
   onUpdateSale: (saleId: string, params: any) => Promise<boolean>;
   onDeleteSale: (saleId: string) => Promise<boolean>;
   onDeleteRun: (runId: string) => Promise<boolean>;
@@ -29,11 +32,15 @@ interface Props {
 interface SaleRow {
   id: string;
   date: string;
-  product_id: string;
+  source_type: 'product' | 'material';
+  product_id: string | null;
+  material_id: string | null;
   quantity: number;
   unit_price: number;
   total_amount: number;
   cost_at_sale: number;
+  services_total: number;
+  expenses_total: number;
   profit: number;
   paid_amount: number;
   contact_id: string | null;
