@@ -160,6 +160,7 @@ export interface AccountOption {
   name: string;
   type: LedgerAccountType;
   balance: number; // debit - credit
+  phone?: string;
 }
 
 // ============= 8. بيانات المخططات =============
