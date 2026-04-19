@@ -19,6 +19,11 @@ interface SummaryCardsProps {
   directRevenue?: number;
   businessExpenses?: number;
   onExpensesClick?: () => void;
+  showLedger?: boolean;
+  showFunds?: boolean;
+  showBusiness?: boolean;
+  showProjects?: boolean;
+  showShipping?: boolean;
 }
 
 export function SummaryCards({
@@ -28,21 +33,25 @@ export function SummaryCards({
   projectProfit = 0, containerProfit = 0,
   directRevenue = 0, businessExpenses = 0,
   onExpensesClick,
+  showLedger = true, showFunds = true, showBusiness = true,
+  showProjects = true, showShipping = true,
 }: SummaryCardsProps) {
   const cashTxs = fundTransactions || [];
   const fundIn = cashTxs.reduce((sum, tx) => tx.type === 'in' ? sum + tx.amount : sum, 0);
   const fundOut = cashTxs.reduce((sum, tx) => tx.type === 'out' ? sum + tx.amount : sum, 0);
   const fundRemaining = stats.totalLiquidity;
 
-  // Revenue = direct business revenue + project profits + container profits
-  const totalRevenue = directRevenue + projectProfit + containerProfit;
+  // Exclude profits from disabled modules
+  const effectiveProjectProfit = showProjects ? projectProfit : 0;
+  const effectiveContainerProfit = showShipping ? containerProfit : 0;
+  const totalRevenue = directRevenue + effectiveProjectProfit + effectiveContainerProfit;
   const netProfit = totalRevenue - businessExpenses;
 
   const conv = (v: number) => convertForDisplay(v, displayCurrency, currencies);
   const sym = getCurrencySymbol(displayCurrency, currencies);
 
-  const rows = [
-    {
+  const allRows = [
+    showLedger && {
       label: 'الحسابات الدفترية',
       cards: [
         { key: 'ledger-debit', label: 'مدين', value: conv(ledgerDebit), icon: TrendingUp, colorClass: 'text-income', gradient: 'bg-gradient-income' },
@@ -50,7 +59,7 @@ export function SummaryCards({
         { key: 'ledger-net', label: 'الصافي', value: conv(ledgerNet), icon: BookOpen, colorClass: 'text-primary', gradient: 'bg-gradient-primary' },
       ],
     },
-    {
+    showFunds && {
       label: 'حركة الصناديق',
       cards: [
         { key: 'fund-in', label: 'الداخل', value: conv(fundIn), icon: ArrowDownLeft, colorClass: 'text-income', gradient: 'bg-gradient-income' },
@@ -58,7 +67,7 @@ export function SummaryCards({
         { key: 'fund-remaining', label: 'المتبقي', value: conv(fundRemaining), icon: Wallet, colorClass: 'text-primary', gradient: 'bg-gradient-primary' },
       ],
     },
-    {
+    showBusiness && {
       label: 'الأعمال',
       cards: [
         { key: 'biz-revenue', label: 'الإيرادات', value: conv(totalRevenue), icon: DollarSign, colorClass: 'text-income', gradient: 'bg-gradient-income' },
@@ -67,6 +76,7 @@ export function SummaryCards({
       ],
     },
   ];
+  const rows = allRows.filter(Boolean) as Array<{ label: string; cards: any[] }>;
 
   return (
     <div className="space-y-2">

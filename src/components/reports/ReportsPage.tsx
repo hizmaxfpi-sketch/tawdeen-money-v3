@@ -21,6 +21,7 @@ import { BackupSection } from './BackupSection';
 import { ActivityLogReport } from './ActivityLogReport';
 import { AccountingLedgerReport } from './AccountingLedgerReport';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { useEnabledModules } from '@/hooks/useEnabledModules';
 
 import { Currency } from '@/hooks/useCurrencies';
 import { CurrencyDisplaySelector, convertForDisplay, getCurrencySymbol } from '@/components/shared/CurrencyDisplaySelector';
@@ -52,7 +53,19 @@ export function ReportsPage({
   transactions, funds, contacts, exportData, importData,
   containers = [], shipments = [], projects = [], projectStats, stats, currencies = [],
 }: ReportsPageProps) {
-  const [activeTab, setActiveTab] = useState('shipping');
+  const { isEnabled } = useEnabledModules();
+  const shippingOn = isEnabled('shipping');
+  const projectsOn = isEnabled('projects');
+  const accountsOn = isEnabled('accounts');
+  const defaultTab = shippingOn ? 'shipping' : accountsOn ? 'ledger' : projectsOn ? 'projects' : 'general';
+  const [activeTab, setActiveTab] = useState(defaultTab);
+  useEffect(() => {
+    if ((activeTab === 'shipping' && !shippingOn) ||
+        (activeTab === 'projects' && !projectsOn) ||
+        (activeTab === 'ledger' && !accountsOn)) {
+      setActiveTab(defaultTab);
+    }
+  }, [shippingOn, projectsOn, accountsOn, activeTab, defaultTab]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewContent, setPreviewContent] = useState<'shipping-summary' | 'container-detail' | 'shipment-detail' | 'projects' | 'general' | 'activity' | null>(null);
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
@@ -421,10 +434,13 @@ export function ReportsPage({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6 h-9">
-          <TabsTrigger value="shipping" className="text-[10px] gap-1"><Ship className="h-3 w-3" />الشحنات</TabsTrigger>
-          <TabsTrigger value="ledger" className="text-[10px] gap-1"><Users className="h-3 w-3" />الدفتر</TabsTrigger>
-          <TabsTrigger value="projects" className="text-[10px] gap-1"><BarChart3 className="h-3 w-3" />المشاريع</TabsTrigger>
+        <TabsList
+          className="grid w-full h-9"
+          style={{ gridTemplateColumns: `repeat(${3 + (shippingOn ? 1 : 0) + (projectsOn ? 1 : 0) + (accountsOn ? 1 : 0)}, minmax(0, 1fr))` }}
+        >
+          {shippingOn && <TabsTrigger value="shipping" className="text-[10px] gap-1"><Ship className="h-3 w-3" />الشحنات</TabsTrigger>}
+          {accountsOn && <TabsTrigger value="ledger" className="text-[10px] gap-1"><Users className="h-3 w-3" />الدفتر</TabsTrigger>}
+          {projectsOn && <TabsTrigger value="projects" className="text-[10px] gap-1"><BarChart3 className="h-3 w-3" />المشاريع</TabsTrigger>}
           <TabsTrigger value="general" className="text-[10px] gap-1"><TrendingUp className="h-3 w-3" />عام</TabsTrigger>
           <TabsTrigger value="activity" className="text-[10px] gap-1"><Clock className="h-3 w-3" />السجل</TabsTrigger>
           <TabsTrigger value="backup" className="text-[10px] gap-1"><Database className="h-3 w-3" />النسخ</TabsTrigger>
