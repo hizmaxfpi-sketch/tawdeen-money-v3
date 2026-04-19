@@ -58,7 +58,7 @@ interface RunRow {
   notes: string | null;
 }
 
-export function ProductionRunsTab({ products, bom, materials, fundOptions, contacts, onProduce, onSell, onUpdateSale, onDeleteSale, onDeleteRun }: Props) {
+export function ProductionRunsTab({ products, bom, materials, services, fundOptions, contacts, onProduce, onSell, onSellMaterial, onUpdateSale, onDeleteSale, onDeleteRun }: Props) {
   const [openProd, setOpenProd] = useState(false);
   const [openSell, setOpenSell] = useState(false);
   const [tab, setTab] = useState<'actions' | 'sales' | 'runs'>('actions');
@@ -66,14 +66,6 @@ export function ProductionRunsTab({ products, bom, materials, fundOptions, conta
   // Production form
   const [prodPid, setProdPid] = useState('');
   const [prodQty, setProdQty] = useState('');
-
-  // Sell form
-  const [sellPid, setSellPid] = useState('');
-  const [sellQty, setSellQty] = useState('');
-  const [sellPrice, setSellPrice] = useState('');
-  const [sellContact, setSellContact] = useState('');
-  const [sellFund, setSellFund] = useState('');
-  const [sellPaid, setSellPaid] = useState('');
 
   // Edit sale
   const [editSale, setEditSale] = useState<SaleRow | null>(null);
