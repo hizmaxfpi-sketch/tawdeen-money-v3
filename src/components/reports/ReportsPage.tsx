@@ -136,24 +136,24 @@ export function ReportsPage({
   }, [filteredShipments, filteredContainers]);
 
   const paymentDistribution = useMemo(() => {
-    const paid = shipments.filter(s => s.paymentStatus === 'paid').length;
-    const partial = shipments.filter(s => s.paymentStatus === 'partial').length;
-    const unpaid = shipments.filter(s => s.paymentStatus === 'unpaid').length;
+    const paid = filteredShipments.filter(s => s.paymentStatus === 'paid').length;
+    const partial = filteredShipments.filter(s => s.paymentStatus === 'partial').length;
+    const unpaid = filteredShipments.filter(s => s.paymentStatus === 'unpaid').length;
     return [
       { name: 'مدفوع', value: paid, color: 'hsl(145,65%,42%)' },
       { name: 'جزئي', value: partial, color: 'hsl(45,93%,47%)' },
       { name: 'غير مدفوع', value: unpaid, color: 'hsl(0,72%,51%)' },
     ].filter(d => d.value > 0);
-  }, [shipments]);
+  }, [filteredShipments]);
 
   const containerProfitChart = useMemo(() => {
-    return containers.slice(0, 6).map(c => ({
+    return filteredContainers.slice(0, 6).map(c => ({
       name: c.containerNumber.slice(-6),
       revenue: c.totalRevenue,
       cost: c.totalCost,
       profit: c.profit,
     }));
-  }, [containers]);
+  }, [filteredContainers]);
 
   // ============= Export Functions =============
   const handleExportImage = async () => {
