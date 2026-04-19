@@ -62,6 +62,7 @@ export function ReportsPage({
   const [showFinancials, setShowFinancials] = useState(true);
   const [showCostDetails, setShowCostDetails] = useState(false);
   const [costsDialogContainerId, setCostsDialogContainerId] = useState<string | null>(null);
+  const [showCharts, setShowCharts] = useState(true);
   const [extraExpensesByContainer, setExtraExpensesByContainer] = useState<Record<string, { id: string; description: string; amount: number; date: string }[]>>({});
 
   // Auto-load extra expenses for inline cost details when previewing a container
