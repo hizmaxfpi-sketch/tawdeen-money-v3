@@ -66,7 +66,8 @@ export function useSupabaseFinance() {
         id: c.id, 
         name: c.name, 
         type: c.type as any, 
-        balance: c.balance 
+        balance: c.balance,
+        phone: c.phone,
       })),
   [contactsHook.contacts]);
 
