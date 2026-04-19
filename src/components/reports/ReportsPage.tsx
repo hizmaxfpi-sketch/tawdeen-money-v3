@@ -97,6 +97,30 @@ export function ReportsPage({
   const [filterFund, setFilterFund] = useState('all');
   const [filterContainerIds, setFilterContainerIds] = useState<Set<string>>(new Set());
 
+  // Project-specific filters
+  const [projectFilterClient, setProjectFilterClient] = useState<string>('all');
+  const [projectFilterStatus, setProjectFilterStatus] = useState<string>('all');
+  const [projectDateFrom, setProjectDateFrom] = useState('');
+  const [projectDateTo, setProjectDateTo] = useState('');
+  const [projectFilterIds, setProjectFilterIds] = useState<Set<string>>(new Set());
+
+  const filteredProjects = useMemo(() => {
+    return projects.filter(p => {
+      if (projectFilterIds.size > 0 && !projectFilterIds.has(p.id)) return false;
+      if (projectFilterClient !== 'all' && (p as any).clientId !== projectFilterClient) return false;
+      if (projectFilterStatus !== 'all' && p.status !== projectFilterStatus) return false;
+      if (projectDateFrom) {
+        const pd = p.startDate ? new Date(p.startDate) : null;
+        if (!pd || pd < new Date(projectDateFrom)) return false;
+      }
+      if (projectDateTo) {
+        const pd = p.startDate ? new Date(p.startDate) : null;
+        if (!pd || pd > new Date(projectDateTo)) return false;
+      }
+      return true;
+    });
+  }, [projects, projectFilterIds, projectFilterClient, projectFilterStatus, projectDateFrom, projectDateTo]);
+
   const previewRef = useRef<HTMLDivElement>(null);
 
   // ============= Computed Stats - RESPECT ALL filters =============
