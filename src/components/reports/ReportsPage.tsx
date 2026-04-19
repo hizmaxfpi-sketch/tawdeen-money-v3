@@ -823,22 +823,38 @@ export function ReportsPage({
                     <div className="p-2 rounded bg-purple-50 dark:bg-purple-950/30"><span className="text-muted-foreground">إجمالي الوزن: </span><span className="font-bold text-purple-600">{cTotalWeight.toLocaleString()} كغ</span></div>
                   </div>
                   {showFinancials && (
-                    <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
-                      <div className="p-2 rounded bg-income/10"><p className="text-muted-foreground">الإيرادات</p><p className="font-bold text-income">{fmtC(c.totalRevenue)}</p></div>
-                      <div className="p-2 rounded bg-expense/10"><p className="text-muted-foreground">التكاليف</p><p className="font-bold text-expense">{fmtC(c.totalCost)}</p></div>
-                      <div className="p-2 rounded bg-accent"><p className="text-muted-foreground">الربح</p><p className={cn("font-bold", c.profit >= 0 ? "text-income" : "text-expense")}>{fmtC(c.profit)}</p></div>
-                    </div>
+                    <>
+                      <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                        <div className="p-2 rounded bg-income/10"><p className="text-muted-foreground">الإيرادات</p><p className="font-bold text-income">{fmtC(c.totalRevenue)}</p></div>
+                        <div className="p-2 rounded bg-expense/10"><p className="text-muted-foreground">التكاليف</p><p className="font-bold text-expense">{fmtC(c.totalCost)}</p></div>
+                        <div className="p-2 rounded bg-accent"><p className="text-muted-foreground">الربح</p><p className={cn("font-bold", c.profit >= 0 ? "text-income" : "text-expense")}>{fmtC(c.profit)}</p></div>
+                      </div>
+                      <div className="flex justify-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-[10px] gap-1"
+                          onClick={() => setCostsDialogContainerId(c.id)}
+                        >
+                          <Eye className="h-3 w-3" />
+                          عرض تفاصيل التكاليف
+                        </Button>
+                      </div>
+                    </>
                   )}
                   {cShipments.length > 0 && (
                     <table className="w-full text-[9px] border-collapse">
                       <thead><tr className="bg-[hsl(215,70%,35%)] text-white">
-                        <th className="p-1.5">العميل</th><th className="p-1.5">رقم التتبع</th><th className="p-1.5">البضاعة</th><th className="p-1.5">القطع</th><th className="p-1.5">الوزن</th><th className="p-1.5">CBM</th>
+                        <th className="p-1.5">العميل</th><th className="p-1.5">الهاتف</th><th className="p-1.5">رقم التتبع</th><th className="p-1.5">البضاعة</th><th className="p-1.5">القطع</th><th className="p-1.5">الوزن</th><th className="p-1.5">CBM</th>
                         {showFinancials && <><th className="p-1.5">المقاولة</th><th className="p-1.5">المتبقي</th></>}
                       </tr></thead>
                       <tbody>
-                        {cShipments.map((s, i) => (
+                        {cShipments.map((s, i) => {
+                          const clientPhone = s.clientId ? contacts.find(ct => ct.id === s.clientId)?.phone : undefined;
+                          return (
                           <tr key={s.id} className={i % 2 === 0 ? 'bg-muted/30' : ''}>
                             <td className="p-1.5 text-center">{s.clientName}</td>
+                            <td className="p-1.5 text-center text-muted-foreground" dir="ltr">{clientPhone || '-'}</td>
                             <td className="p-1.5 text-center text-muted-foreground">{s.trackingNumber || '-'}</td>
                             <td className="p-1.5 text-center">{s.goodsType}</td>
                             <td className="p-1.5 text-center">{s.quantity}</td>
@@ -851,7 +867,8 @@ export function ReportsPage({
                               </>
                             )}
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   )}
