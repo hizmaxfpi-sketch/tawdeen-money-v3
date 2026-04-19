@@ -38,11 +38,16 @@ export function useBusinessTransactions(transactions: Transaction[], options: Op
     let directRevenue = 0;
     let businessExpenses = 0;
 
+    // أنواع المصادر الآلية الخاصة بالإنتاج — نستبعدها كاملاً من حسابات الأعمال اليدوية
+    // ونعتمد على extraRevenue/extraExpenses القادمة من useProduction (مبيعات + تكلفة + مصاريف)
+    const PRODUCTION_SOURCES = new Set([
+      'production_sale', 'production_sale_payment',
+      'production_purchase', 'production_purchase_payment',
+    ]);
+
     for (const tx of transactions) {
       const isManual = !tx.sourceType || tx.sourceType === 'manual';
-      // نتجاهل قيود الإنتاج هنا — تأتي عبر extraRevenue/extraExpenses من useProduction
-      // لتجنب العد المزدوج (الإيراد كاملاً + التكلفة كاملةً بدلاً من صافي الربح)
-      if (tx.sourceType === 'production_sale') continue;
+      if (tx.sourceType && PRODUCTION_SOURCES.has(tx.sourceType)) continue;
 
       if (tx.projectId) continue;
 
@@ -67,16 +72,18 @@ export function useBusinessTransactions(transactions: Transaction[], options: Op
 
 export function isBusinessTransaction(tx: Transaction): boolean {
   if (tx.projectId) return false;
-  const isManual = !tx.sourceType || tx.sourceType === 'manual';
-  const isProductionSource = tx.sourceType === 'production_sale';
+  // استبعاد كافة قيود الإنتاج من سجل عمليات الأعمال (المبيعات/المشتريات/السداد)
+  const PRODUCTION_SOURCES = new Set([
+    'production_sale', 'production_sale_payment',
+    'production_purchase', 'production_purchase_payment',
+  ]);
+  if (tx.sourceType && PRODUCTION_SOURCES.has(tx.sourceType)) return false;
 
+  const isManual = !tx.sourceType || tx.sourceType === 'manual';
   if (isManual) {
     if (tx.category.startsWith('custom_')) return true;
     const allBizCategories = [...DIRECT_REVENUE_CATEGORIES, ...BUSINESS_EXPENSE_CATEGORIES];
     return allBizCategories.includes(tx.category);
-  }
-  if (isProductionSource) {
-    return ['production_sale', 'business_expense'].includes(tx.category);
   }
   return false;
 }
