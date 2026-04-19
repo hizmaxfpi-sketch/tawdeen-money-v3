@@ -37,6 +37,7 @@ interface SaleRow {
   profit: number;
   paid_amount: number;
   contact_id: string | null;
+  fund_id: string | null;
   notes: string | null;
 }
 
