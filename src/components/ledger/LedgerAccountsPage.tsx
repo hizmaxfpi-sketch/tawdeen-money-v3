@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Plus, Search, UserCheck, Truck, Ship, Briefcase, Handshake, User, ChevronLeft, Phone, MessageCircle, Building2, MoreVertical, TrendingUp, TrendingDown, ArrowRightLeft, Receipt, RefreshCw, Eye, FileText, FileSpreadsheet, Download, Filter, LayoutGrid, List, X, CheckSquare, ClipboardList } from 'lucide-react';
+import { BookOpen, Plus, Search, UserCheck, Truck, Ship, Briefcase, Handshake, User, ChevronLeft, Phone, MessageCircle, Building2, MoreVertical, TrendingUp, TrendingDown, ArrowRightLeft, Receipt, RefreshCw, Eye, FileText, FileSpreadsheet, Download, Filter, LayoutGrid, List, X, CheckSquare, ClipboardList, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
