@@ -402,6 +402,22 @@ export function ProductionRunsTab({ products, bom, materials, services, fundOpti
         </TabsContent>
       </Tabs>
 
+      {/* ====== Sales Preview ====== */}
+      <ProductionPreviewDialog
+        open={openSalesPreview}
+        onOpenChange={setOpenSalesPreview}
+        kind="sales"
+        sales={filteredSales.map<SaleRowPreview>(s => ({
+          id: s.id, date: s.date, source_type: s.source_type,
+          itemName: saleItemName(s),
+          contactName: s.contact_id ? contactName(s.contact_id) : undefined,
+          quantity: Number(s.quantity), unit_price: Number(s.unit_price),
+          total_amount: Number(s.total_amount), cost_at_sale: Number(s.cost_at_sale),
+          services_total: Number(s.services_total), expenses_total: Number(s.expenses_total),
+          profit: Number(s.profit), paid_amount: Number(s.paid_amount),
+        }))}
+      />
+
       {/* ====== Unified Sell Dialog ====== */}
       <UnifiedSellDialog
         open={openSell}
