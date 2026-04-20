@@ -61,7 +61,8 @@ export function BusinessPage({
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [assetForm, setAssetForm] = useState({
     name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
-    depreciationRate: '', notes: '', fundId: '', vendorId: '',
+    depreciationRate: '', depreciationPeriod: 'yearly' as 'yearly' | 'monthly',
+    notes: '', fundId: '', vendorId: '',
     paymentType: 'full', installmentCount: '1', depreciationFundId: '',
   });
 
