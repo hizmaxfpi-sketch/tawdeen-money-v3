@@ -136,6 +136,7 @@ export function UnifiedTransactionLog({
       ledger_debit: 'قيد مدين',
       ledger_credit: 'قيد دائن',
       production_expense: 'مصروف بيع إنتاج',
+      production_cogs: 'تكلفة مواد مباعة',
       other: 'أخرى',
     };
     return labels[category] || category;
