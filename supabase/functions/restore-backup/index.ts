@@ -83,9 +83,24 @@ Deno.serve(async (req) => {
     const currencies = asArray(body?.currencies);
     const companySettings = asArray(body?.company_settings ?? body?.companySettings);
     const ledgerAccounts = asArray(body?.ledger_accounts ?? body?.ledgerAccounts);
+    const containerExpenses = asArray(body?.container_expenses ?? body?.containerExpenses);
+    // Production module
+    const productionMaterials = asArray(body?.production_materials ?? body?.productionMaterials);
+    const productionProducts = asArray(body?.production_products ?? body?.productionProducts);
+    const productionServices = asArray(body?.production_services ?? body?.productionServices);
+    const materialPurchases = asArray(body?.material_purchases ?? body?.materialPurchases);
+    const productionRuns = asArray(body?.production_runs ?? body?.productionRuns);
+    const productionSales = asArray(body?.production_sales ?? body?.productionSales);
+    const productBom = asArray(body?.product_bom ?? body?.productBom);
+    const productionSaleServices = asArray(body?.production_sale_services ?? body?.productionSaleServices);
+    const productionSaleExpenses = asArray(body?.production_sale_expenses ?? body?.productionSaleExpenses);
+    // Assets module
+    const assets = asArray(body?.assets);
+    const assetPayments = asArray(body?.asset_payments ?? body?.assetPayments);
+    const assetImprovements = asArray(body?.asset_improvements ?? body?.assetImprovements);
     const backupMeta = body?.backupMeta ?? body?.backup_meta ?? {};
 
-    const totalItems = contacts.length + funds.length + transactions.length + debts.length + projects.length + containers.length + shipments.length + currencies.length;
+    const totalItems = contacts.length + funds.length + transactions.length + debts.length + projects.length + containers.length + shipments.length + currencies.length + productionMaterials.length + productionProducts.length + productionSales.length + assets.length;
     if (totalItems === 0) {
       return new Response(JSON.stringify({ error: "Backup payload is empty" }), {
         status: 400,
