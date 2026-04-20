@@ -116,13 +116,39 @@ export function useSupabaseFinance() {
     // Fetch additional tables for complete backup
     let containers: any[] = [], shipments: any[] = [], shipmentPayments: any[] = [];
     let currencies: any[] = [], companySettings: any[] = [];
+    let ledgerAccounts: any[] = [], containerExpenses: any[] = [];
+    let productionMaterials: any[] = [], productionProducts: any[] = [], productionServices: any[] = [];
+    let materialPurchases: any[] = [], productionRuns: any[] = [], productionSales: any[] = [];
+    let productBom: any[] = [], productionSaleServices: any[] = [], productionSaleExpenses: any[] = [];
+    let assets: any[] = [], assetPayments: any[] = [], assetImprovements: any[] = [];
     try {
-      [containers, shipments, shipmentPayments, currencies, companySettings] = await Promise.all([
+      [
+        containers, shipments, shipmentPayments, currencies, companySettings,
+        ledgerAccounts, containerExpenses,
+        productionMaterials, productionProducts, productionServices,
+        materialPurchases, productionRuns, productionSales,
+        productBom, productionSaleServices, productionSaleExpenses,
+        assets, assetPayments, assetImprovements,
+      ] = await Promise.all([
         supabase.from('containers').select('*').then(r => r.data || []),
         supabase.from('shipments').select('*').then(r => r.data || []),
         supabase.from('shipment_payments').select('*').then(r => r.data || []),
         supabase.from('currencies').select('*').then(r => r.data || []),
         supabase.from('company_settings').select('*').then(r => r.data || []),
+        supabase.from('ledger_accounts').select('*').then(r => r.data || []),
+        supabase.from('container_expenses').select('*').then(r => r.data || []),
+        supabase.from('production_materials').select('*').then(r => r.data || []),
+        supabase.from('production_products').select('*').then(r => r.data || []),
+        (supabase as any).from('production_services').select('*').then((r: any) => r.data || []),
+        supabase.from('material_purchases').select('*').then(r => r.data || []),
+        supabase.from('production_runs').select('*').then(r => r.data || []),
+        supabase.from('production_sales').select('*').then(r => r.data || []),
+        supabase.from('product_bom').select('*').then(r => r.data || []),
+        supabase.from('production_sale_services').select('*').then(r => r.data || []),
+        supabase.from('production_sale_expenses').select('*').then(r => r.data || []),
+        supabase.from('assets').select('*').then(r => r.data || []),
+        supabase.from('asset_payments').select('*').then(r => r.data || []),
+        supabase.from('asset_improvements').select('*').then(r => r.data || []),
       ]);
     } catch (e) {
       console.warn('Error fetching additional tables for backup:', e);
@@ -158,12 +184,26 @@ export function useSupabaseFinance() {
       shipment_payments: shipmentPayments,
       currencies,
       company_settings: companySettings,
+      ledger_accounts: ledgerAccounts,
+      container_expenses: containerExpenses,
+      production_materials: productionMaterials,
+      production_products: productionProducts,
+      production_services: productionServices,
+      material_purchases: materialPurchases,
+      production_runs: productionRuns,
+      production_sales: productionSales,
+      product_bom: productBom,
+      production_sale_services: productionSaleServices,
+      production_sale_expenses: productionSaleExpenses,
+      assets,
+      asset_payments: assetPayments,
+      asset_improvements: assetImprovements,
       backupMeta: {
         companyId: activeRole?.company_id || null,
         exportedByUserId: user.id,
       },
       exportedAt: new Date().toISOString(),
-      backupVersion: 4,
+      backupVersion: 5,
     };
   }, [fetchAllRows, user]);
 
