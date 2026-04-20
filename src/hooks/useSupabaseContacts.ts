@@ -124,12 +124,36 @@ export function useSupabaseContacts() {
     } as any).select().single();
     if (error) { toast.error('خطأ في إضافة جهة الاتصال'); console.error(error); return; }
     toast.success('تم إضافة جهة الاتصال بنجاح');
-    // Log to activity
-    try { await supabase.from('activity_log').insert({ user_id: user.id, event_type: 'contact_created', entity_type: 'contact', entity_id: (data as any)?.id, entity_name: input.name, details: { type: input.type, customType: input.customType }, status: 'active' } as any); } catch {}
+    // تحديث متفائل: أضف الجهة فوراً للقائمة دون انتظار الجلب
+    if (data) {
+      const newContact: Contact = {
+        id: (data as any).id,
+        name: (data as any).name,
+        type: (data as any).type as ContactType,
+        customType: (data as any).custom_type || undefined,
+        phone: (data as any).phone || undefined,
+        email: (data as any).email || undefined,
+        company: (data as any).company || undefined,
+        address: (data as any).address || undefined,
+        notes: (data as any).notes || undefined,
+        parentContactId: (data as any).parent_contact_id || undefined,
+        linkedContacts: (data as any).linked_contacts || undefined,
+        totalTransactions: 0,
+        totalDebit: 0,
+        totalCredit: 0,
+        balance: 0,
+        status: 'active',
+        createdAt: new Date((data as any).created_at),
+        updatedAt: new Date((data as any).updated_at),
+      };
+      setContacts(prev => [newContact, ...prev]);
+      _cachedContacts = null;
+    }
+    // سجل النشاط في الخلفية
+    supabase.from('activity_log').insert({ user_id: user.id, event_type: 'contact_created', entity_type: 'contact', entity_id: (data as any)?.id, entity_name: input.name, details: { type: input.type, customType: input.customType }, status: 'active' } as any).then(() => {}, () => {});
     realtimeRef.current.suppressNext();
-    fetchContacts(true);
     return data;
-  }, [user, fetchContacts]);
+  }, [user]);
 
   const updateContact = useCallback(async (id: string, updates: Partial<Contact>) => {
     if (!user) return;
@@ -145,11 +169,12 @@ export function useSupabaseContacts() {
     }).eq('id', id);
     if (error) { toast.error('خطأ في تحديث جهة الاتصال'); return; }
     toast.success('تم تحديث جهة الاتصال بنجاح');
-    // Log to activity
-    try { await supabase.from('activity_log').insert({ user_id: user.id, event_type: 'contact_updated', entity_type: 'contact', entity_id: id, entity_name: updates.name || '', details: { type: updates.type }, status: 'active' } as any); } catch {}
+    // تحديث متفائل
+    setContacts(prev => prev.map(c => c.id === id ? { ...c, ...updates, updatedAt: new Date() } as Contact : c));
+    _cachedContacts = null;
+    supabase.from('activity_log').insert({ user_id: user.id, event_type: 'contact_updated', entity_type: 'contact', entity_id: id, entity_name: updates.name || '', details: { type: updates.type }, status: 'active' } as any).then(() => {}, () => {});
     realtimeRef.current.suppressNext();
-    fetchContacts(true);
-  }, [user, fetchContacts]);
+  }, [user]);
 
   const deleteContact = useCallback(async (id: string) => {
     if (!user) return;
@@ -158,13 +183,13 @@ export function useSupabaseContacts() {
     const { error } = await supabase.from('contacts').delete().eq('id', id);
     if (error) { toast.error('خطأ في حذف جهة الاتصال'); return; }
     toast.success('تم حذف جهة الاتصال');
-    // Log deletion to activity
+    setContacts(prev => prev.filter(c => c.id !== id));
+    _cachedContacts = null;
     if (contact) {
-      try { await supabase.from('activity_log').insert({ user_id: user.id, event_type: 'contact_deleted', entity_type: 'contact', entity_id: id, entity_name: contact.name, details: { type: contact.type, balance: contact.balance }, status: 'deleted' } as any); } catch {}
+      supabase.from('activity_log').insert({ user_id: user.id, event_type: 'contact_deleted', entity_type: 'contact', entity_id: id, entity_name: contact.name, details: { type: contact.type, balance: contact.balance }, status: 'deleted' } as any).then(() => {}, () => {});
     }
     realtimeRef.current.suppressNext();
-    fetchContacts(true);
-  }, [user, contacts, fetchContacts]);
+  }, [user, contacts]);
 
   // مزامنة أرصدة الحسابات من الدفتر الموحد (v_contact_balance)
   const syncBalances = useCallback(async () => {
