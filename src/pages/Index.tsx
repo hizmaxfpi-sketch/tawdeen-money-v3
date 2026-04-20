@@ -30,6 +30,8 @@ import { useEnabledModules, ModuleKey } from '@/hooks/useEnabledModules';
 import { TransactionType, Transaction } from '@/types/finance';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { useLanguage } from '@/i18n/LanguageContext';
+import { cn } from '@/lib/utils';
 
 type PageType = 'home' | 'funds' | 'accounts' | 'projects' | 'reports' | 'shipping' | 'business' | 'production';
 
@@ -58,7 +60,7 @@ function ListSkeleton() {
 
 const Index = () => {
   const { user } = useAuth();
-  const { dir } = useLanguage();
+  const { dir, t } = useLanguage();
   const { canEdit: roleCanEdit, isViewer } = useUserRole();
   const perms = useUserPermissions();
   const { isEnabled, enabled: enabledModules, loading: modulesLoading } = useEnabledModules();
