@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Package, Trash2, ShoppingCart, Edit2, Eye } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, Package, Trash2, ShoppingCart, Edit2, Eye, Search, X } from 'lucide-react';
 import { ProductionPreviewDialog } from './ProductionPreviewDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
