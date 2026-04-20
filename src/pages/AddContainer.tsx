@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { ContainerType, ContainerStatus } from '@/types/finance';
-import { CONTAINER_CAPACITIES } from '@/hooks/useShippingStore';
+import { CONTAINER_CAPACITIES } from '@/constants/shipping';
 import { ORIGIN_COUNTRIES, DESTINATION_COUNTRIES } from '@/types/shipping-extended';
 import { useSupabaseShipping } from '@/hooks/useSupabaseShipping';
 import { supabase } from '@/integrations/supabase/client';

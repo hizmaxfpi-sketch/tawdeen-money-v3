@@ -14,7 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { ContainerType, ContainerStatus } from '@/types/finance';
-import { CONTAINER_CAPACITIES } from '@/hooks/useShippingStore';
+import { CONTAINER_CAPACITIES } from '@/constants/shipping';
 import { SearchableCountrySelect } from '@/components/shared/SearchableCountrySelect';
 import { POPULAR_ORIGIN_IDS, POPULAR_DESTINATION_IDS, getCountryLabel } from '@/data/countries';
 import { supabase } from '@/integrations/supabase/client';

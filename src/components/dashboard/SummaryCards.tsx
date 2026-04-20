@@ -4,6 +4,7 @@ import { FinanceStats, Transaction } from '@/types/finance';
 import { Currency } from '@/hooks/useCurrencies';
 import { cn } from '@/lib/utils';
 import { convertForDisplay, getCurrencySymbol } from '@/components/shared/CurrencyDisplaySelector';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 interface SummaryCardsProps {
   stats: FinanceStats;
@@ -41,6 +42,7 @@ export function SummaryCards({
   showProjects = true, showShipping = true,
   showProduction = false, productionSales = 0, productionMaterialsValue = 0, productionProductsValue = 0,
 }: SummaryCardsProps) {
+  const { t } = useLanguage();
   const cashTxs = fundTransactions || [];
   const fundIn = cashTxs.reduce((sum, tx) => tx.type === 'in' ? sum + tx.amount : sum, 0);
   const fundOut = cashTxs.reduce((sum, tx) => tx.type === 'out' ? sum + tx.amount : sum, 0);
@@ -59,46 +61,46 @@ export function SummaryCards({
 
   const allRows = [
     showLedger && {
-      label: 'الحسابات الدفترية',
+      label: t('nav.ledger'),
       cards: [
-        { key: 'ledger-debit', label: 'مدين', value: conv(ledgerDebit), icon: TrendingUp, colorClass: 'text-income', gradient: 'bg-gradient-income' },
-        { key: 'ledger-credit', label: 'دائن', value: conv(ledgerCredit), icon: TrendingDown, colorClass: 'text-expense', gradient: 'bg-gradient-expense' },
-        { key: 'ledger-net', label: 'الصافي', value: conv(ledgerNet), icon: BookOpen, colorClass: 'text-primary', gradient: 'bg-gradient-primary' },
+        { key: 'ledger-debit', label: t('tx.debit'), value: conv(ledgerDebit), icon: TrendingUp, colorClass: 'text-income', gradient: 'bg-gradient-income' },
+        { key: 'ledger-credit', label: t('tx.credit'), value: conv(ledgerCredit), icon: TrendingDown, colorClass: 'text-expense', gradient: 'bg-gradient-expense' },
+        { key: 'ledger-net', label: t('common.net'), value: conv(ledgerNet), icon: BookOpen, colorClass: 'text-primary', gradient: 'bg-gradient-primary' },
       ],
     },
     showFunds && {
-      label: 'حركة الصناديق',
+      label: t('funds.title'),
       cards: [
-        { key: 'fund-in', label: 'الداخل', value: conv(fundIn), icon: ArrowDownLeft, colorClass: 'text-income', gradient: 'bg-gradient-income' },
-        { key: 'fund-out', label: 'الخارج', value: conv(fundOut), icon: ArrowUpRight, colorClass: 'text-expense', gradient: 'bg-gradient-expense' },
-        { key: 'fund-remaining', label: 'المتبقي', value: conv(fundRemaining), icon: Wallet, colorClass: 'text-primary', gradient: 'bg-gradient-primary' },
+        { key: 'fund-in', label: t('common.in'), value: conv(fundIn), icon: ArrowDownLeft, colorClass: 'text-income', gradient: 'bg-gradient-income' },
+        { key: 'fund-out', label: t('common.out'), value: conv(fundOut), icon: ArrowUpRight, colorClass: 'text-expense', gradient: 'bg-gradient-expense' },
+        { key: 'fund-remaining', label: t('common.net'), value: conv(fundRemaining), icon: Wallet, colorClass: 'text-primary', gradient: 'bg-gradient-primary' },
       ],
     },
     showBusiness && {
-      label: 'الأعمال',
+      label: t('nav.business'),
       cards: [
-        { key: 'biz-revenue', label: 'الإيرادات', value: conv(totalRevenue), icon: DollarSign, colorClass: 'text-income', gradient: 'bg-gradient-income' },
-        { key: 'biz-expenses', label: 'المصاريف', value: conv(businessExpenses), icon: TrendingDown, colorClass: 'text-expense', gradient: 'bg-gradient-expense', onClick: onExpensesClick },
-        { key: 'biz-profit', label: 'صافي الربح', value: conv(netProfit), icon: Calculator, colorClass: netProfit >= 0 ? 'text-income' : 'text-expense', gradient: 'bg-gradient-primary' },
+        { key: 'biz-revenue', label: t('common.revenue'), value: conv(totalRevenue), icon: DollarSign, colorClass: 'text-income', gradient: 'bg-gradient-income' },
+        { key: 'biz-expenses', label: t('common.expenses'), value: conv(businessExpenses), icon: TrendingDown, colorClass: 'text-expense', gradient: 'bg-gradient-expense', onClick: onExpensesClick },
+        { key: 'biz-profit', label: t('dashboard.netProfit'), value: conv(netProfit), icon: Calculator, colorClass: netProfit >= 0 ? 'text-income' : 'text-expense', gradient: 'bg-gradient-primary' },
       ],
     },
     showProduction && {
-      label: 'الإنتاج',
+      label: t('nav.production'),
       cards: [
-        { key: 'prod-materials', label: 'مخزون المواد', value: conv(productionMaterialsValue), icon: Boxes, colorClass: 'text-primary', gradient: 'bg-gradient-primary' },
-        { key: 'prod-products', label: 'مخزون المنتجات', value: conv(productionProductsValue), icon: Package, colorClass: 'text-primary', gradient: 'bg-gradient-primary' },
-        { key: 'prod-sales', label: 'المبيعات', value: conv(productionSales), icon: ShoppingBag, colorClass: 'text-income', gradient: 'bg-gradient-income' },
+        { key: 'prod-materials', label: t('common.materials'), value: conv(productionMaterialsValue), icon: Boxes, colorClass: 'text-primary', gradient: 'bg-gradient-primary' },
+        { key: 'prod-products', label: t('common.products'), value: conv(productionProductsValue), icon: Package, colorClass: 'text-primary', gradient: 'bg-gradient-primary' },
+        { key: 'prod-sales', label: t('common.sales'), value: conv(productionSales), icon: ShoppingBag, colorClass: 'text-income', gradient: 'bg-gradient-income' },
       ],
     },
   ];
   const rows = allRows.filter(Boolean) as Array<{ label: string; cards: any[] }>;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       {rows.map((row, ri) => (
         <div key={row.label}>
-          <p className="text-[10px] text-muted-foreground mb-1 font-medium">{row.label}</p>
-          <div className="grid grid-cols-3 gap-2">
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">{row.label}</p>
+          <div className="grid grid-cols-3 gap-3">
             {row.cards.map((card, ci) => {
               const Icon = card.icon;
               const isClickable = !!(card as any).onClick;

@@ -1,12 +1,14 @@
 import { motion } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChartData } from '@/types/finance';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 interface ExpenseChartProps {
   data: ChartData[];
 }
 
 export function ExpenseChart({ data }: ExpenseChartProps) {
+  const { t, language } = useLanguage();
   const total = data.reduce((sum, item) => sum + item.value, 0);
   
   const formattedData = data.map((item, index) => ({
@@ -36,7 +38,7 @@ export function ExpenseChart({ data }: ExpenseChartProps) {
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: number) => [`${value.toLocaleString('ar-SA')} $`, 'المبلغ']}
+              formatter={(value: number) => [`${value.toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US')} $`, t('tx.amount')]}
               contentStyle={{
                 backgroundColor: 'hsl(var(--card))',
                 border: '1px solid hsl(var(--border))',

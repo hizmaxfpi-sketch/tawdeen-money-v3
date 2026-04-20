@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { LedgerAccount, Container, GoodsCategory } from '@/types/finance';
 import { ContactOption, CreateContactInput } from '@/types/contacts';
-import { COMMON_PRICES, GOODS_CATEGORIES } from '@/hooks/useShippingStore';
+import { COMMON_PRICES, GOODS_CATEGORIES } from '@/constants/shipping';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ShipmentOCRScanner } from './ShipmentOCRScanner';

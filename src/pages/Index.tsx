@@ -5,6 +5,7 @@ import { AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { Sidebar } from '@/components/layout/Sidebar';
 import { FloatingAddButton } from '@/components/layout/FloatingAddButton';
 import { Dashboard } from '@/components/dashboard/Dashboard';
 import { FundsPage } from '@/components/funds/FundsPage';
@@ -57,6 +58,7 @@ function ListSkeleton() {
 
 const Index = () => {
   const { user } = useAuth();
+  const { dir } = useLanguage();
   const { canEdit: roleCanEdit, isViewer } = useUserRole();
   const perms = useUserPermissions();
   const { isEnabled, enabled: enabledModules, loading: modulesLoading } = useEnabledModules();
@@ -89,10 +91,10 @@ const Index = () => {
     if (sessionStorage.getItem('tawdeen-show-update-toast') === 'true') {
       sessionStorage.removeItem('tawdeen-show-update-toast');
       setTimeout(() => {
-        toast.success('تم تحديث توطين للنسخة 3.0 - قسم الأعمال + الأصول + لوحة تحكم محسّنة', { duration: 5000 });
+        toast.success(t('system.updateToast3'), { duration: 5000 });
       }, 1500);
     }
-  }, []);
+  }, [t]);
 
   const {
     funds, fundsLoading, transactions, transactionsLoading,
@@ -186,7 +188,7 @@ const Index = () => {
     if (currentPage !== 'home' && !isEnabled(currentPage as ModuleKey)) {
       return (
         <div className="text-center py-12 text-muted-foreground text-sm">
-          هذا القسم غير مفعّل لشركتك. تواصل مع المنصة للتفعيل.
+          {t('system.moduleDisabled')}
         </div>
       );
     }
@@ -286,13 +288,22 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="container max-w-lg mx-auto px-3 py-3 pb-24">
-        {renderPage()}
-      </main>
-      {!showTransactionForm && perms.canCreate('transactions') && <FloatingAddButton onClick={() => handleOpenForm('in')} />}
-      <BottomNav currentPage={currentPage} onNavigate={handleNavigate} />
+    <div className="min-h-screen bg-background flex flex-col md:flex-row">
+      <Sidebar currentPage={currentPage} onNavigate={handleNavigate} />
+
+      <div className={cn(
+        "flex-1 flex flex-col min-h-screen transition-all duration-300",
+        dir === 'rtl' ? "md:mr-64" : "md:ml-64"
+      )}>
+        <Header />
+        <main className="container max-w-lg mx-auto px-3 py-3 pb-24 md:max-w-4xl lg:max-w-5xl">
+          {renderPage()}
+        </main>
+        {!showTransactionForm && perms.canCreate('transactions') && <FloatingAddButton onClick={() => handleOpenForm('in')} />}
+        <div className="md:hidden">
+          <BottomNav currentPage={currentPage} onNavigate={handleNavigate} />
+        </div>
+      </div>
 
       <AnimatePresence>
         {showTransactionForm && perms.canCreate('transactions') && (

@@ -32,8 +32,8 @@ export function Header() {
           <div className="flex items-center gap-2">
             <img src={logo} alt="توطين" className="h-8 w-8 rounded-lg object-contain" />
             <div>
-              <h1 className="text-sm font-bold leading-tight">توطين</h1>
-              <p className="text-[9px] opacity-80 leading-tight">{t('brand.slogan')} <span className="opacity-60">v2.9</span></p>
+              <h1 className="text-sm font-bold leading-tight">{t('brand.name')}</h1>
+              <p className="text-[9px] opacity-80 leading-tight">{t('brand.slogan')} <span className="opacity-60">v3.0</span></p>
             </div>
           </div>
           

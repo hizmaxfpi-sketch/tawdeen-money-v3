@@ -58,7 +58,7 @@ export function Dashboard({
   const { t } = useLanguage();
 
   return (
-    <div className="space-y-3 py-3 animate-fade-in">
+    <div className="space-y-4 py-3 animate-fade-in">
       <SummaryCards
         stats={stats}
         fundTransactions={transactions}
@@ -129,7 +129,6 @@ export function Dashboard({
 
       <UnifiedTransactionLog 
         transactions={transactions} 
-        title="الحركات المالية"
         onEditTransaction={onEditTransaction}
         onDeleteTransaction={onDeleteTransaction}
         showDateRange={true}

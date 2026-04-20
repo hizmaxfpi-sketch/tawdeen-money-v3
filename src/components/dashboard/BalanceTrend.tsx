@@ -1,11 +1,13 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendData } from '@/types/finance';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 interface BalanceTrendProps {
   data: TrendData[];
 }
 
 export function BalanceTrend({ data }: BalanceTrendProps) {
+  const { t, language } = useLanguage();
   return (
     <div className="h-48">
       <ResponsiveContainer width="100%" height="100%">
@@ -23,8 +25,8 @@ export function BalanceTrend({ data }: BalanceTrendProps) {
           />
           <Tooltip
             formatter={(value: number, name: string) => [
-              `${value.toLocaleString('ar-SA')} $`,
-              name === 'income' ? 'مدين' : name === 'expense' ? 'دائن' : 'الرصيد'
+              `${value.toLocaleString(language === 'ar' ? 'ar-SA' : 'en-US')} $`,
+              name === 'income' ? t('tx.debit') : name === 'expense' ? t('tx.credit') : t('common.net')
             ]}
             contentStyle={{
               backgroundColor: 'hsl(var(--card))',
@@ -35,7 +37,7 @@ export function BalanceTrend({ data }: BalanceTrendProps) {
             }}
           />
           <Legend 
-            formatter={(value) => value === 'income' ? 'مدين' : value === 'expense' ? 'دائن' : 'الرصيد'}
+            formatter={(value) => value === 'income' ? t('tx.debit') : value === 'expense' ? t('tx.credit') : t('common.net')}
             wrapperStyle={{ fontFamily: 'Tajawal', fontSize: '10px' }}
           />
           <Line
