@@ -47,16 +47,26 @@ Deno.serve(async (req) => {
     const userId = user.id;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify platform admin status
-    const { data: adminData, error: adminError } = await supabase
-      .from("platform_admins")
-      .select("id")
-      .eq("user_id", userId)
-      .maybeSingle();
+    // Verify authorization: platform admin OR company admin/owner can restore
+    const [{ data: platformAdmin }, { data: roleRow }] = await Promise.all([
+      supabase.from("platform_admins").select("id").eq("user_id", userId).maybeSingle(),
+      supabase
+        .from("user_roles")
+        .select("role, company_id, is_active")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .maybeSingle(),
+    ]);
 
-    if (adminError || !adminData) {
-      console.warn(`Unauthorized restore attempt by user ${userId}`);
-      return new Response(JSON.stringify({ error: "Unauthorized: Platform admin privileges required" }), {
+    const isPlatformAdmin = !!platformAdmin;
+    const userRole = (roleRow as any)?.role as string | undefined;
+    const isCompanyAdmin = userRole === "admin" || userRole === "owner";
+
+    if (!isPlatformAdmin && !isCompanyAdmin) {
+      console.warn(`Unauthorized restore attempt by user ${userId} (role=${userRole ?? 'none'})`);
+      return new Response(JSON.stringify({
+        error: "غير مصرح: تحتاج صلاحيات مدير الشركة أو المسؤول العام لاستعادة النسخ الاحتياطية",
+      }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
