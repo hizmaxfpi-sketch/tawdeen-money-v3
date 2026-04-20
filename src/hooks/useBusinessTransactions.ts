@@ -21,6 +21,7 @@ export const EXPENSE_CATEGORIES = [
   { value: 'transport', label: 'نقل' },
   { value: 'maintenance', label: 'صيانة' },
   { value: 'asset_depreciation', label: 'إهلاك أصول' },
+  { value: 'production_expense', label: 'مصروف بيع إنتاج' },
   { value: 'business_expense', label: 'مصروف عام' },
   { value: 'other_expense', label: 'مصروف آخر' },
 ];
