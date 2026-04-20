@@ -1,5 +1,6 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
 import { ArrowRight, TrendingUp, TrendingDown, Wallet, Landmark, CreditCard, Eye, Scale, Edit2, Trash2, RefreshCw } from 'lucide-react';
 import { Fund, Transaction, FundType } from '@/types/finance';
