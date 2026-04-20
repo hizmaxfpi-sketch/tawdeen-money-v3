@@ -115,15 +115,14 @@ export function useSupabaseFinance() {
 
     // Fetch additional tables for complete backup
     let containers: any[] = [], shipments: any[] = [], shipmentPayments: any[] = [];
-    let currencies: any[] = [], companySettings: any[] = [], ledgerAccounts: any[] = [];
+    let currencies: any[] = [], companySettings: any[] = [];
     try {
-      [containers, shipments, shipmentPayments, currencies, companySettings, ledgerAccounts] = await Promise.all([
+      [containers, shipments, shipmentPayments, currencies, companySettings] = await Promise.all([
         supabase.from('containers').select('*').then(r => r.data || []),
         supabase.from('shipments').select('*').then(r => r.data || []),
         supabase.from('shipment_payments').select('*').then(r => r.data || []),
         supabase.from('currencies').select('*').then(r => r.data || []),
         supabase.from('company_settings').select('*').then(r => r.data || []),
-        supabase.from('ledger_accounts').select('*').then(r => r.data || []),
       ]);
     } catch (e) {
       console.warn('Error fetching additional tables for backup:', e);
@@ -159,7 +158,6 @@ export function useSupabaseFinance() {
       shipment_payments: shipmentPayments,
       currencies,
       company_settings: companySettings,
-      ledger_accounts: ledgerAccounts,
       backupMeta: {
         companyId: activeRole?.company_id || null,
         exportedByUserId: user.id,

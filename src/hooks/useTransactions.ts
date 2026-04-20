@@ -14,8 +14,7 @@ const logToActivity = async (userId: string, eventType: string, entityType: stri
   try { await supabase.from('activity_log').insert({ user_id: userId, event_type: eventType, entity_type: entityType, entity_id: entityId, entity_name: entityName, details, status } as any); } catch {}
 };
 
-const FETCH_BATCH_SIZE = 500;
-const MAX_FETCH_ROWS = 1000; // حد أقصى للجلب الأولي
+const PAGE_SIZE = 50;
 
 // كاش بسيط لمنع إعادة الجلب عند التنقل بين الصفحات
 let _cachedTransactions: any[] | null = null;
@@ -27,84 +26,92 @@ export function useTransactions() {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>(() => cacheGet<Transaction[]>('transactions') || []);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
   const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
 
-  const fetchTransactions = useCallback(async (_reset = false) => {
+  const mapTransaction = (t: any): Transaction => ({
+    id: t.id,
+    type: t.type as TransactionType,
+    category: t.category as TransactionCategory,
+    amount: Number(t.amount),
+    description: t.description || '',
+    date: t.date,
+    fundId: t.fund_id || '',
+    accountId: t.account_id || undefined,
+    contactId: t.contact_id || undefined,
+    projectId: t.project_id || undefined,
+    notes: t.notes || undefined,
+    attachment: t.attachments?.[0] || undefined,
+    currencyCode: t.currency_code || 'USD',
+    exchangeRate: Number(t.exchange_rate || 1),
+    toFundId: undefined,
+    sourceType: t.source_type || 'manual',
+    createdByName: t.created_by_name || undefined,
+    createdAt: new Date(t.created_at),
+  });
+
+  const fetchTransactions = useCallback(async (reset = false) => {
     if (!user) return;
 
-    // استخدام الكاش إذا كان حديثاً
-    if (!_reset && _cachedTransactions && _cacheUserId === user.id && (Date.now() - _cacheTime) < CACHE_TTL) {
+    const currentPage = reset ? 0 : page;
+
+    // استخدام الكاش إذا كان حديثاً والطلب ليس لإعادة الضبط
+    if (!reset && currentPage === 0 && _cachedTransactions && _cacheUserId === user.id && (Date.now() - _cacheTime) < CACHE_TTL) {
       setTransactions(_cachedTransactions as any);
-      if (loading) setLoading(false);
+      setLoading(false);
       setInitialLoaded(true);
       return;
     }
 
-    // Only show loading spinner on first load, not on refetch
-    if (!initialLoaded) setLoading(true);
+    if (reset || !initialLoaded) setLoading(true);
+    else setLoadingMore(true);
 
-    const allRows: any[] = [];
-    let from = 0;
-    let keepFetching = true;
+    const from = currentPage * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
 
-    while (keepFetching && from < MAX_FETCH_ROWS) {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('id, type, category, amount, description, date, fund_id, account_id, contact_id, project_id, notes, attachments, created_at, currency_code, exchange_rate, source_type, created_by_name')
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .range(from, from + FETCH_BATCH_SIZE - 1);
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('id, type, category, amount, description, date, fund_id, account_id, contact_id, project_id, notes, attachments, created_at, currency_code, exchange_rate, source_type, created_by_name')
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
-      if (error) {
-        console.error('Error fetching transactions:', error);
-        keepFetching = false;
-        break;
-      }
-
-      const batch = data || [];
-      allRows.push(...batch);
-      keepFetching = batch.length === FETCH_BATCH_SIZE;
-      from += FETCH_BATCH_SIZE;
+    if (error) {
+      console.error('Error fetching transactions:', error);
+      toast.error('خطأ في جلب البيانات');
+      setLoading(false);
+      setLoadingMore(false);
+      return;
     }
 
-    const mapped = allRows
-      .map(t => ({
-        id: t.id,
-        type: t.type as TransactionType,
-        category: t.category as TransactionCategory,
-        amount: Number(t.amount),
-        description: t.description || '',
-        date: t.date,
-        fundId: t.fund_id || '',
-        accountId: t.account_id || undefined,
-        contactId: t.contact_id || undefined,
-        projectId: t.project_id || undefined,
-        notes: t.notes || undefined,
-        attachment: t.attachments?.[0] || undefined,
-        currencyCode: t.currency_code || 'USD',
-        exchangeRate: Number(t.exchange_rate || 1),
-        toFundId: undefined,
-        sourceType: t.source_type || 'manual',
-        createdByName: t.created_by_name || undefined,
-        createdAt: new Date(t.created_at),
-      }))
-      .sort(compareTransactionsByBusinessDateDesc);
+    const mapped = (data || []).map(mapTransaction);
 
-    setTransactions(mapped);
-    cacheSet('transactions', mapped);
-    _cachedTransactions = mapped;
-    _cacheUserId = user.id;
-    _cacheTime = Date.now();
-    setHasMore(false);
+    if (reset || currentPage === 0) {
+      setTransactions(mapped);
+      cacheSet('transactions', mapped);
+      _cachedTransactions = mapped;
+      _cacheUserId = user.id;
+      _cacheTime = Date.now();
+      setPage(0);
+    } else {
+      setTransactions(prev => {
+        const combined = [...prev, ...mapped];
+        return combined.sort(compareTransactionsByBusinessDateDesc);
+      });
+    }
+
+    setHasMore((data || []).length === PAGE_SIZE);
     setLoading(false);
+    setLoadingMore(false);
     setInitialLoaded(true);
-  }, [user]);
+  }, [user, page, initialLoaded]);
 
   useEffect(() => {
     if (user) fetchTransactions(true);
-  }, [user, fetchTransactions]);
+  }, [user]);
 
   // Realtime: auto-refresh when transactions change
   const rt = useRealtimeSync(['transactions'], () => {
@@ -115,8 +122,16 @@ export function useTransactions() {
   realtimeRef.current = rt;
 
   const loadMore = useCallback(() => {
-    return;
-  }, []);
+    if (!loading && !loadingMore && hasMore) {
+      setPage(prev => prev + 1);
+    }
+  }, [loading, loadingMore, hasMore]);
+
+  useEffect(() => {
+    if (page > 0) {
+      fetchTransactions();
+    }
+  }, [page]);
 
   // استخدام RPC للذرية
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'> & { contactId?: string; currencyCode?: string; exchangeRate?: number }) => {
@@ -216,7 +231,7 @@ export function useTransactions() {
   const getExpenseBreakdown = useCallback((): ChartData[] => calculateExpenseBreakdown(transactions), [transactions]);
 
   return {
-    transactions, loading, initialLoaded, hasMore,
+    transactions, loading, loadingMore, initialLoaded, hasMore,
     addTransaction, updateTransaction, deleteTransaction, loadMore,
     getMonthlyTrend, getExpenseBreakdown,
     fetchTransactions,

@@ -4,6 +4,7 @@ import { TrendingUp, Edit3, X, Check, RefreshCw } from 'lucide-react';
 import { Currency, CURRENCY_FLAGS } from '@/hooks/useCurrencies';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 interface MarketRatesWidgetProps {
   currencies: Currency[];
@@ -19,6 +20,7 @@ const QuickEditModal = memo(({
   onUpdateRate: (id: string, rate: number) => void; 
   onClose: () => void;
 }) => {
+  const { t } = useLanguage();
   const [rates, setRates] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     currencies.filter(c => c.code !== 'USD').forEach(c => {
@@ -58,7 +60,7 @@ const QuickEditModal = memo(({
         <div className="flex items-center justify-between p-3 border-b border-border">
           <div className="flex items-center gap-2">
             <RefreshCw className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-bold">تحديث أسعار الصرف</h3>
+            <h3 className="text-sm font-bold">{t('funds.updateRates')}</h3>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-muted rounded">
             <X className="h-4 w-4" />
@@ -94,14 +96,14 @@ const QuickEditModal = memo(({
             onClick={onClose}
             className="flex-1 h-8 rounded-lg border border-border text-xs font-medium hover:bg-muted transition-colors"
           >
-            إلغاء
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSaveAll}
             className="flex-1 h-8 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
           >
             <Check className="h-3 w-3" />
-            حفظ الجميع
+            {t('funds.saveAll')}
           </button>
         </div>
       </motion.div>
@@ -112,6 +114,7 @@ const QuickEditModal = memo(({
 QuickEditModal.displayName = 'QuickEditModal';
 
 export const MarketRatesWidget = memo(({ currencies, onUpdateRate }: MarketRatesWidgetProps) => {
+  const { t } = useLanguage();
   const [showQuickEdit, setShowQuickEdit] = useState(false);
   const nonUsdCurrencies = currencies.filter(c => c.code !== 'USD');
 
@@ -127,14 +130,14 @@ export const MarketRatesWidget = memo(({ currencies, onUpdateRate }: MarketRates
         <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-1.5">
             <TrendingUp className="h-3.5 w-3.5 text-primary" />
-            <h3 className="text-xs font-bold">أسعار الصرف اليوم</h3>
+            <h3 className="text-xs font-bold">{t('funds.todayRates')}</h3>
           </div>
           <button
             onClick={() => setShowQuickEdit(true)}
             className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors font-medium"
           >
             <Edit3 className="h-3 w-3" />
-            تعديل سريع
+            {t('funds.quickEdit')}
           </button>
         </div>
 

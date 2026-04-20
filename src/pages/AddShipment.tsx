@@ -13,7 +13,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useSupabaseShipping } from '@/hooks/useSupabaseShipping';
 import { useSupabaseFinance } from '@/hooks/useSupabaseFinance';
 import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
-import { COMMON_PRICES, GOODS_CATEGORIES } from '@/hooks/useShippingStore';
+import { COMMON_PRICES, GOODS_CATEGORIES } from '@/constants/shipping';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ShipmentOCRScanner } from '@/components/shipping/ShipmentOCRScanner';

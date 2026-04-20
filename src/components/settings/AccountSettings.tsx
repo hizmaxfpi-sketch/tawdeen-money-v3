@@ -18,20 +18,20 @@ export function AccountSettings() {
 
   const handleChangePassword = async () => {
     if (newPassword.length < 6) {
-      toast.error('كلمة السر يجب أن تكون 6 أحرف على الأقل');
+      toast.error(t('auth.passwordMinError'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error('كلمات السر غير متطابقة');
+      toast.error(t('auth.passwordMismatchError'));
       return;
     }
     setSaving('password');
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setSaving(null);
     if (error) {
-      toast.error('فشل تغيير كلمة السر: ' + error.message);
+      toast.error(t('common.error') + ': ' + error.message);
     } else {
-      toast.success('تم تغيير كلمة السر بنجاح');
+      toast.success(t('common.success'));
       setNewPassword('');
       setConfirmPassword('');
     }
@@ -39,23 +39,23 @@ export function AccountSettings() {
 
   const handleChangeEmail = async () => {
     if (!newEmail || !newEmail.includes('@')) {
-      toast.error('أدخل بريد إلكتروني صحيح');
+      toast.error(t('auth.emailInvalid'));
       return;
     }
     setSaving('email');
     const { error } = await supabase.auth.updateUser({ email: newEmail });
     setSaving(null);
     if (error) {
-      toast.error('فشل تغيير البريد: ' + error.message);
+      toast.error(t('common.error') + ': ' + error.message);
     } else {
-      toast.success('تم إرسال رابط التأكيد إلى البريد الجديد');
+      toast.success(t('auth.emailUpdateSuccess'));
       setNewEmail('');
     }
   };
 
   const handleUpdateName = async () => {
     if (!fullName.trim()) {
-      toast.error('أدخل الاسم');
+      toast.error(t('auth.nameRequired'));
       return;
     }
     setSaving('name');
@@ -65,26 +65,26 @@ export function AccountSettings() {
     }
     setSaving(null);
     if (authError) {
-      toast.error('فشل تحديث الاسم');
+      toast.error(t('common.error'));
     } else {
-      toast.success('تم تحديث الاسم بنجاح');
+      toast.success(t('common.success'));
     }
   };
 
   return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-4">
       {/* Display Name */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
-            <User className="h-4 w-4" /> الاسم الكامل
+            <User className="h-4 w-4" /> {t('auth.fullName')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="الاسم الكامل" />
+          <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder={t('auth.fullName')} />
           <Button size="sm" onClick={handleUpdateName} disabled={saving === 'name'} className="w-full gap-2">
             {saving === 'name' ? <Loader2 className="h-4 w-4 animate-spin" /> : <User className="h-4 w-4" />}
-            تحديث الاسم
+            {t('auth.updateName')}
           </Button>
         </CardContent>
       </Card>
@@ -93,21 +93,21 @@ export function AccountSettings() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
-            <KeyRound className="h-4 w-4" /> تغيير كلمة السر
+            <KeyRound className="h-4 w-4" /> {t('settings.darkMode') === 'Dark Mode' ? 'Change Password' : 'تغيير كلمة السر'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2">
-            <Label>كلمة السر الجديدة</Label>
-            <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="كلمة السر الجديدة" dir="ltr" />
+            <Label>{t('auth.newPassword')}</Label>
+            <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder={t('auth.newPassword')} dir="ltr" />
           </div>
           <div className="space-y-2">
-            <Label>تأكيد كلمة السر</Label>
-            <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="أعد كتابة كلمة السر" dir="ltr" />
+            <Label>{t('auth.confirmNewPassword')}</Label>
+            <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder={t('auth.confirmNewPassword')} dir="ltr" />
           </div>
           <Button size="sm" onClick={handleChangePassword} disabled={saving === 'password'} className="w-full gap-2">
             {saving === 'password' ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-            تغيير كلمة السر
+            {t('settings.darkMode') === 'Dark Mode' ? 'Change Password' : 'تغيير كلمة السر'}
           </Button>
         </CardContent>
       </Card>
@@ -116,15 +116,15 @@ export function AccountSettings() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Mail className="h-4 w-4" /> تغيير البريد الإلكتروني
+            <Mail className="h-4 w-4" /> {t('auth.updateEmail')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-xs text-muted-foreground">البريد الحالي: <span dir="ltr" className="font-mono">{user?.email}</span></p>
-          <Input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="البريد الجديد" dir="ltr" />
+          <p className="text-xs text-muted-foreground">{t('auth.currentEmail')}: <span dir="ltr" className="font-mono">{user?.email}</span></p>
+          <Input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder={t('auth.email')} dir="ltr" />
           <Button size="sm" onClick={handleChangeEmail} disabled={saving === 'email'} className="w-full gap-2">
             {saving === 'email' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-            تغيير البريد
+            {t('auth.updateEmail')}
           </Button>
         </CardContent>
       </Card>

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowUpCircle, ArrowDownCircle, Filter, Search, ChevronDown, Edit3, Download, FileText, FileSpreadsheet, Trash2, X, Paperclip, Eye, Calendar, Printer, Globe } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Filter, Search, ChevronDown, Edit3, Download, FileText, FileSpreadsheet, Trash2, X, Paperclip, Eye, Calendar, Printer, Globe, Ship, Briefcase, ArrowLeftRight, Landmark } from 'lucide-react';
 import { generateHDPreviewPDF } from '@/utils/hdPreview';
 import { cn } from '@/lib/utils';
 import { Transaction } from '@/types/finance';
@@ -35,6 +35,7 @@ import {
 import { toast } from 'sonner';
 import { TransactionHDPreview } from './TransactionHDPreview';
 import { usePersistedFilter } from '@/hooks/usePersistedFilters';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 interface UnifiedTransactionLogProps {
   transactions: Transaction[];
@@ -54,7 +55,7 @@ interface UnifiedTransactionLogProps {
 
 export function UnifiedTransactionLog({ 
   transactions, 
-  title = 'سجل العمليات',
+  title,
   showExport = true,
   showDateRange = false,
   showPreviewButton = false,
@@ -67,6 +68,7 @@ export function UnifiedTransactionLog({
   displayCurrencyCode = 'USD',
   onDisplayCurrencyChange,
 }: UnifiedTransactionLogProps) {
+  const { t, language } = useLanguage();
   const [filter, setFilter] = usePersistedFilter<'all' | 'in' | 'out'>('txlog-filter', 'all');
   const [search, setSearch] = usePersistedFilter('txlog-search', '');
   const [showFilters, setShowFilters] = useState(false);
@@ -79,6 +81,8 @@ export function UnifiedTransactionLog({
   const [dateTo, setDateTo] = usePersistedFilter('txlog-dateto', '');
   const containerRef = useRef<HTMLDivElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
+
+  const displayTitle = title || t('reports.transactionLog');
 
   const filteredTransactions = transactions
     .filter(t => {
@@ -120,26 +124,11 @@ export function UnifiedTransactionLog({
   };
 
   const formatFullDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' });
+    return new Date(dateStr).toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
   const getCategoryLabel = (category: string) => {
-    const labels: Record<string, string> = {
-      client_collection: 'تحصيل',
-      vendor_payment: 'صرف مورد',
-      expense: 'مصروفات',
-      partner_payment: 'صرف شريك',
-      partner_collection: 'تحصيل شريك',
-      fund_transfer: 'تحويل',
-      debt_payment: 'سداد دين',
-      debt_collection: 'تحصيل دين',
-      ledger_debit: 'قيد مدين',
-      ledger_credit: 'قيد دائن',
-      production_expense: 'مصروف بيع إنتاج',
-      production_cogs: 'تكلفة مواد مباعة',
-      other: 'أخرى',
-    };
-    return labels[category] || category;
+    return t(`category.${category}`);
   };
 
   const formatDescription = (tx: Transaction): string => {
@@ -155,26 +144,33 @@ export function UnifiedTransactionLog({
     return desc;
   };
   const getSourceLabel = (sourceType: string): string => {
-    const labels: Record<string, string> = {
-      manual: 'يدوي',
-      shipment_invoice: 'شحنة',
-      shipment_payment: 'دفعة شحن',
-      project_client: 'مشروع',
-      project_vendor: 'مشروع',
-      fund_transfer: 'تحويل',
-      debt_payment: 'مديونية',
-    };
-    return labels[sourceType] || 'تلقائي';
+    return t(`source.${sourceType}`);
+  };
+
+  const getTransactionIcon = (tx: Transaction) => {
+    if (tx.sourceType === 'shipment_invoice' || tx.sourceType === 'shipment_payment') {
+      return <Ship className="h-4 w-4" />;
+    }
+    if (tx.sourceType === 'project_client' || tx.sourceType === 'project_vendor') {
+      return <Briefcase className="h-4 w-4" />;
+    }
+    if (tx.sourceType === 'fund_transfer') {
+      return <ArrowLeftRight className="h-4 w-4" />;
+    }
+    if (tx.sourceType === 'debt_payment') {
+      return <Landmark className="h-4 w-4" />;
+    }
+    return tx.type === 'in' ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />;
   };
 
   const handleExport = (format: 'pdf' | 'excel') => {
-    toast.success(`جاري تصدير السجل كـ ${format.toUpperCase()}...`);
+    toast.success(`${t('common.loading')} ${format.toUpperCase()}...`);
   };
 
   const handleDelete = () => {
     if (deletingTransaction && onDeleteTransaction) {
       onDeleteTransaction(deletingTransaction.id);
-      toast.success('تم حذف العملية بنجاح');
+      toast.success(t('common.success'));
     }
     setDeletingTransaction(null);
     setEditingTransaction(null);
@@ -183,9 +179,9 @@ export function UnifiedTransactionLog({
   return (
     <div ref={containerRef} className="rounded-xl bg-card p-3 shadow-sm border border-border">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-bold">{title}</h3>
+        <h3 className="text-sm font-bold">{displayTitle}</h3>
         <div className="flex items-center gap-1.5">
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowReportPreview(true)} title="معاينة التقرير">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowReportPreview(true)} title={t('common.previewReport')}>
             <Eye className="h-4 w-4" />
           </Button>
           {showExport && (
@@ -198,11 +194,11 @@ export function UnifiedTransactionLog({
               <DropdownMenuContent align="end" className="bg-card border-border z-50">
                 <DropdownMenuItem onClick={() => handleExport('pdf')} className="gap-2 cursor-pointer">
                   <FileText className="h-4 w-4" />
-                  تصدير PDF
+                  {t('common.export')} PDF
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleExport('excel')} className="gap-2 cursor-pointer">
                   <FileSpreadsheet className="h-4 w-4" />
-                  تصدير Excel
+                  {t('common.export')} Excel
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -219,7 +215,7 @@ export function UnifiedTransactionLog({
       {/* Currency Display Selector */}
       {currencies.length > 0 && onDisplayCurrencyChange && (
         <div className="flex items-center justify-between mb-2 px-1">
-          <span className="text-[10px] text-muted-foreground">عرض الكشف بعملة:</span>
+          <span className="text-[10px] text-muted-foreground">{t('projects.displayCurrency')}</span>
           <CurrencyDisplaySelector currencies={currencies} selectedCode={displayCurrencyCode} onChange={onDisplayCurrencyChange} />
         </div>
       )}
@@ -229,24 +225,24 @@ export function UnifiedTransactionLog({
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mb-3">
             <div className="space-y-2">
               <div className="relative">
-                <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث..." className="h-9 text-sm pr-9" />
+                <Search className={cn("absolute top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground", language === 'ar' ? "right-2.5" : "left-2.5")} />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('common.search') + "..."} className={cn("h-9 text-sm", language === 'ar' ? "pr-9" : "pl-9")} />
               </div>
               <div className="flex gap-1.5">
                 {(['all', 'in', 'out'] as const).map((type) => (
                   <button key={type} onClick={() => setFilter(type)} className={cn("flex-1 py-1.5 rounded-md text-xs font-medium transition-colors", filter === type ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80")}>
-                    {type === 'all' ? 'الكل' : type === 'in' ? 'مدين' : 'دائن'}
+                    {type === 'all' ? t('common.all') : type === 'in' ? t('tx.debit') : t('tx.credit')}
                   </button>
                 ))}
               </div>
               {/* Date Range Filter */}
               <div className="flex gap-2 items-center">
                 <div className="flex-1">
-                  <label className="text-[10px] text-muted-foreground mb-0.5 block">من تاريخ</label>
+                  <label className="text-[10px] text-muted-foreground mb-0.5 block">{t('common.fromDate')}</label>
                   <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs" />
                 </div>
                 <div className="flex-1">
-                  <label className="text-[10px] text-muted-foreground mb-0.5 block">إلى تاريخ</label>
+                  <label className="text-[10px] text-muted-foreground mb-0.5 block">{t('common.toDate')}</label>
                   <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" />
                 </div>
                 {(dateFrom || dateTo) && (
@@ -262,7 +258,7 @@ export function UnifiedTransactionLog({
 
       <div className="space-y-1.5 overflow-y-auto scrollbar-hide" style={{ maxHeight }}>
         {filteredTransactions.length === 0 ? (
-          <p className="text-center py-6 text-sm text-muted-foreground">لا توجد عمليات</p>
+          <p className="text-center py-6 text-sm text-muted-foreground">{t('common.noTransactions')}</p>
         ) : (
           filteredTransactions.map((transaction, index) => {
             const isExpanded = expandedId === transaction.id;
@@ -281,8 +277,13 @@ export function UnifiedTransactionLog({
                 )}
               >
                 <div className="flex items-center gap-2.5 p-2">
-                  <div className={cn("flex h-8 w-8 items-center justify-center rounded-full shrink-0", transaction.type === 'in' ? "bg-income-light" : "bg-expense-light")}>
-                    {transaction.type === 'in' ? <ArrowUpCircle className="h-4 w-4 text-income" /> : <ArrowDownCircle className="h-4 w-4 text-expense" />}
+                  <div className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-full shrink-0 transition-colors",
+                    transaction.type === 'in' ? "bg-income-light text-income" : "bg-expense-light text-expense",
+                    transaction.sourceType === 'shipment_invoice' || transaction.sourceType === 'shipment_payment' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" :
+                    transaction.sourceType === 'project_client' || transaction.sourceType === 'project_vendor' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" : ""
+                  )}>
+                    {getTransactionIcon(transaction)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
@@ -334,44 +335,44 @@ export function UnifiedTransactionLog({
                       <div className="px-3 pb-2 pt-1 border-t border-border/50 space-y-1.5">
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div>
-                            <span className="text-muted-foreground">التاريخ:</span>
+                            <span className="text-muted-foreground">{t('tx.date')}:</span>
                             <span className="mr-1 font-medium">{formatFullDate(transaction.date)}</span>
                           </div>
                           <div>
-                            <span className="text-muted-foreground">النوع:</span>
-                            <span className="mr-1 font-medium">{transaction.type === 'in' ? 'مدين' : 'دائن'}</span>
+                            <span className="text-muted-foreground">{t('common.typeLabel')}:</span>
+                            <span className="mr-1 font-medium">{transaction.type === 'in' ? t('tx.debit') : t('tx.credit')}</span>
                           </div>
                           {transaction.currencyCode && transaction.currencyCode !== 'USD' && (
                             <div className="col-span-2">
-                              <span className="text-muted-foreground">العملة الأصلية:</span>
+                              <span className="text-muted-foreground">{t('tx.currency')}:</span>
                               <span className="mr-1 font-medium">
-                                {(() => { const orig = getOriginalAmount(transaction); return `${orig.code} ${orig.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })} (سعر الصرف: ${orig.rate})`; })()}
+                                {(() => { const orig = getOriginalAmount(transaction); return `${orig.code} ${orig.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })} (${t('tx.exchangeRate')}: ${orig.rate})`; })()}
                               </span>
                             </div>
                           )}
                           {transaction.createdAt && (
                             <div className="col-span-2">
-                              <span className="text-muted-foreground">وقت الإنشاء:</span>
+                              <span className="text-muted-foreground">{t('activity.time')}:</span>
                               <span className="mr-1 font-medium">{formatDateTime(transaction.createdAt)}</span>
                             </div>
                           )}
                           {transaction.createdByName && (
                             <div className="col-span-2">
-                              <span className="text-muted-foreground">بواسطة:</span>
+                              <span className="text-muted-foreground">{t('activity.user')}:</span>
                               <span className="mr-1 font-medium text-primary">{transaction.createdByName}</span>
                             </div>
                           )}
                         </div>
                         {transaction.notes && (
                           <div className="text-xs">
-                            <span className="text-muted-foreground">ملاحظات:</span>
+                            <span className="text-muted-foreground">{t('tx.notes')}:</span>
                             <p className="mt-0.5 text-foreground bg-muted/50 p-1.5 rounded text-[11px]">{transaction.notes}</p>
                           </div>
                         )}
                         <div className="flex items-center justify-center pt-1">
                           <span className="text-[10px] text-primary flex items-center gap-1">
                             <Edit3 className="h-3 w-3" />
-                            اضغط مرة أخرى للخيارات
+                            {t('tx.clickAgain')}
                           </span>
                         </div>
                       </div>
@@ -382,13 +383,27 @@ export function UnifiedTransactionLog({
             );
           })
         )}
+
+        {hasMore && onLoadMore && (
+          <div className="flex justify-center pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onLoadMore}
+              className="h-8 text-[11px] gap-1.5 px-6 border-primary/20 hover:bg-primary/5 text-primary"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+              {t('common.loadMore')}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Transaction Details Modal */}
       <Dialog open={!!editingTransaction} onOpenChange={(open) => !open && setEditingTransaction(null)}>
         <DialogContent className="max-w-sm p-4">
           <DialogHeader className="pb-2">
-            <DialogTitle className="text-sm">تفاصيل العملية</DialogTitle>
+            <DialogTitle className="text-sm">{t('common.details')}</DialogTitle>
           </DialogHeader>
           {editingTransaction && (
             <div className="space-y-3">
@@ -406,11 +421,11 @@ export function UnifiedTransactionLog({
                 </div>
                 <div className="space-y-1.5 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">التصنيف:</span>
+                    <span className="text-muted-foreground">{t('tx.category')}:</span>
                     <span>{getCategoryLabel(editingTransaction.category)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">المصدر:</span>
+                    <span className="text-muted-foreground">{t('common.source')}:</span>
                     <span className={cn(
                       "px-1.5 py-0.5 rounded text-[10px] font-bold",
                       (!editingTransaction.sourceType || editingTransaction.sourceType === 'manual')
@@ -421,30 +436,30 @@ export function UnifiedTransactionLog({
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">التاريخ:</span>
+                    <span className="text-muted-foreground">{t('tx.date')}:</span>
                     <span>{formatFullDate(editingTransaction.date)}</span>
                   </div>
                   {editingTransaction.currencyCode && editingTransaction.currencyCode !== 'USD' && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">العملة الأصلية:</span>
+                      <span className="text-muted-foreground">{t('tx.currency')}:</span>
                       <span>{(() => { const orig = getOriginalAmount(editingTransaction); return `${orig.code} ${orig.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`; })()}</span>
                     </div>
                   )}
                   {editingTransaction.currencyCode && editingTransaction.currencyCode !== 'USD' && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">سعر الصرف:</span>
+                      <span className="text-muted-foreground">{t('tx.exchangeRate')}:</span>
                       <span>{editingTransaction.exchangeRate}</span>
                     </div>
                   )}
                   {editingTransaction.createdAt && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">وقت الإنشاء:</span>
+                      <span className="text-muted-foreground">{t('activity.time')}:</span>
                       <span>{formatDateTime(editingTransaction.createdAt)}</span>
                     </div>
                   )}
                   {editingTransaction.notes && (
                     <div>
-                      <span className="text-muted-foreground">ملاحظات:</span>
+                      <span className="text-muted-foreground">{t('tx.notes')}:</span>
                       <p className="mt-0.5 p-1.5 bg-background rounded text-[11px]">{editingTransaction.notes}</p>
                     </div>
                   )}
@@ -455,7 +470,7 @@ export function UnifiedTransactionLog({
                 <div className="p-2.5 rounded-lg bg-muted/50">
                   <div className="flex items-center gap-2 text-xs">
                     <Paperclip className="h-3.5 w-3.5 text-primary" />
-                    <span className="text-muted-foreground">مستند مرفق</span>
+                    <span className="text-muted-foreground">{t('tx.attachedDocument')}</span>
                   </div>
                   <div className="mt-2">
                     {editingTransaction.attachment.startsWith('data:image') ? (
@@ -463,7 +478,7 @@ export function UnifiedTransactionLog({
                     ) : (
                       <div className="flex items-center gap-2 p-2 bg-background rounded-md">
                         <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-[11px]">ملف مرفق</span>
+                        <span className="text-[11px]">{t('tx.attachedFile')}</span>
                       </div>
                     )}
                   </div>
@@ -481,7 +496,7 @@ export function UnifiedTransactionLog({
                   }}
                 >
                   <Eye className="h-3 w-3" />
-                  معاينة HD
+                  {t('common.preview')} HD
                 </Button>
                 
                 {/* Show edit only for manual transactions */}
@@ -496,7 +511,7 @@ export function UnifiedTransactionLog({
                     }}
                   >
                     <Edit3 className="h-3 w-3" />
-                    تعديل
+                    {t('common.edit')}
                   </Button>
                 )}
                 
@@ -509,7 +524,7 @@ export function UnifiedTransactionLog({
                     onClick={() => setDeletingTransaction(editingTransaction)}
                   >
                     <Trash2 className="h-3 w-3" />
-                    حذف
+                    {t('common.delete')}
                   </Button>
                 )}
 
@@ -517,18 +532,18 @@ export function UnifiedTransactionLog({
                 {editingTransaction.sourceType && editingTransaction.sourceType !== 'manual' && (
                   <div className="col-span-2 text-center p-2.5 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
                     <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold mb-1">
-                      🔒 قيد محمي - للقراءة فقط
+                      {t('tx.protectedEntry')}
                     </p>
                     <p className="text-[9px] text-amber-600 dark:text-amber-500">
                       {editingTransaction.sourceType === 'project_client' || editingTransaction.sourceType === 'project_vendor'
-                        ? 'هذا القيد مرتبط بمشروع. للتعديل أو الحذف، اذهب إلى صفحة المشاريع.'
+                        ? t('tx.projectLink')
                         : editingTransaction.sourceType === 'shipment_invoice' || editingTransaction.sourceType === 'shipment_payment'
-                        ? 'هذا القيد مرتبط بشحنة. للتعديل أو الحذف، اذهب إلى صفحة الشحنات.'
+                        ? t('tx.shipmentLink')
                         : editingTransaction.sourceType === 'fund_transfer'
-                        ? 'هذا القيد ناتج عن تحويل بين صناديق.'
+                        ? t('tx.transferLink')
                         : editingTransaction.sourceType === 'debt_payment'
-                        ? 'هذا القيد مرتبط بسداد مديونية.'
-                        : 'هذا القيد تم إنشاؤه تلقائياً ولا يمكن تعديله من هنا.'}
+                        ? t('tx.debtLink')
+                        : t('tx.autoLink')}
                     </p>
                   </div>
                 )}
@@ -549,15 +564,15 @@ export function UnifiedTransactionLog({
       <AlertDialog open={!!deletingTransaction} onOpenChange={(open) => !open && setDeletingTransaction(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+            <AlertDialogTitle>{t('common.confirm')}</AlertDialogTitle>
             <AlertDialogDescription>
-              سيتم حذف هذه العملية نهائياً. هذا الإجراء لا يمكن التراجع عنه.
+              {language === 'ar' ? 'سيتم حذف هذه العملية نهائياً. هذا الإجراء لا يمكن التراجع عنه.' : 'This transaction will be permanently deleted. This action cannot be undone.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              حذف
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -569,7 +584,7 @@ export function UnifiedTransactionLog({
           <DialogHeader className="p-4 pb-2">
             <div className="flex items-center justify-between">
               <DialogTitle className="text-sm flex items-center gap-2">
-                <Eye className="h-4 w-4" /> معاينة تقرير العمليات
+                <Eye className="h-4 w-4" /> {t('reports.ledgerPreview')}
               </DialogTitle>
               <div className="flex gap-1">
                 <Button variant="outline" size="sm" className="h-7 text-[9px] gap-1" onClick={() => {
@@ -577,10 +592,10 @@ export function UnifiedTransactionLog({
                   const printWindow = window.open('', '_blank');
                   if (!printWindow) return;
                   printWindow.document.write(`
-                    <html dir="rtl"><head><title>تقرير العمليات المالية</title>
+                    <html dir="${language === 'ar' ? 'rtl' : 'ltr'}"><head><title>${t('reports.transactionLog')}</title>
                     <style>
                       * { margin:0; padding:0; box-sizing:border-box; }
-                      body { font-family: 'Segoe UI', Tahoma, sans-serif; direction:rtl; padding:15mm; color:#1a1a1a; }
+                      body { font-family: 'Segoe UI', Tahoma, sans-serif; direction:${language === 'ar' ? 'rtl' : 'ltr'}; padding:15mm; color:#1a1a1a; }
                       table { width:100%; border-collapse:collapse; }
                       th { background:#194178; color:white; padding:6px; font-size:11px; }
                       td { padding:5px 4px; border-bottom:1px solid #e5e7eb; text-align:center; font-size:10px; }
@@ -593,29 +608,29 @@ export function UnifiedTransactionLog({
                   printWindow.document.close();
                   setTimeout(() => printWindow.print(), 400);
                 }}>
-                  <Printer className="h-3 w-3" /> طباعة
+                  <Printer className="h-3 w-3" /> {t('common.print')}
                 </Button>
                 <Button variant="outline" size="sm" className="h-7 text-[9px] gap-1" onClick={async () => {
                   if (!reportRef.current) return;
                   try {
-                    await generateHDPreviewPDF(reportRef.current, `تقرير_العمليات_${Date.now()}.pdf`);
-                    toast.success('تم تصدير PDF بنجاح');
-                  } catch { toast.error('خطأ في التصدير'); }
+                    await generateHDPreviewPDF(reportRef.current, `report_${Date.now()}.pdf`);
+                    toast.success(t('common.success'));
+                  } catch { toast.error(t('common.error')); }
                 }}>
                   <FileText className="h-3 w-3" /> PDF
                 </Button>
               </div>
             </div>
           </DialogHeader>
-          <div ref={reportRef} className="mx-4 mb-4 bg-white text-black rounded-lg overflow-hidden" style={{ direction: 'rtl' }}>
+          <div ref={reportRef} className="mx-4 mb-4 bg-white text-black rounded-lg overflow-hidden" style={{ direction: language === 'ar' ? 'rtl' : 'ltr' }}>
             <div style={{ background: '#194178', color: 'white', padding: '16px', textAlign: 'center' }}>
-              <h1 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>تقرير العمليات المالية</h1>
-              <p style={{ fontSize: '10px', opacity: 0.9 }}>توطين - المساعد المالي</p>
+              <h1 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>{t('reports.transactionLog')}</h1>
+              <p style={{ fontSize: '10px', opacity: 0.9 }}>{t('brand.full')}</p>
               <p style={{ fontSize: '9px', opacity: 0.8, marginTop: '2px' }}>
-                تاريخ الإصدار: {formatDateGregorian(new Date(), 'long')}
-                {dateFrom && ` | من: ${dateFrom}`}
-                {dateTo && ` | إلى: ${dateTo}`}
-                {displayCurrencyCode !== 'USD' && ` | العملة: ${displayCurrencyCode}`}
+                {t('common.issueDate')}: {formatDateGregorian(new Date(), 'long')}
+                {dateFrom && ` | ${t('common.fromDate')}: ${dateFrom}`}
+                {dateTo && ` | ${t('common.toDate')}: ${dateTo}`}
+                {displayCurrencyCode !== 'USD' && ` | ${t('common.currency')}: ${displayCurrencyCode}`}
               </p>
             </div>
 
@@ -623,33 +638,33 @@ export function UnifiedTransactionLog({
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
                 <thead>
                    <tr style={{ background: '#f0f4f8' }}>
-                     <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>التاريخ</th>
-                     <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>الوقت</th>
-                     <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>البيان</th>
-                     <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>النوع</th>
-                     <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>المبلغ ({getCurrencySymbol(displayCurrencyCode, currencies)})</th>
-                     {displayCurrencyCode === 'USD' && <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>العملة الأصلية</th>}
+                     <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>{t('common.date')}</th>
+                     <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>{t('activity.time')}</th>
+                     <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>{t('tx.description')}</th>
+                     <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>{t('common.typeLabel')}</th>
+                     <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>{t('common.amount')} ({getCurrencySymbol(displayCurrencyCode, currencies)})</th>
+                     {displayCurrencyCode === 'USD' && <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>{t('tx.currency')}</th>}
                    </tr>
                 </thead>
                 <tbody>
-                  {filteredTransactions.map((t, i) => (
-                    <tr key={t.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                      <td style={{ padding: '5px 4px', textAlign: 'center', whiteSpace: 'nowrap' }}>{formatDateGregorian(t.date)}</td>
-                      <td style={{ padding: '5px 4px', textAlign: 'center', whiteSpace: 'nowrap' }}>{t.createdAt ? formatTime(t.createdAt) : '-'}</td>
-                      <td style={{ padding: '5px 4px', textAlign: 'center' }}>{t.description || '-'}</td>
-                      <td style={{ padding: '5px 4px', textAlign: 'center', color: t.type === 'in' ? '#16a34a' : '#dc2626' }}>
-                        {t.type === 'in' ? 'مدين' : 'دائن'}
+                  {filteredTransactions.map((t_item, i) => (
+                    <tr key={t_item.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                      <td style={{ padding: '5px 4px', textAlign: 'center', whiteSpace: 'nowrap' }}>{formatDateGregorian(t_item.date)}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'center', whiteSpace: 'nowrap' }}>{t_item.createdAt ? formatTime(t_item.createdAt) : '-'}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'center' }}>{t_item.description || '-'}</td>
+                      <td style={{ padding: '5px 4px', textAlign: 'center', color: t_item.type === 'in' ? '#16a34a' : '#dc2626' }}>
+                        {t_item.type === 'in' ? t('tx.debit') : t('tx.credit')}
                       </td>
-                      <td style={{ padding: '5px 4px', textAlign: 'center', fontWeight: 'bold', color: t.type === 'in' ? '#16a34a' : '#dc2626' }}>
+                      <td style={{ padding: '5px 4px', textAlign: 'center', fontWeight: 'bold', color: t_item.type === 'in' ? '#16a34a' : '#dc2626' }}>
                         {displayCurrencyCode === 'USD'
-                          ? `$${t.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                          : formatWithCurrency(convertForDisplay(t.amount, displayCurrencyCode, currencies), displayCurrencyCode, currencies)
+                          ? `$${t_item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                          : formatWithCurrency(convertForDisplay(t_item.amount, displayCurrencyCode, currencies), displayCurrencyCode, currencies)
                         }
                       </td>
                       {displayCurrencyCode === 'USD' && (
                         <td style={{ padding: '5px 4px', textAlign: 'center', fontSize: '9px', color: '#666' }}>
-                          {t.currencyCode && t.currencyCode !== 'USD'
-                            ? (() => { const orig = getOriginalAmount(t); return `${orig.code} ${orig.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`; })()
+                          {t_item.currencyCode && t_item.currencyCode !== 'USD'
+                            ? (() => { const orig = getOriginalAmount(t_item); return `${orig.code} ${orig.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`; })()
                             : '-'
                           }
                         </td>
@@ -659,14 +674,14 @@ export function UnifiedTransactionLog({
                 </tbody>
               </table>
               {filteredTransactions.length === 0 && (
-                <p style={{ textAlign: 'center', padding: '20px', color: '#999', fontSize: '11px' }}>لا توجد عمليات</p>
+                <p style={{ textAlign: 'center', padding: '20px', color: '#999', fontSize: '11px' }}>{t('common.noTransactions')}</p>
               )}
             </div>
 
             {/* Summary totals */}
              {filteredTransactions.length > 0 && (() => {
-              const totalIn = filteredTransactions.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0);
-              const totalOut = filteredTransactions.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0);
+              const totalIn = filteredTransactions.filter(t_item => t_item.type === 'in').reduce((s, t_item) => s + t_item.amount, 0);
+              const totalOut = filteredTransactions.filter(t_item => t_item.type === 'out').reduce((s, t_item) => s + t_item.amount, 0);
               const sym = getCurrencySymbol(displayCurrencyCode, currencies);
               const dispIn = convertForDisplay(totalIn, displayCurrencyCode, currencies);
               const dispOut = convertForDisplay(totalOut, displayCurrencyCode, currencies);
@@ -674,13 +689,13 @@ export function UnifiedTransactionLog({
               <div style={{ padding: '8px 12px', borderTop: '2px solid #194178' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
                   <div style={{ textAlign: 'center', padding: '8px', background: '#dcfce7', borderRadius: '6px' }}>
-                    <div style={{ fontSize: '9px', color: '#166534' }}>إجمالي مدين (Debit)</div>
+                    <div style={{ fontSize: '9px', color: '#166534' }}>{language === 'ar' ? 'إجمالي مدين (Debit)' : 'Total Debit'}</div>
                     <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#166534' }}>
                       {sym}{dispIn.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </div>
                   </div>
                   <div style={{ textAlign: 'center', padding: '8px', background: '#fef2f2', borderRadius: '6px' }}>
-                    <div style={{ fontSize: '9px', color: '#991b1b' }}>إجمالي دائن (Credit)</div>
+                    <div style={{ fontSize: '9px', color: '#991b1b' }}>{language === 'ar' ? 'إجمالي دائن (Credit)' : 'Total Credit'}</div>
                     <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#991b1b' }}>
                       {sym}{dispOut.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </div>
@@ -692,7 +707,7 @@ export function UnifiedTransactionLog({
 
             <div style={{ padding: '8px 12px', borderTop: '1px solid #e5e7eb', textAlign: 'center' }}>
               <p style={{ fontSize: '8px', color: '#999', lineHeight: 1.6 }}>
-                هذا المستند تم إنشاؤه آلياً من النظام وهو معتمد بدون توقيع أو ختم. تخلي المؤسسة مسؤوليتها عن أي كشط، شطب، أو تعديل يدوي يطرأ على هذه الورقة.
+                {t('reports.legalDisclaimer')}
               </p>
             </div>
           </div>

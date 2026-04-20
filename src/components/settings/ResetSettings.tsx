@@ -58,7 +58,6 @@ export function ResetSettings() {
       await supabase.from('contacts' as any).delete().eq('user_id', user.id);
       
       // 9. حذف البيانات المساعدة
-      await supabase.from('ledger_accounts' as any).delete().eq('user_id', user.id);
       await supabase.from('currencies' as any).delete().eq('user_id', user.id);
       await supabase.from('activity_log' as any).delete().eq('user_id', user.id);
       await supabase.from('company_settings' as any).delete().eq('user_id', user.id);
