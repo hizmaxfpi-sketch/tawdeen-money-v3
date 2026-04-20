@@ -2123,6 +2123,11 @@ export type Database = {
         }
         Returns: string
       }
+      recalculate_all_fund_balances: { Args: never; Returns: number }
+      recalculate_fund_balance: {
+        Args: { p_fund_id: string }
+        Returns: undefined
+      }
       reverse_material_purchase: {
         Args: { p_purchase_id: string }
         Returns: undefined
