@@ -405,8 +405,11 @@ export function ContactDetails() {
         </motion.div>
       </main>
 
-      {/* Bottom Nav */}
-      <BottomNav currentPage="accounts" onNavigate={(page) => navigate(`/?page=${page}`)} />
+        {/* Bottom Nav (mobile only) */}
+        <div className="md:hidden">
+          <BottomNav currentPage="accounts" onNavigate={(page) => navigate(`/?page=${page}`)} />
+        </div>
+      </div>
 
       {/* Transaction Form Dialog */}
       <Dialog open={showTransactionForm} onOpenChange={(open) => {
