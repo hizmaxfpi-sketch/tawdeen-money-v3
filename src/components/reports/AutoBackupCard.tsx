@@ -14,6 +14,7 @@ import {
   BackupRecord,
 } from '@/lib/autoBackupStore';
 import { useAutoBackup } from '@/hooks/useAutoBackup';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface AutoBackupCardProps {
@@ -21,6 +22,7 @@ interface AutoBackupCardProps {
 }
 
 export function AutoBackupCard({ exportData }: AutoBackupCardProps) {
+  const { user } = useAuth();
   const wrappedExport = async () => await exportData();
   const { settings, updateSettings, runBackupNow } = useAutoBackup({ exportData: wrappedExport });
   const [backups, setBackups] = useState<BackupRecord[]>([]);
@@ -28,9 +30,10 @@ export function AutoBackupCard({ exportData }: AutoBackupCardProps) {
   const [running, setRunning] = useState(false);
 
   const refresh = async () => {
+    if (!user) return;
     setLoading(true);
     try {
-      const list = await listBackups();
+      const list = await listBackups(user.id);
       setBackups(list);
     } finally {
       setLoading(false);
@@ -41,7 +44,8 @@ export function AutoBackupCard({ exportData }: AutoBackupCardProps) {
     refresh();
     const id = setInterval(refresh, 15000);
     return () => clearInterval(id);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const handleManualRun = async () => {
     setRunning(true);
@@ -54,7 +58,8 @@ export function AutoBackupCard({ exportData }: AutoBackupCardProps) {
   };
 
   const handleDelete = async (id: string) => {
-    await deleteBackup(id);
+    if (!user) return;
+    await deleteBackup(id, user.id);
     toast.success('تم حذف النسخة');
     await refresh();
   };
