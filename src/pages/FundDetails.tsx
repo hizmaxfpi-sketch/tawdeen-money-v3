@@ -1,5 +1,6 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
 import { ArrowRight, TrendingUp, TrendingDown, Wallet, Landmark, CreditCard, Eye, Scale, Edit2, Trash2, RefreshCw } from 'lucide-react';
 import { Fund, Transaction, FundType } from '@/types/finance';
@@ -66,13 +67,66 @@ export function FundDetails({ funds, transactions, currencies = [], onUpdateFund
   const permissions = useUserPermissions();
 
   const fund = funds.find(f => f.id === id);
-  
+
+  // جلب كامل حركات الصندوق مباشرة من قاعدة البيانات (لتجاوز حد الـ 50 المُحمَّلة في الذاكرة)
+  const [allFundTransactions, setAllFundTransactions] = useState<Transaction[]>([]);
+  const [loadingFundTx, setLoadingFundTx] = useState(false);
+
+  useEffect(() => {
+    if (!fund) return;
+    let cancelled = false;
+    const fetchAll = async () => {
+      setLoadingFundTx(true);
+      const pageSize = 1000;
+      let from = 0;
+      const rows: any[] = [];
+      while (true) {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('id, type, category, amount, description, date, fund_id, account_id, contact_id, project_id, notes, attachments, created_at, currency_code, exchange_rate, source_type, created_by_name')
+          .eq('fund_id', fund.id)
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false })
+          .range(from, from + pageSize - 1);
+        if (error || !data) break;
+        rows.push(...data);
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+      if (cancelled) return;
+      const mapped: Transaction[] = rows.map(t => ({
+        id: t.id,
+        type: t.type as any,
+        category: t.category as any,
+        amount: Number(t.amount),
+        description: t.description || '',
+        date: t.date,
+        fundId: t.fund_id || '',
+        accountId: t.account_id || undefined,
+        contactId: t.contact_id || undefined,
+        projectId: t.project_id || undefined,
+        notes: t.notes || undefined,
+        attachment: t.attachments?.[0] || undefined,
+        currencyCode: t.currency_code || 'USD',
+        exchangeRate: Number(t.exchange_rate || 1),
+        toFundId: undefined,
+        sourceType: t.source_type || 'manual',
+        createdByName: t.created_by_name || undefined,
+        createdAt: new Date(t.created_at),
+      }));
+      setAllFundTransactions(mapped);
+      setLoadingFundTx(false);
+    };
+    fetchAll();
+    return () => { cancelled = true; };
+  }, [fund?.id, transactions.length]);
+
   const fundTransactions = useMemo(() => {
     if (!fund) return [];
-    return transactions
-      .filter(t => t.fundId === fund.id)
-      .sort(compareTransactionsByBusinessDateAsc);
-  }, [fund, transactions]);
+    // ندمج: نفضّل الجلب المباشر من DB، ونرجع للـprop عند التحميل الأول
+    const source = allFundTransactions.length > 0 ? allFundTransactions : transactions.filter(t => t.fundId === fund.id);
+    return [...source].sort(compareTransactionsByBusinessDateAsc);
+  }, [fund, transactions, allFundTransactions]);
 
   // Get unique currency codes from transactions
   const availableCurrencyTabs = useMemo(() => {
