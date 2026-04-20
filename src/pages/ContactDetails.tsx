@@ -16,6 +16,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { useLanguage } from '@/i18n/LanguageContext';
 import { UnifiedTransactionLog } from '@/components/shared/UnifiedTransactionLog';
 import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
 import { useSupabaseFinance } from '@/hooks/useSupabaseFinance';

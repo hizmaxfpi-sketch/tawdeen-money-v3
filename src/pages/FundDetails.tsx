@@ -11,6 +11,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { useLanguage } from '@/i18n/LanguageContext';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { UnifiedTransactionLog } from '@/components/shared/UnifiedTransactionLog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
