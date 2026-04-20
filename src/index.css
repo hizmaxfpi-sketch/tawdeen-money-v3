@@ -156,17 +156,8 @@
   }
 
   body {
-    @apply bg-background text-foreground font-tajawal antialiased font-normal;
+    @apply bg-background text-foreground font-tajawal antialiased;
     padding-bottom: var(--nav-height);
-  }
-
-  /* Enhance legibility for small Arabic text */
-  .text-xs, .text-sm {
-    @apply font-medium tracking-tight;
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-bold;
   }
 }
 
