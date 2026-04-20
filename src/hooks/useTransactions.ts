@@ -108,7 +108,7 @@ export function useTransactions() {
   }, [user, initialLoaded]);
 
   useEffect(() => {
-    if (user) fetchTransactions(true);
+    if (user) fetchTransactions(true, true);
   }, [user]);
 
   // Realtime: auto-refresh when transactions change
@@ -157,16 +157,16 @@ export function useTransactions() {
       await supabase.from('transactions').update({ attachments: [transaction.attachment] }).eq('id', data as string);
     }
     toast.success('تم إضافة العملية بنجاح');
-    // Log to activity
+    // Log to activity (لا ننتظر)
     if (user) {
-      await logToActivity(user.id, 'transaction_created', 'transaction', data as string, transaction.description, { amount: transaction.amount, type: transaction.type, category: transaction.category });
+      logToActivity(user.id, 'transaction_created', 'transaction', data as string, transaction.description, { amount: transaction.amount, type: transaction.type, category: transaction.category });
     }
-    // مزامنة أرصدة الحسابات من الدفتر الموحد
-    if (user) {
-      await (supabase.rpc as any)('sync_contact_balances');
-    }
+    // مزامنة أرصدة الحسابات في الخلفية (لا ننتظر)
+    (supabase.rpc as any)('sync_contact_balances').catch(() => {});
     realtimeRef.current.suppressNext();
-    await fetchTransactions(true);
+    // جلب سريع: أول صفحة فقط
+    _cachedTransactions = null; _cacheTime = 0;
+    await fetchTransactions(true, false);
     return data;
   }, [user, fetchTransactions]);
 
@@ -191,15 +191,13 @@ export function useTransactions() {
     
     if (error) { toast.error('خطأ في تعديل العملية'); console.error(error); return; }
     toast.success('تم تعديل العملية بنجاح');
-    // Log to activity
     if (user) {
-      await logToActivity(user.id, 'transaction_modified', 'transaction', transactionId, updates.description, { amount: updates.amount, type: updates.type, category: updates.category });
+      logToActivity(user.id, 'transaction_modified', 'transaction', transactionId, updates.description, { amount: updates.amount, type: updates.type, category: updates.category });
     }
-    if (user) {
-      await (supabase.rpc as any)('sync_contact_balances');
-    }
+    (supabase.rpc as any)('sync_contact_balances').catch(() => {});
     realtimeRef.current.suppressNext();
-    await fetchTransactions(true);
+    _cachedTransactions = null; _cacheTime = 0;
+    await fetchTransactions(true, false);
   }, [user, fetchTransactions]);
 
   // استخدام RPC للحذف الذري
@@ -212,16 +210,13 @@ export function useTransactions() {
     });
     if (error) { toast.error('خطأ في حذف العملية'); console.error(error); return; }
     toast.success('تم حذف العملية');
-    // Log deletion to activity
     if (user && txToDelete) {
-      await logToActivity(user.id, 'transaction_deleted', 'transaction', transactionId, txToDelete.description, { amount: txToDelete.amount, type: txToDelete.type, category: txToDelete.category }, 'deleted');
+      logToActivity(user.id, 'transaction_deleted', 'transaction', transactionId, txToDelete.description, { amount: txToDelete.amount, type: txToDelete.type, category: txToDelete.category }, 'deleted');
     }
-    // مزامنة أرصدة الحسابات من الدفتر الموحد
-    if (user) {
-      await (supabase.rpc as any)('sync_contact_balances');
-    }
+    (supabase.rpc as any)('sync_contact_balances').catch(() => {});
     realtimeRef.current.suppressNext();
-    await fetchTransactions(true);
+    _cachedTransactions = null; _cacheTime = 0;
+    await fetchTransactions(true, false);
   }, [user, transactions, fetchTransactions]);
 
   const getMonthlyTrend = useCallback((): TrendData[] => calculateMonthlyTrend(transactions), [transactions]);
