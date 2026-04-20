@@ -129,6 +129,7 @@ export function Dashboard({
 
       <UnifiedTransactionLog 
         transactions={transactions} 
+        title="الحركات المالية"
         onEditTransaction={onEditTransaction}
         onDeleteTransaction={onDeleteTransaction}
         showDateRange={true}
