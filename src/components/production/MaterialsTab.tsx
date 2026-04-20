@@ -26,6 +26,11 @@ export function MaterialsTab({ materials, fundOptions, contacts, onAdd, onUpdate
   const [openEdit, setOpenEdit] = useState<ProductionMaterial | null>(null);
   const [openPreview, setOpenPreview] = useState(false);
 
+  // Search & filter state
+  const [search, setSearch] = useState('');
+  const [stockFilter, setStockFilter] = useState<'all' | 'in' | 'out'>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'qty_desc' | 'qty_asc' | 'value_desc'>('name');
+
   // Add form state
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
@@ -41,6 +46,26 @@ export function MaterialsTab({ materials, fundOptions, contacts, onAdd, onUpdate
 
   const reset = () => { setName(''); setCode(''); setUnit('pcs'); setNotes(''); };
   const resetP = () => { setPQty(''); setPPrice(''); setPContact(''); setPFund(''); setPPaid(''); };
+
+  const filteredMaterials = useMemo(() => {
+    let list = materials;
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(m =>
+        m.name.toLowerCase().includes(q) ||
+        (m.code || '').toLowerCase().includes(q) ||
+        (m.notes || '').toLowerCase().includes(q)
+      );
+    }
+    if (stockFilter === 'in') list = list.filter(m => m.quantity > 0);
+    else if (stockFilter === 'out') list = list.filter(m => m.quantity <= 0);
+    const sorted = [...list];
+    if (sortBy === 'qty_desc') sorted.sort((a, b) => b.quantity - a.quantity);
+    else if (sortBy === 'qty_asc') sorted.sort((a, b) => a.quantity - b.quantity);
+    else if (sortBy === 'value_desc') sorted.sort((a, b) => (b.quantity * b.avg_cost) - (a.quantity * a.avg_cost));
+    else sorted.sort((a, b) => a.name.localeCompare(b.name));
+    return sorted;
+  }, [materials, search, stockFilter, sortBy]);
 
   const handleAdd = async () => {
     if (!name.trim()) return;
