@@ -4,12 +4,21 @@ import { useAuth } from '@/contexts/AuthContext';
 
 type AppRole = 'owner' | 'admin' | 'accountant' | 'shipping_staff' | 'viewer';
 
+// أولوية الأدوار: الأقوى أولاً (يُستخدم لاختيار الدور الفعلي عند تعدد الشركات)
+const ROLE_PRIORITY: Record<AppRole, number> = {
+  owner: 5,
+  admin: 4,
+  accountant: 3,
+  shipping_staff: 2,
+  viewer: 1,
+};
+
 interface UserRoleInfo {
   role: AppRole;
   isLoading: boolean;
-  canEdit: boolean;      // owner, admin, accountant, shipping_staff
-  canDelete: boolean;    // owner, admin
-  canManageUsers: boolean; // owner, admin
+  canEdit: boolean;
+  canDelete: boolean;
+  canManageUsers: boolean;
   isViewer: boolean;
 }
 
@@ -20,23 +29,35 @@ export function useUserRole(): UserRoleInfo {
 
   useEffect(() => {
     if (!user) {
+      setRole('viewer');
       setIsLoading(false);
       return;
     }
 
+    let cancelled = false;
     const fetchRole = async () => {
+      // اختر الدور النشط الأعلى صلاحية للمستخدم الحالي
+      // (يحمي ضد التشويش بين الشركات لو كان عضواً في أكثر من شركة)
       const { data } = await supabase
         .from('user_roles')
-        .select('role')
+        .select('role, company_id, is_active')
         .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
+        .eq('is_active', true);
 
-      setRole((data?.role as AppRole) || 'viewer');
+      if (cancelled) return;
+
+      const roles = (data || []).map(r => r.role as AppRole);
+      if (roles.length === 0) {
+        setRole('viewer');
+      } else {
+        roles.sort((a, b) => ROLE_PRIORITY[b] - ROLE_PRIORITY[a]);
+        setRole(roles[0]);
+      }
       setIsLoading(false);
     };
 
     fetchRole();
+    return () => { cancelled = true; };
   }, [user]);
 
   const isViewer = role === 'viewer';

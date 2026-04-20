@@ -1,8 +1,8 @@
 // ============= IndexedDB Auto-Backup Store =============
 // يحفظ آخر 7 نسخ احتياطية محلياً داخل المتصفح (IndexedDB)
-// بدون تأثير على الأداء أو حدود localStorage
+// مع عزل كل مستخدم/شركة في قاعدة بيانات منفصلة لمنع تسرب البيانات.
 
-const DB_NAME = 'tawdeen_autobackup';
+const DB_PREFIX = 'tawdeen_autobackup';
 const STORE_NAME = 'backups';
 const MAX_BACKUPS = 7;
 const DB_VERSION = 1;
@@ -15,9 +15,15 @@ export interface BackupRecord {
   data: any;             // the JSON snapshot
 }
 
-function openDB(): Promise<IDBDatabase> {
+/** قاعدة بيانات معزولة لكل مستخدم لمنع اختلاط بيانات الشركات */
+function dbNameFor(userId: string | null | undefined): string {
+  const safe = (userId || 'anon').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32);
+  return `${DB_PREFIX}_${safe}`;
+}
+
+function openDB(userId: string | null | undefined): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    const req = indexedDB.open(dbNameFor(userId), DB_VERSION);
     req.onerror = () => reject(req.error);
     req.onsuccess = () => resolve(req.result);
     req.onupgradeneeded = () => {
@@ -30,8 +36,8 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveBackup(data: any): Promise<BackupRecord> {
-  const db = await openDB();
+export async function saveBackup(data: any, userId: string | null | undefined): Promise<BackupRecord> {
+  const db = await openDB(userId);
   const json = JSON.stringify(data);
   const id = new Date().toISOString();
 
@@ -59,14 +65,13 @@ export async function saveBackup(data: any): Promise<BackupRecord> {
     tx.onerror = () => reject(tx.error);
   });
 
-  // الاحتفاظ بآخر MAX_BACKUPS فقط (FIFO)
-  await pruneOldBackups();
+  await pruneOldBackups(userId);
   db.close();
   return record;
 }
 
-export async function listBackups(): Promise<BackupRecord[]> {
-  const db = await openDB();
+export async function listBackups(userId: string | null | undefined): Promise<BackupRecord[]> {
+  const db = await openDB(userId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const req = tx.objectStore(STORE_NAME).getAll();
@@ -80,8 +85,8 @@ export async function listBackups(): Promise<BackupRecord[]> {
   });
 }
 
-export async function getBackup(id: string): Promise<BackupRecord | null> {
-  const db = await openDB();
+export async function getBackup(id: string, userId: string | null | undefined): Promise<BackupRecord | null> {
+  const db = await openDB(userId);
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const req = tx.objectStore(STORE_NAME).get(id);
@@ -90,8 +95,8 @@ export async function getBackup(id: string): Promise<BackupRecord | null> {
   });
 }
 
-export async function deleteBackup(id: string): Promise<void> {
-  const db = await openDB();
+export async function deleteBackup(id: string, userId: string | null | undefined): Promise<void> {
+  const db = await openDB(userId);
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     tx.objectStore(STORE_NAME).delete(id);
@@ -101,17 +106,17 @@ export async function deleteBackup(id: string): Promise<void> {
   db.close();
 }
 
-async function pruneOldBackups() {
-  const all = await listBackups();
+async function pruneOldBackups(userId: string | null | undefined) {
+  const all = await listBackups(userId);
   if (all.length <= MAX_BACKUPS) return;
   const toDelete = all.slice(MAX_BACKUPS);
   for (const b of toDelete) {
-    await deleteBackup(b.id);
+    await deleteBackup(b.id, userId);
   }
 }
 
-export async function getLastBackupTime(): Promise<number | null> {
-  const all = await listBackups();
+export async function getLastBackupTime(userId: string | null | undefined): Promise<number | null> {
+  const all = await listBackups(userId);
   return all[0]?.createdAt ?? null;
 }
 
