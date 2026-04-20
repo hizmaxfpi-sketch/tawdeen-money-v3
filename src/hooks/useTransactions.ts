@@ -53,7 +53,9 @@ export function useTransactions() {
     createdAt: new Date(t.created_at),
   });
 
-  const fetchTransactions = useCallback(async (reset = false) => {
+  // fullRefresh: true => جلب كل الصفحات (التحميل الأولي فقط)
+  // false/quickRefresh => جلب أول صفحة فقط بعد عمليات الإضافة/التعديل/الحذف لتسريع الاستجابة
+  const fetchTransactions = useCallback(async (reset = false, fullRefresh = false) => {
     if (!user) return;
 
     // استخدام الكاش إذا كان حديثاً
@@ -64,9 +66,9 @@ export function useTransactions() {
       return;
     }
 
-    setLoading(true);
+    if (!initialLoaded) setLoading(true);
 
-    // جلب جميع الحركات بصفحات داخلية حتى تنتهي
+    // جلب صفحات داخلية حتى تنتهي (أو صفحة واحدة فقط في الوضع السريع)
     const all: any[] = [];
     let from = 0;
     while (true) {
@@ -87,6 +89,8 @@ export function useTransactions() {
       const batch = data || [];
       all.push(...batch);
       if (batch.length < PAGE_SIZE) break;
+      // في الوضع السريع نتوقف بعد أول صفحة (1000 سجل تكفي للعرض الفوري)
+      if (!fullRefresh) break;
       from += PAGE_SIZE;
     }
 
@@ -97,7 +101,7 @@ export function useTransactions() {
     _cacheUserId = user.id;
     _cacheTime = Date.now();
     setPage(0);
-    setHasMore(false); // تم جلب الكل
+    setHasMore(false);
     setLoading(false);
     setLoadingMore(false);
     setInitialLoaded(true);
