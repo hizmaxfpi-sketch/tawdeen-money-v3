@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Transaction } from '@/types/finance';
 
 export const DIRECT_REVENUE_CATEGORIES = ['direct_revenue', 'asset_revenue', 'consulting_revenue', 'service_revenue', 'other_revenue'];
-export const BUSINESS_EXPENSE_CATEGORIES = ['expense', 'business_expense', 'asset_depreciation', 'salary', 'rent', 'utilities', 'marketing', 'supplies', 'transport', 'maintenance', 'other_expense', 'asset_improvement'];
+export const BUSINESS_EXPENSE_CATEGORIES = ['expense', 'business_expense', 'asset_depreciation', 'salary', 'rent', 'utilities', 'marketing', 'supplies', 'transport', 'maintenance', 'other_expense', 'asset_improvement', 'production_expense'];
 
 export const REVENUE_CATEGORIES = [
   { value: 'direct_revenue', label: 'إيراد مباشر' },
@@ -21,6 +21,7 @@ export const EXPENSE_CATEGORIES = [
   { value: 'transport', label: 'نقل' },
   { value: 'maintenance', label: 'صيانة' },
   { value: 'asset_depreciation', label: 'إهلاك أصول' },
+  { value: 'production_expense', label: 'مصروف بيع إنتاج' },
   { value: 'business_expense', label: 'مصروف عام' },
   { value: 'other_expense', label: 'مصروف آخر' },
 ];
