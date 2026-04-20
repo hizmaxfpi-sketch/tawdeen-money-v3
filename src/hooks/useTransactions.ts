@@ -14,7 +14,7 @@ const logToActivity = async (userId: string, eventType: string, entityType: stri
   try { await supabase.from('activity_log').insert({ user_id: userId, event_type: eventType, entity_type: entityType, entity_id: entityId, entity_name: entityName, details, status } as any); } catch {}
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 1000; // جلب كامل بصفحات داخلية كبيرة
 
 // كاش بسيط لمنع إعادة الجلب عند التنقل بين الصفحات
 let _cachedTransactions: any[] | null = null;
