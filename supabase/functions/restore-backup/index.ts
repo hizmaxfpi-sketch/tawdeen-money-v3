@@ -77,6 +77,61 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ============= حماية متعددة الشركات =============
+    // امنع استعادة أي سجل id موجود حالياً لمستخدم آخر (شركة أخرى)
+    // حتى لا يتم الكتابة فوق بياناتهم عبر upsert.
+    const collectIds = (rows: any[]) =>
+      rows.map(r => asString(r?.id)).filter((v): v is string => !!v);
+
+    const checkOwnership = async (table: string, ids: string[]): Promise<Set<string>> => {
+      const conflicts = new Set<string>();
+      if (!ids.length) return conflicts;
+      // batch in chunks of 200 to avoid URL limits
+      for (let i = 0; i < ids.length; i += 200) {
+        const chunk = ids.slice(i, i + 200);
+        const { data } = await supabase.from(table).select("id,user_id").in("id", chunk);
+        (data || []).forEach((row: any) => {
+          if (row.user_id && row.user_id !== userId) conflicts.add(row.id);
+        });
+      }
+      return conflicts;
+    };
+
+    const tablesToCheck: Array<[string, any[]]> = [
+      ["contacts", contacts],
+      ["funds", funds],
+      ["transactions", transactions],
+      ["debts", debts],
+      ["projects", projects],
+      ["containers", containers],
+      ["shipments", shipments],
+      ["currencies", currencies],
+      ["ledger_accounts", ledgerAccounts],
+      ["company_settings", companySettings],
+      ["shipment_payments", shipmentPayments],
+    ];
+    const foreignIdsByTable: Record<string, Set<string>> = {};
+    let foreignTotal = 0;
+    for (const [table, rows] of tablesToCheck) {
+      const conflicts = await checkOwnership(table, collectIds(rows));
+      if (conflicts.size) {
+        foreignIdsByTable[table] = conflicts;
+        foreignTotal += conflicts.size;
+      }
+    }
+    if (foreignTotal > 0) {
+      console.warn("Restore blocked - cross-company id conflicts:", JSON.stringify(
+        Object.fromEntries(Object.entries(foreignIdsByTable).map(([k, v]) => [k, v.size]))
+      ));
+      return new Response(JSON.stringify({
+        error: "تم رفض الاستعادة: ملف النسخة الاحتياطية يحتوي معرفات تخص شركة أخرى. الرجاء استخدام نسخة احتياطية تخص شركتك فقط.",
+        conflicts: Object.fromEntries(Object.entries(foreignIdsByTable).map(([k, v]) => [k, Array.from(v)])),
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     console.log(`Restore: contacts=${contacts.length}, funds=${funds.length}, tx=${transactions.length}, debts=${debts.length}, projects=${projects.length}, containers=${containers.length}, shipments=${shipments.length}, currencies=${currencies.length}`);
 
     const results: Record<string, { success: number; errors: number }> = {};
