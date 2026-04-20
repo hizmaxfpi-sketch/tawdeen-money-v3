@@ -74,11 +74,16 @@ export function useBusinessTransactions(transactions: Transaction[], options: Op
 
 export function isBusinessTransaction(tx: Transaction): boolean {
   if (tx.projectId) return false;
-  // استبعاد كافة قيود الإنتاج من سجل عمليات الأعمال (المبيعات/المشتريات/السداد)
+
+  // مصاريف بيع الإنتاج (production_sale_expense) تظهر في سجل الأعمال للعرض فقط
+  // هي قيود عرضية (بدون fund_id) لتوثيق المصاريف ضمن سجل الأعمال دون أثر على الصندوق
+  if (tx.sourceType === 'production_sale_expense') return true;
+
+  // استبعاد بقية قيود الإنتاج من سجل عمليات الأعمال (المبيعات/المشتريات/السداد/COGS)
   const PRODUCTION_SOURCES = new Set([
     'production_sale', 'production_sale_payment',
     'production_purchase', 'production_purchase_payment',
-    'production_cogs', 'production_sale_expense',
+    'production_cogs',
   ]);
   if (tx.sourceType && PRODUCTION_SOURCES.has(tx.sourceType)) return false;
 
