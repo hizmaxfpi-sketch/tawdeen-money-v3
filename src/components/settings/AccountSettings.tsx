@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { KeyRound, Mail, Loader2, User } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 export function AccountSettings() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [newEmail, setNewEmail] = useState('');
