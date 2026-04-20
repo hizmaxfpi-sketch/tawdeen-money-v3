@@ -13,8 +13,18 @@ export default {
       },
     },
     extend: {
+      fontSize: {
+        'xs': ['0.8125rem', { lineHeight: '1.25rem' }], // ~13.8px (approx +1px from 12.75px)
+        'sm': ['0.9375rem', { lineHeight: '1.5rem' }],  // ~15.9px (approx +1px from 14.875px)
+      },
       fontFamily: {
         tajawal: ["Tajawal", "Arial", "sans-serif"],
+      },
+      fontWeight: {
+        normal: '400',
+        medium: '500',
+        semibold: '600',
+        bold: '700',
       },
       colors: {
         border: "hsl(var(--border))",
