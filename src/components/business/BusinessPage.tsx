@@ -73,9 +73,24 @@ export function BusinessPage({
   
   const allCategories = useMemo(() => {
     const base = [...REVENUE_CATEGORIES, ...EXPENSE_CATEGORIES];
-    const customs = customCategories.filter((c: any) => !base.find(b => b.value === c.value));
-    return [...base, ...customs];
-  }, [customCategories]);
+    const existingValues = new Set(base.map(c => c.value));
+    const customs = customCategories.filter((c: any) => !existingValues.has(c.value));
+    customs.forEach((c: any) => existingValues.add(c.value));
+
+    const autoDetected = transactions
+      .filter(isBusinessTransaction)
+      .map(tx => tx.category)
+      .filter(category => !existingValues.has(category))
+      .map(category => {
+        existingValues.add(category);
+        return {
+          value: category,
+          label: category.startsWith('custom_') ? category.replace('custom_', '').replace(/_/g, ' ') : category.replace(/_/g, ' '),
+        };
+      });
+
+    return [...base, ...customs, ...autoDetected];
+  }, [customCategories, transactions]);
 
   const toggleCategory = (value: string) => {
     setSelectedCategories(prev =>
