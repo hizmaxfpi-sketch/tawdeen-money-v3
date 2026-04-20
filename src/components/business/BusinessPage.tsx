@@ -110,11 +110,14 @@ export function BusinessPage({
 
   const handleAddAsset = async () => {
     if (!assetForm.name || !assetForm.value) return;
+    // Convert monthly rate to yearly for storage (engine works in yearly)
+    const enteredRate = Number(assetForm.depreciationRate) || 0;
+    const yearlyRate = assetForm.depreciationPeriod === 'monthly' ? enteredRate * 12 : enteredRate;
     await addAsset({
       name: assetForm.name,
       value: Number(assetForm.value),
       purchaseDate: assetForm.purchaseDate,
-      depreciationRate: Number(assetForm.depreciationRate) || 0,
+      depreciationRate: yearlyRate,
       notes: assetForm.notes || undefined,
       fundId: assetForm.fundId || undefined,
       vendorId: assetForm.vendorId || undefined,
@@ -124,7 +127,8 @@ export function BusinessPage({
     });
     setAssetForm({
       name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
-      depreciationRate: '', notes: '', fundId: '', vendorId: '',
+      depreciationRate: '', depreciationPeriod: 'yearly',
+      notes: '', fundId: '', vendorId: '',
       paymentType: 'full', installmentCount: '1', depreciationFundId: '',
     });
     setShowAddAsset(false);
