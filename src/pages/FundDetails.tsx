@@ -11,6 +11,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { useLanguage } from '@/i18n/LanguageContext';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { UnifiedTransactionLog } from '@/components/shared/UnifiedTransactionLog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -242,31 +244,34 @@ export function FundDetails({ funds, transactions, currencies = [], onUpdateFund
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-gradient-primary text-primary-foreground shadow-lg">
-        <div className="container flex h-14 items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-primary-foreground/10">
-            <ArrowRight className="h-5 w-5" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold truncate">{fund.name}</h1>
-            <p className="text-xs opacity-80">{FUND_LABELS[fund.type]}</p>
-          </div>
-          <div className="flex items-center gap-1">
-            {onRefresh && (
-              <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10" onClick={onRefresh}>
-                <RefreshCw className="h-5 w-5" />
-              </Button>
-            )}
-            <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10" onClick={() => setShowPreview(true)}>
-              <Eye className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-background flex flex-col md:flex-row">
+      <Sidebar currentPage="funds" onNavigate={(page) => navigate(`/?page=${page}`)} />
 
-      <main className="container max-w-lg mx-auto px-4 py-4 space-y-4">
+      <div className="flex-1 flex flex-col min-h-screen md:mr-64 rtl:md:mr-64 ltr:md:ml-64">
+        {/* Header */}
+        <header className="sticky top-0 z-40 bg-gradient-primary text-primary-foreground shadow-lg">
+          <div className="container max-w-5xl mx-auto flex h-14 items-center gap-3 px-4">
+            <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-primary-foreground/10">
+              <ArrowRight className="h-5 w-5" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-bold truncate">{fund.name}</h1>
+              <p className="text-xs opacity-80">{FUND_LABELS[fund.type]}</p>
+            </div>
+            <div className="flex items-center gap-1">
+              {onRefresh && (
+                <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10" onClick={onRefresh}>
+                  <RefreshCw className="h-5 w-5" />
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10" onClick={() => setShowPreview(true)}>
+                <Eye className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        <main className="container max-w-lg mx-auto px-4 py-4 space-y-4 md:max-w-4xl lg:max-w-5xl pb-24">
         {/* Fund Info Card */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -429,7 +434,10 @@ export function FundDetails({ funds, transactions, currencies = [], onUpdateFund
         </div>
       </main>
 
-      <BottomNav currentPage="funds" onNavigate={(page) => navigate(`/?page=${page}`)} />
+        <div className="md:hidden">
+          <BottomNav currentPage="funds" onNavigate={(page) => navigate(`/?page=${page}`)} />
+        </div>
+      </div>
 
       {/* HD Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
