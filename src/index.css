@@ -149,6 +149,14 @@
     @apply border-border;
   }
 
+  .text-xs {
+    @apply font-medium;
+  }
+
+  .text-sm {
+    @apply font-medium;
+  }
+
   html {
     direction: rtl;
     scroll-behavior: smooth;
