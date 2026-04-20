@@ -33,31 +33,56 @@ export function ResetSettings() {
     setResetting(true);
     try {
       // حذف بالترتيب الصحيح لاحترام المفاتيح الأجنبية
-      // 1. حذف دفعات الشحن أولاً (تعتمد على الشحنات والصناديق)
+
+      // 1. مصاريف وخدمات مبيعات الإنتاج (تعتمد على المبيعات)
+      await supabase.from('production_sale_expenses' as any).delete().eq('user_id', user.id);
+      await supabase.from('production_sale_services' as any).delete().eq('user_id', user.id);
+
+      // 2. مبيعات الإنتاج وعمليات التشغيل ومشتريات المواد و BOM
+      await supabase.from('production_sales' as any).delete().eq('user_id', user.id);
+      await supabase.from('production_runs' as any).delete().eq('user_id', user.id);
+      await supabase.from('material_purchases' as any).delete().eq('user_id', user.id);
+      await supabase.from('product_bom' as any).delete().eq('user_id', user.id);
+
+      // 3. منتجات/خدمات/مواد الإنتاج
+      await supabase.from('production_products' as any).delete().eq('user_id', user.id);
+      await supabase.from('production_services' as any).delete().eq('user_id', user.id);
+      await supabase.from('production_materials' as any).delete().eq('user_id', user.id);
+
+      // 4. الأصول (دفعات وتحسينات ثم الأصول نفسها)
+      await supabase.from('asset_payments' as any).delete().eq('user_id', user.id);
+      await supabase.from('asset_improvements' as any).delete().eq('user_id', user.id);
+      await supabase.from('assets' as any).delete().eq('user_id', user.id);
+
+      // 5. مصاريف الحاويات
+      await supabase.from('container_expenses' as any).delete().eq('user_id', user.id);
+
+      // 6. دفعات الشحن (تعتمد على الشحنات والصناديق)
       await supabase.from('shipment_payments' as any).delete().eq('user_id', user.id);
-      
-      // 2. حذف دفعات الديون (تعتمد على الديون والصناديق)
+
+      // 7. دفعات الديون (تعتمد على الديون والصناديق)
       await supabase.from('debt_payments' as any).delete().eq('user_id', user.id);
-      
-      // 3. حذف العمليات المالية (تعتمد على الصناديق والحسابات والمشاريع والشحنات)
+
+      // 8. العمليات المالية (تعتمد على الصناديق والحسابات والمشاريع والشحنات)
       await supabase.from('transactions' as any).delete().eq('user_id', user.id);
-      
-      // 4. حذف الشحنات (تعتمد على الحاويات والحسابات)
+
+      // 9. الشحنات (تعتمد على الحاويات والحسابات)
       await supabase.from('shipments' as any).delete().eq('user_id', user.id);
-      
-      // 5. حذف الحاويات (تعتمد على الحسابات)
+
+      // 10. الحاويات (تعتمد على الحسابات)
       await supabase.from('containers' as any).delete().eq('user_id', user.id);
-      
-      // 6. حذف الديون (تعتمد على الحسابات والمشاريع)
+
+      // 11. الديون (تعتمد على الحسابات والمشاريع)
       await supabase.from('debts' as any).delete().eq('user_id', user.id);
-      
-      // 7. حذف المشاريع (تعتمد على الحسابات)
+
+      // 12. المشاريع (تعتمد على الحسابات)
       await supabase.from('projects' as any).delete().eq('user_id', user.id);
-      
-      // 8. حذف الحسابات
+
+      // 13. الحسابات الدفترية والاتصال
+      await supabase.from('ledger_accounts' as any).delete().eq('user_id', user.id);
       await supabase.from('contacts' as any).delete().eq('user_id', user.id);
-      
-      // 9. حذف البيانات المساعدة
+
+      // 14. البيانات المساعدة
       await supabase.from('currencies' as any).delete().eq('user_id', user.id);
       await supabase.from('activity_log' as any).delete().eq('user_id', user.id);
       await supabase.from('company_settings' as any).delete().eq('user_id', user.id);
