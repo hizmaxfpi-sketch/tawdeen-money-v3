@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { GoogleDriveBackup } from './GoogleDriveBackup';
+import { AutoBackupCard } from './AutoBackupCard';
 
 interface BackupSectionProps {
   onExportData: () => Promise<object> | object;
@@ -138,6 +139,9 @@ export function BackupSection({ onExportData, onImportData }: BackupSectionProps
         onChange={handleFileChange}
         className="hidden"
       />
+
+      {/* النسخ الاحتياطي التلقائي */}
+      <AutoBackupCard exportData={onExportData} />
 
       {/* Google Drive Integration */}
       <GoogleDriveBackup 
