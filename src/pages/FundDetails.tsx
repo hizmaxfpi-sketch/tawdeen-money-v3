@@ -434,7 +434,10 @@ export function FundDetails({ funds, transactions, currencies = [], onUpdateFund
         </div>
       </main>
 
-      <BottomNav currentPage="funds" onNavigate={(page) => navigate(`/?page=${page}`)} />
+        <div className="md:hidden">
+          <BottomNav currentPage="funds" onNavigate={(page) => navigate(`/?page=${page}`)} />
+        </div>
+      </div>
 
       {/* HD Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
