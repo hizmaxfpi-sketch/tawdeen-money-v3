@@ -115,7 +115,7 @@ export function useTransactions() {
   const rt = useRealtimeSync(['transactions'], () => {
     _cachedTransactions = null;
     _cacheTime = 0;
-    fetchTransactions(true);
+    fetchTransactions(true, false);
   });
   realtimeRef.current = rt;
 
