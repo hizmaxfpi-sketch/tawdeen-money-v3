@@ -68,11 +68,56 @@ Deno.serve(async (req) => {
     const currencies = asArray(body?.currencies);
     const companySettings = asArray(body?.company_settings ?? body?.companySettings);
     const ledgerAccounts = asArray(body?.ledger_accounts ?? body?.ledgerAccounts);
+    const backupMeta = body?.backupMeta ?? body?.backup_meta ?? {};
 
     const totalItems = contacts.length + funds.length + transactions.length + debts.length + projects.length + containers.length + shipments.length + currencies.length;
     if (totalItems === 0) {
       return new Response(JSON.stringify({ error: "Backup payload is empty" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: activeRole } = await supabase
+      .from("user_roles")
+      .select("company_id")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    const currentCompanyId = activeRole?.company_id ?? null;
+    if (!currentCompanyId) {
+      return new Response(JSON.stringify({ error: "لم يتم العثور على شركة مرتبطة بحسابك" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: companyMembers } = await supabase
+      .from("user_roles")
+      .select("user_id")
+      .eq("company_id", currentCompanyId)
+      .eq("is_active", true);
+
+    const allowedCompanyUserIds = Array.from(new Set([
+      userId,
+      ...(companyMembers || []).map((row: any) => row.user_id).filter(Boolean),
+    ]));
+    const allowedCompanyUserIdSet = new Set(allowedCompanyUserIds);
+
+    const resolveRowUserId = (candidate: unknown): string => {
+      const resolved = asString(candidate);
+      return resolved && allowedCompanyUserIdSet.has(resolved) ? resolved : userId;
+    };
+
+    const backupCompanyId = asString(backupMeta?.companyId);
+    if (backupCompanyId && backupCompanyId !== currentCompanyId) {
+      return new Response(JSON.stringify({
+        error: "تم رفض الاستعادة: هذه النسخة الاحتياطية تخص شركة مختلفة.",
+        backupCompanyId,
+        currentCompanyId,
+      }), {
+        status: 409,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -91,7 +136,7 @@ Deno.serve(async (req) => {
         const chunk = ids.slice(i, i + 200);
         const { data } = await supabase.from(table).select("id,user_id").in("id", chunk);
         (data || []).forEach((row: any) => {
-          if (row.user_id && row.user_id !== userId) conflicts.add(row.id);
+          if (row.user_id && !allowedCompanyUserIdSet.has(row.user_id)) conflicts.add(row.id);
         });
       }
       return conflicts;
@@ -148,7 +193,7 @@ Deno.serve(async (req) => {
         const contactId = asString(c.id) ?? crypto.randomUUID();
         const { error } = await supabase.from("contacts").upsert({
           id: contactId,
-          user_id: userId,
+          user_id: resolveRowUserId(c.user_id),
           name: asString(c.name) ?? "جهة اتصال",
           type: validEnum(c.type, ["client", "vendor", "shipping_agent", "employee", "partner", "other"] as const, "other"),
           custom_type: asString(c.custom_type ?? c.customType),
@@ -185,7 +230,7 @@ Deno.serve(async (req) => {
       for (const la of ledgerAccounts) {
         const { error } = await supabase.from("ledger_accounts").upsert({
           id: asString(la.id) ?? crypto.randomUUID(),
-          user_id: userId,
+          user_id: resolveRowUserId(la.user_id),
           name: asString(la.name) ?? "حساب",
           type: validEnum(la.type, ["client", "vendor", "partner", "investor", "employee", "custom"] as const, "client"),
           custom_type: asString(la.custom_type ?? la.customType),
@@ -206,7 +251,7 @@ Deno.serve(async (req) => {
       for (const cur of currencies) {
         const { error } = await supabase.from("currencies").upsert({
           id: asString(cur.id) ?? crypto.randomUUID(),
-          user_id: userId,
+          user_id: resolveRowUserId(cur.user_id),
           code: asString(cur.code) ?? "USD",
           name: asString(cur.name) ?? "عملة",
           symbol: asString(cur.symbol) ?? "$",
@@ -224,7 +269,7 @@ Deno.serve(async (req) => {
       for (const cs of companySettings) {
         const { error } = await supabase.from("company_settings").upsert({
           id: asString(cs.id) ?? crypto.randomUUID(),
-          user_id: userId,
+          user_id: resolveRowUserId(cs.user_id),
           company_name: asString(cs.company_name ?? cs.companyName),
           company_address: asString(cs.company_address ?? cs.companyAddress),
           company_phone: asString(cs.company_phone ?? cs.companyPhone),
@@ -244,7 +289,7 @@ Deno.serve(async (req) => {
         const fundId = asString(f.id) ?? crypto.randomUUID();
         const { error } = await supabase.from("funds").upsert({
           id: fundId,
-          user_id: userId,
+          user_id: resolveRowUserId(f.user_id),
           name: asString(f.name) ?? "صندوق",
           type: validEnum(f.type, ["cash", "bank", "wallet", "safe", "other"] as const, "cash"),
           balance: asNumber(f.balance),
@@ -267,7 +312,7 @@ Deno.serve(async (req) => {
         const vendorId = asString(p.vendorId ?? p.vendor_id);
         const { error } = await supabase.from("projects").upsert({
           id: projectId,
-          user_id: userId,
+          user_id: resolveRowUserId(p.user_id),
           name: asString(p.name) ?? "مشروع",
           notes: asString(p.description ?? p.notes),
           client_id: clientId && validContactIds.has(clientId) ? clientId : null,
@@ -299,7 +344,7 @@ Deno.serve(async (req) => {
         const agentId = asString(ct.shipping_agent_id ?? ct.shippingAgentId);
         const { error } = await supabase.from("containers").upsert({
           id: containerId,
-          user_id: userId,
+          user_id: resolveRowUserId(ct.user_id),
           container_number: asString(ct.container_number ?? ct.containerNumber) ?? "CONT-???",
           type: asString(ct.type) ?? "40ft",
           capacity: asNumber(ct.capacity, 67),
@@ -346,7 +391,7 @@ Deno.serve(async (req) => {
         if (!containerId || !validContainerIds.has(containerId)) { errors++; continue; }
         const { error } = await supabase.from("shipments").upsert({
           id: shipmentId,
-          user_id: userId,
+          user_id: resolveRowUserId(s.user_id),
           container_id: containerId,
           client_id: clientId && validContactIds.has(clientId) ? clientId : null,
           client_name: asString(s.client_name ?? s.clientName) ?? "",
@@ -393,7 +438,7 @@ Deno.serve(async (req) => {
         if (!shipmentId || !validShipmentIds.has(shipmentId)) { errors++; continue; }
         const { error } = await supabase.from("shipment_payments").upsert({
           id: asString(sp.id) ?? crypto.randomUUID(),
-          user_id: userId,
+          user_id: resolveRowUserId(sp.user_id),
           shipment_id: shipmentId,
           amount: asNumber(sp.amount),
           date: asString(sp.date) ?? new Date().toISOString(),
@@ -415,7 +460,7 @@ Deno.serve(async (req) => {
         const shipmentId = asString(t.shipment_id ?? t.shipmentId);
         const { error } = await supabase.from("transactions").upsert({
           id: asString(t.id) ?? crypto.randomUUID(),
-          user_id: userId,
+          user_id: resolveRowUserId(t.user_id),
           type: validEnum(t.type, ["in", "out"] as const, "out"),
           category: asString(t.category) ?? "general",
           amount: asNumber(t.amount),
@@ -450,7 +495,7 @@ Deno.serve(async (req) => {
         const projectId = asString(d.projectId ?? d.project_id);
         const { error } = await supabase.from("debts").upsert({
           id: debtId,
-          user_id: userId,
+          user_id: resolveRowUserId(d.user_id),
           type: validEnum(d.type, ["receivable", "payable"] as const, "receivable"),
           contact_id: contactId && validContactIds.has(contactId) ? contactId : null,
           account_id: null,
@@ -469,7 +514,7 @@ Deno.serve(async (req) => {
             const paymentFundId = asString(p.fundId ?? p.fund_id);
             await supabase.from("debt_payments").upsert({
               id: asString(p.id) ?? crypto.randomUUID(),
-              user_id: userId,
+              user_id: resolveRowUserId(p.user_id ?? d.user_id),
               debt_id: debtId,
               amount: asNumber(p.amount),
               date: asString(p.date) ?? new Date().toISOString(),
@@ -482,7 +527,55 @@ Deno.serve(async (req) => {
       results.debts = { success, errors };
     }
 
-    // 12. Sync contact balances
+    // 12. Recalculate fund balances from actual ledger entries
+    const fundIdsToReconcile = new Set<string>(validFundIds);
+    const { data: companyFunds } = await supabase
+      .from("funds")
+      .select("id")
+      .in("user_id", allowedCompanyUserIds);
+
+    (companyFunds || []).forEach((row: any) => {
+      if (row?.id) fundIdsToReconcile.add(row.id);
+    });
+
+    if (fundIdsToReconcile.size > 0) {
+      const fundIdList = Array.from(fundIdsToReconcile);
+      const ledgerEffectByFund = new Map<string, number>();
+
+      for (let i = 0; i < fundIdList.length; i += 200) {
+        const chunk = fundIdList.slice(i, i + 200);
+        const { data: txRows } = await supabase
+          .from("transactions")
+          .select("fund_id,type,amount,user_id")
+          .in("fund_id", chunk)
+          .in("user_id", allowedCompanyUserIds);
+
+        for (const row of txRows || []) {
+          if (!row?.fund_id) continue;
+          const signedAmount = row.type === "in" ? asNumber(row.amount) : -asNumber(row.amount);
+          ledgerEffectByFund.set(row.fund_id, (ledgerEffectByFund.get(row.fund_id) || 0) + signedAmount);
+        }
+      }
+
+      let success = 0, errors = 0;
+      for (const fundId of fundIdList) {
+        const balance = Number((ledgerEffectByFund.get(fundId) || 0).toFixed(6));
+        const { error } = await supabase
+          .from("funds")
+          .update({ balance })
+          .eq("id", fundId);
+
+        if (error) {
+          console.error("Fund reconcile:", JSON.stringify(error));
+          errors++;
+        } else {
+          success++;
+        }
+      }
+      results.funds_reconciled = { success, errors };
+    }
+
+    // 13. Sync contact balances
     await supabase.rpc("sync_contact_balances_admin", { p_user_id: userId });
 
     console.log("Restore complete:", JSON.stringify(results));
