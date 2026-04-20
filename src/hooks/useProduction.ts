@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -56,37 +56,50 @@ export function useProduction() {
     setLoading(false);
   }, [user]);
 
+  // Debounced reload to coalesce many realtime events into one fetch
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleReload = useCallback(() => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => {
+      reloadTimerRef.current = null;
+      loadAll();
+    }, 1500);
+  }, [loadAll]);
+
   useEffect(() => { loadAll(); }, [loadAll]);
 
   useEffect(() => {
     if (!user) return;
     const ch = supabase
       .channel('production-' + user.id)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_materials' }, () => loadAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_products' }, () => loadAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_sales' }, () => loadAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_bom' }, () => loadAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_services' as any }, () => loadAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_materials' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_products' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_sales' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_bom' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_services' as any }, scheduleReload)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [user, loadAll]);
+    return () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      supabase.removeChannel(ch);
+    };
+  }, [user, scheduleReload]);
 
   // Materials
   const addMaterial = async (data: { name: string; code?: string; unit: string; notes?: string }): Promise<void> => {
     if (!user) return;
     const { error } = await supabase.from('production_materials').insert({ ...data, user_id: user.id, quantity: 0, avg_cost: 0 });
     if (error) { toast.error('فشل إضافة المادة'); return; }
-    toast.success('تمت إضافة المادة'); loadAll();
+    toast.success('تمت إضافة المادة'); scheduleReload();
   };
   const updateMaterial = async (id: string, patch: Partial<ProductionMaterial>): Promise<void> => {
     const { error } = await supabase.from('production_materials').update(patch).eq('id', id);
     if (error) { toast.error('فشل التحديث'); return; }
-    toast.success('تم التحديث'); loadAll();
+    toast.success('تم التحديث'); scheduleReload();
   };
   const deleteMaterial = async (id: string): Promise<void> => {
     const { error } = await supabase.from('production_materials').delete().eq('id', id);
     if (error) { toast.error('فشل الحذف'); return; }
-    toast.success('تم الحذف'); loadAll();
+    toast.success('تم الحذف'); scheduleReload();
   };
   const purchaseMaterial = async (params: any) => {
     const { error } = await supabase.rpc('purchase_material', {
@@ -96,7 +109,7 @@ export function useProduction() {
       p_date: params.date || new Date().toISOString().slice(0, 10), p_notes: params.notes,
     });
     if (error) { toast.error(error.message || 'فشل الشراء'); return false; }
-    toast.success('تم تسجيل الشراء'); loadAll(); return true;
+    toast.success('تم تسجيل الشراء'); scheduleReload(); return true;
   };
 
   // Products
@@ -104,17 +117,17 @@ export function useProduction() {
     if (!user) return;
     const { error } = await supabase.from('production_products').insert({ ...data, user_id: user.id, quantity: 0, unit_cost: 0 });
     if (error) { toast.error('فشل الإضافة'); return; }
-    toast.success('تمت الإضافة'); loadAll();
+    toast.success('تمت الإضافة'); scheduleReload();
   };
   const updateProduct = async (id: string, patch: Partial<ProductionProduct>): Promise<void> => {
     const { error } = await supabase.from('production_products').update(patch).eq('id', id);
     if (error) { toast.error('فشل التحديث'); return; }
-    toast.success('تم التحديث'); loadAll();
+    toast.success('تم التحديث'); scheduleReload();
   };
   const deleteProduct = async (id: string): Promise<void> => {
     const { error } = await supabase.from('production_products').delete().eq('id', id);
     if (error) { toast.error('فشل الحذف'); return; }
-    toast.success('تم الحذف'); loadAll();
+    toast.success('تم الحذف'); scheduleReload();
   };
 
   // Services
@@ -122,17 +135,17 @@ export function useProduction() {
     if (!user) return;
     const { error } = await (supabase as any).from('production_services').insert({ ...data, unit_type: data.unit_type || 'piece', user_id: user.id });
     if (error) { toast.error('فشل إضافة الخدمة'); return; }
-    toast.success('تمت إضافة الخدمة'); loadAll();
+    toast.success('تمت إضافة الخدمة'); scheduleReload();
   };
   const updateService = async (id: string, patch: Partial<ProductionService>): Promise<void> => {
     const { error } = await (supabase as any).from('production_services').update(patch).eq('id', id);
     if (error) { toast.error('فشل التحديث'); return; }
-    toast.success('تم التحديث'); loadAll();
+    toast.success('تم التحديث'); scheduleReload();
   };
   const deleteService = async (id: string): Promise<void> => {
     const { error } = await (supabase as any).from('production_services').delete().eq('id', id);
     if (error) { toast.error('فشل الحذف'); return; }
-    toast.success('تم الحذف'); loadAll();
+    toast.success('تم الحذف'); scheduleReload();
   };
 
   // BOM
@@ -144,7 +157,7 @@ export function useProduction() {
       const { error } = await supabase.from('product_bom').insert(rows);
       if (error) { toast.error('فشل حفظ المكونات'); return; }
     }
-    toast.success('تم حفظ مكونات المنتج'); loadAll();
+    toast.success('تم حفظ مكونات المنتج'); scheduleReload();
   };
 
   const produceProduct = async (params: { product_id: string; quantity: number; date?: string; notes?: string }) => {
@@ -153,7 +166,7 @@ export function useProduction() {
       p_date: params.date || new Date().toISOString().slice(0, 10), p_notes: params.notes,
     });
     if (error) { toast.error(error.message || 'فشل التصنيع'); return false; }
-    toast.success('تم تسجيل عملية الإنتاج'); loadAll(); return true;
+    toast.success('تم تسجيل عملية الإنتاج'); scheduleReload(); return true;
   };
 
   // Sell Product (with services & expenses)
@@ -170,7 +183,7 @@ export function useProduction() {
       p_services: params.services || [], p_expenses: params.expenses || [],
     });
     if (error) { toast.error(error.message || 'فشل البيع'); return false; }
-    toast.success('تم تسجيل البيع'); loadAll(); return true;
+    toast.success('تم تسجيل البيع'); scheduleReload(); return true;
   };
 
   // Sell Raw Material directly
@@ -187,7 +200,7 @@ export function useProduction() {
       p_services: params.services || [], p_expenses: params.expenses || [],
     });
     if (error) { toast.error(error.message || 'فشل البيع المباشر'); return false; }
-    toast.success('تم تسجيل البيع المباشر'); loadAll(); return true;
+    toast.success('تم تسجيل البيع المباشر'); scheduleReload(); return true;
   };
 
   const updateSale = async (saleId: string, params: any) => {
@@ -197,22 +210,22 @@ export function useProduction() {
       p_paid_amount: params.paid_amount || 0, p_date: params.date || null, p_notes: params.notes || null,
     });
     if (error) { toast.error(error.message || 'فشل التعديل'); return false; }
-    toast.success('تم التعديل'); loadAll(); return true;
+    toast.success('تم التعديل'); scheduleReload(); return true;
   };
   const deleteSale = async (saleId: string) => {
     const { error } = await (supabase.rpc as any)('reverse_production_sale', { p_sale_id: saleId });
     if (error) { toast.error(error.message || 'فشل الحذف'); return false; }
-    toast.success('تم حذف البيع وعكس أثره'); loadAll(); return true;
+    toast.success('تم حذف البيع وعكس أثره'); scheduleReload(); return true;
   };
   const deleteRun = async (runId: string) => {
     const { error } = await (supabase.rpc as any)('reverse_production_run', { p_run_id: runId });
     if (error) { toast.error(error.message || 'فشل الإلغاء'); return false; }
-    toast.success('تم الإلغاء'); loadAll(); return true;
+    toast.success('تم الإلغاء'); scheduleReload(); return true;
   };
   const deletePurchase = async (purchaseId: string) => {
     const { error } = await (supabase.rpc as any)('reverse_material_purchase', { p_purchase_id: purchaseId });
     if (error) { toast.error(error.message || 'فشل الإلغاء'); return false; }
-    toast.success('تم الإلغاء'); loadAll(); return true;
+    toast.success('تم الإلغاء'); scheduleReload(); return true;
   };
 
   return {
