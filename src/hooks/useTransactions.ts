@@ -56,58 +56,52 @@ export function useTransactions() {
   const fetchTransactions = useCallback(async (reset = false) => {
     if (!user) return;
 
-    const currentPage = reset ? 0 : page;
-
-    // استخدام الكاش إذا كان حديثاً والطلب ليس لإعادة الضبط
-    if (!reset && currentPage === 0 && _cachedTransactions && _cacheUserId === user.id && (Date.now() - _cacheTime) < CACHE_TTL) {
+    // استخدام الكاش إذا كان حديثاً
+    if (!reset && _cachedTransactions && _cacheUserId === user.id && (Date.now() - _cacheTime) < CACHE_TTL) {
       setTransactions(_cachedTransactions as any);
       setLoading(false);
       setInitialLoaded(true);
       return;
     }
 
-    if (reset || !initialLoaded) setLoading(true);
-    else setLoadingMore(true);
+    setLoading(true);
 
-    const from = currentPage * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+    // جلب جميع الحركات بصفحات داخلية حتى تنتهي
+    const all: any[] = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('id, type, category, amount, description, date, fund_id, account_id, contact_id, project_id, notes, attachments, created_at, currency_code, exchange_rate, source_type, created_by_name')
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
 
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('id, type, category, amount, description, date, fund_id, account_id, contact_id, project_id, notes, attachments, created_at, currency_code, exchange_rate, source_type, created_by_name')
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (error) {
-      console.error('Error fetching transactions:', error);
-      toast.error('خطأ في جلب البيانات');
-      setLoading(false);
-      setLoadingMore(false);
-      return;
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        toast.error('خطأ في جلب البيانات');
+        setLoading(false);
+        setLoadingMore(false);
+        return;
+      }
+      const batch = data || [];
+      all.push(...batch);
+      if (batch.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
     }
 
-    const mapped = (data || []).map(mapTransaction);
-
-    if (reset || currentPage === 0) {
-      setTransactions(mapped);
-      cacheSet('transactions', mapped);
-      _cachedTransactions = mapped;
-      _cacheUserId = user.id;
-      _cacheTime = Date.now();
-      setPage(0);
-    } else {
-      setTransactions(prev => {
-        const combined = [...prev, ...mapped];
-        return combined.sort(compareTransactionsByBusinessDateDesc);
-      });
-    }
-
-    setHasMore((data || []).length === PAGE_SIZE);
+    const mapped = all.map(mapTransaction);
+    setTransactions(mapped);
+    cacheSet('transactions', mapped);
+    _cachedTransactions = mapped;
+    _cacheUserId = user.id;
+    _cacheTime = Date.now();
+    setPage(0);
+    setHasMore(false); // تم جلب الكل
     setLoading(false);
     setLoadingMore(false);
     setInitialLoaded(true);
-  }, [user, page, initialLoaded]);
+  }, [user, initialLoaded]);
 
   useEffect(() => {
     if (user) fetchTransactions(true);
