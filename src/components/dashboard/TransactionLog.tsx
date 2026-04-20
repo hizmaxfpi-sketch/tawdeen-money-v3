@@ -77,6 +77,7 @@ export function TransactionLog({ transactions, onEditTransaction }: TransactionL
       partner_payment: 'دفع شريك',
       partner_collection: 'تحصيل شريك',
       fund_transfer: 'تحويل',
+      production_expense: 'مصروف بيع إنتاج',
       other: 'أخرى',
     };
     return labels[category] || category;

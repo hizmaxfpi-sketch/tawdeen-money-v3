@@ -135,6 +135,7 @@ export function UnifiedTransactionLog({
       debt_collection: 'تحصيل دين',
       ledger_debit: 'قيد مدين',
       ledger_credit: 'قيد دائن',
+      production_expense: 'مصروف بيع إنتاج',
       other: 'أخرى',
     };
     return labels[category] || category;
