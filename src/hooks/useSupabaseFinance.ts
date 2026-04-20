@@ -138,6 +138,13 @@ export function useSupabaseFinance() {
       paymentsByDebt.set(debtId, existing);
     }
 
+    const { data: activeRole } = await supabase
+      .from('user_roles')
+      .select('company_id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle();
+
     return {
       contacts,
       funds,
@@ -153,8 +160,12 @@ export function useSupabaseFinance() {
       currencies,
       company_settings: companySettings,
       ledger_accounts: ledgerAccounts,
+      backupMeta: {
+        companyId: activeRole?.company_id || null,
+        exportedByUserId: user.id,
+      },
       exportedAt: new Date().toISOString(),
-      backupVersion: 3,
+      backupVersion: 4,
     };
   }, [fetchAllRows, user]);
 
