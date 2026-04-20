@@ -557,6 +557,326 @@ Deno.serve(async (req) => {
       results.debts = { success, errors };
     }
 
+    // ============= Production Module =============
+    const validMaterialIds = new Set<string>();
+    const validProductIds = new Set<string>();
+    const validServiceIds = new Set<string>();
+    const validSaleIds = new Set<string>();
+    const validAssetIds = new Set<string>();
+
+    // Production materials
+    if (productionMaterials.length) {
+      let success = 0, errors = 0;
+      for (const m of productionMaterials) {
+        const id = asString(m.id) ?? crypto.randomUUID();
+        const { error } = await supabase.from("production_materials").upsert({
+          id,
+          user_id: resolveRowUserId(m.user_id),
+          name: asString(m.name) ?? "مادة",
+          code: asString(m.code),
+          unit: asString(m.unit) ?? "pcs",
+          quantity: asNumber(m.quantity),
+          avg_cost: asNumber(m.avg_cost ?? m.avgCost),
+          notes: asString(m.notes),
+          created_by_name: asString(m.created_by_name ?? m.createdByName),
+        }, { onConflict: "id" });
+        if (error) { console.error("Material:", JSON.stringify(error)); errors++; }
+        else { success++; validMaterialIds.add(id); }
+      }
+      results.production_materials = { success, errors };
+    }
+
+    // Production products
+    if (productionProducts.length) {
+      let success = 0, errors = 0;
+      for (const p of productionProducts) {
+        const id = asString(p.id) ?? crypto.randomUUID();
+        const { error } = await supabase.from("production_products").upsert({
+          id,
+          user_id: resolveRowUserId(p.user_id),
+          name: asString(p.name) ?? "منتج",
+          code: asString(p.code),
+          unit: asString(p.unit) ?? "pcs",
+          quantity: asNumber(p.quantity),
+          unit_cost: asNumber(p.unit_cost ?? p.unitCost),
+          sell_price: asNumber(p.sell_price ?? p.sellPrice),
+          notes: asString(p.notes),
+          created_by_name: asString(p.created_by_name ?? p.createdByName),
+        }, { onConflict: "id" });
+        if (error) { console.error("Product:", JSON.stringify(error)); errors++; }
+        else { success++; validProductIds.add(id); }
+      }
+      results.production_products = { success, errors };
+    }
+
+    // Production services
+    if (productionServices.length) {
+      let success = 0, errors = 0;
+      for (const s of productionServices) {
+        const id = asString(s.id) ?? crypto.randomUUID();
+        const { error } = await supabase.from("production_services").upsert({
+          id,
+          user_id: resolveRowUserId(s.user_id),
+          name: asString(s.name) ?? "خدمة",
+          code: asString(s.code),
+          default_price: asNumber(s.default_price ?? s.defaultPrice),
+          unit_type: asString(s.unit_type ?? s.unitType) ?? "piece",
+          custom_unit: asString(s.custom_unit ?? s.customUnit),
+          notes: asString(s.notes),
+          created_by_name: asString(s.created_by_name ?? s.createdByName),
+        }, { onConflict: "id" });
+        if (error) { console.error("Service:", JSON.stringify(error)); errors++; }
+        else { success++; validServiceIds.add(id); }
+      }
+      results.production_services = { success, errors };
+    }
+
+    // Product BOM
+    if (productBom.length) {
+      let success = 0, errors = 0;
+      for (const b of productBom) {
+        const productId = asString(b.product_id ?? b.productId);
+        const materialId = asString(b.material_id ?? b.materialId);
+        if (!productId || !validProductIds.has(productId)) { errors++; continue; }
+        if (!materialId || !validMaterialIds.has(materialId)) { errors++; continue; }
+        const { error } = await supabase.from("product_bom").upsert({
+          id: asString(b.id) ?? crypto.randomUUID(),
+          user_id: resolveRowUserId(b.user_id),
+          product_id: productId,
+          material_id: materialId,
+          qty_per_unit: asNumber(b.qty_per_unit ?? b.qtyPerUnit),
+        }, { onConflict: "id" });
+        if (error) { console.error("BOM:", JSON.stringify(error)); errors++; } else success++;
+      }
+      results.product_bom = { success, errors };
+    }
+
+    // Material purchases
+    if (materialPurchases.length) {
+      let success = 0, errors = 0;
+      for (const mp of materialPurchases) {
+        const materialId = asString(mp.material_id ?? mp.materialId);
+        if (!materialId || !validMaterialIds.has(materialId)) { errors++; continue; }
+        const contactId = asString(mp.contact_id ?? mp.contactId);
+        const fundId = asString(mp.fund_id ?? mp.fundId);
+        const { error } = await supabase.from("material_purchases").upsert({
+          id: asString(mp.id) ?? crypto.randomUUID(),
+          user_id: resolveRowUserId(mp.user_id),
+          material_id: materialId,
+          contact_id: contactId && validContactIds.has(contactId) ? contactId : null,
+          fund_id: fundId && validFundIds.has(fundId) ? fundId : null,
+          quantity: asNumber(mp.quantity),
+          unit_price: asNumber(mp.unit_price ?? mp.unitPrice),
+          total_amount: asNumber(mp.total_amount ?? mp.totalAmount),
+          paid_amount: asNumber(mp.paid_amount ?? mp.paidAmount),
+          date: asString(mp.date) ?? new Date().toISOString().split("T")[0],
+          notes: asString(mp.notes),
+          created_by_name: asString(mp.created_by_name ?? mp.createdByName),
+        }, { onConflict: "id" });
+        if (error) { console.error("MaterialPurchase:", JSON.stringify(error)); errors++; } else success++;
+      }
+      results.material_purchases = { success, errors };
+    }
+
+    // Production runs
+    if (productionRuns.length) {
+      let success = 0, errors = 0;
+      for (const r of productionRuns) {
+        const productId = asString(r.product_id ?? r.productId);
+        if (!productId || !validProductIds.has(productId)) { errors++; continue; }
+        const { error } = await supabase.from("production_runs").upsert({
+          id: asString(r.id) ?? crypto.randomUUID(),
+          user_id: resolveRowUserId(r.user_id),
+          product_id: productId,
+          quantity: asNumber(r.quantity),
+          unit_cost: asNumber(r.unit_cost ?? r.unitCost),
+          total_cost: asNumber(r.total_cost ?? r.totalCost),
+          date: asString(r.date) ?? new Date().toISOString().split("T")[0],
+          notes: asString(r.notes),
+          created_by_name: asString(r.created_by_name ?? r.createdByName),
+        }, { onConflict: "id" });
+        if (error) { console.error("Run:", JSON.stringify(error)); errors++; } else success++;
+      }
+      results.production_runs = { success, errors };
+    }
+
+    // Production sales
+    if (productionSales.length) {
+      let success = 0, errors = 0;
+      for (const s of productionSales) {
+        const id = asString(s.id) ?? crypto.randomUUID();
+        const productId = asString(s.product_id ?? s.productId);
+        const materialId = asString(s.material_id ?? s.materialId);
+        const contactId = asString(s.contact_id ?? s.contactId);
+        const fundId = asString(s.fund_id ?? s.fundId);
+        const { error } = await supabase.from("production_sales").upsert({
+          id,
+          user_id: resolveRowUserId(s.user_id),
+          source_type: asString(s.source_type ?? s.sourceType) ?? "product",
+          product_id: productId && validProductIds.has(productId) ? productId : null,
+          material_id: materialId && validMaterialIds.has(materialId) ? materialId : null,
+          contact_id: contactId && validContactIds.has(contactId) ? contactId : null,
+          fund_id: fundId && validFundIds.has(fundId) ? fundId : null,
+          quantity: asNumber(s.quantity),
+          unit_price: asNumber(s.unit_price ?? s.unitPrice),
+          total_amount: asNumber(s.total_amount ?? s.totalAmount),
+          paid_amount: asNumber(s.paid_amount ?? s.paidAmount),
+          cost_at_sale: asNumber(s.cost_at_sale ?? s.costAtSale),
+          services_total: asNumber(s.services_total ?? s.servicesTotal),
+          expenses_total: asNumber(s.expenses_total ?? s.expensesTotal),
+          expenses_as_business: s.expenses_as_business ?? s.expensesAsBusiness ?? true,
+          profit: asNumber(s.profit),
+          date: asString(s.date) ?? new Date().toISOString().split("T")[0],
+          notes: asString(s.notes),
+          created_by_name: asString(s.created_by_name ?? s.createdByName),
+        }, { onConflict: "id" });
+        if (error) { console.error("Sale:", JSON.stringify(error)); errors++; }
+        else { success++; validSaleIds.add(id); }
+      }
+      results.production_sales = { success, errors };
+    }
+
+    // Production sale services
+    if (productionSaleServices.length) {
+      let success = 0, errors = 0;
+      for (const ss of productionSaleServices) {
+        const saleId = asString(ss.sale_id ?? ss.saleId);
+        if (!saleId || !validSaleIds.has(saleId)) { errors++; continue; }
+        const serviceId = asString(ss.service_id ?? ss.serviceId);
+        const { error } = await supabase.from("production_sale_services").upsert({
+          id: asString(ss.id) ?? crypto.randomUUID(),
+          user_id: resolveRowUserId(ss.user_id),
+          sale_id: saleId,
+          service_id: serviceId && validServiceIds.has(serviceId) ? serviceId : null,
+          name: asString(ss.name) ?? "خدمة",
+          amount: asNumber(ss.amount),
+        }, { onConflict: "id" });
+        if (error) { console.error("SaleService:", JSON.stringify(error)); errors++; } else success++;
+      }
+      results.production_sale_services = { success, errors };
+    }
+
+    // Production sale expenses
+    if (productionSaleExpenses.length) {
+      let success = 0, errors = 0;
+      for (const se of productionSaleExpenses) {
+        const saleId = asString(se.sale_id ?? se.saleId);
+        if (!saleId || !validSaleIds.has(saleId)) { errors++; continue; }
+        const fundId = asString(se.fund_id ?? se.fundId);
+        const { error } = await supabase.from("production_sale_expenses").upsert({
+          id: asString(se.id) ?? crypto.randomUUID(),
+          user_id: resolveRowUserId(se.user_id),
+          sale_id: saleId,
+          description: asString(se.description) ?? "مصروف",
+          amount: asNumber(se.amount),
+          fund_id: fundId && validFundIds.has(fundId) ? fundId : null,
+          treat_as_business: se.treat_as_business ?? se.treatAsBusiness ?? true,
+        }, { onConflict: "id" });
+        if (error) { console.error("SaleExpense:", JSON.stringify(error)); errors++; } else success++;
+      }
+      results.production_sale_expenses = { success, errors };
+    }
+
+    // ============= Assets Module =============
+    if (assets.length) {
+      let success = 0, errors = 0;
+      for (const a of assets) {
+        const id = asString(a.id) ?? crypto.randomUUID();
+        const fundId = asString(a.fund_id ?? a.fundId);
+        const depFundId = asString(a.depreciation_fund_id ?? a.depreciationFundId);
+        const vendorId = asString(a.vendor_id ?? a.vendorId);
+        const { error } = await supabase.from("assets").upsert({
+          id,
+          user_id: resolveRowUserId(a.user_id),
+          name: asString(a.name) ?? "أصل",
+          value: asNumber(a.value),
+          current_value: asNumber(a.current_value ?? a.currentValue),
+          paid_amount: asNumber(a.paid_amount ?? a.paidAmount),
+          installment_count: asNumber(a.installment_count ?? a.installmentCount, 1),
+          payment_type: asString(a.payment_type ?? a.paymentType) ?? "full",
+          purchase_date: asString(a.purchase_date ?? a.purchaseDate) ?? new Date().toISOString().split("T")[0],
+          depreciation_rate: asNumber(a.depreciation_rate ?? a.depreciationRate),
+          monthly_depreciation: asNumber(a.monthly_depreciation ?? a.monthlyDepreciation),
+          total_depreciation: asNumber(a.total_depreciation ?? a.totalDepreciation),
+          fund_id: fundId && validFundIds.has(fundId) ? fundId : null,
+          depreciation_fund_id: depFundId && validFundIds.has(depFundId) ? depFundId : null,
+          vendor_id: vendorId && validContactIds.has(vendorId) ? vendorId : null,
+          status: asString(a.status) ?? "active",
+          notes: asString(a.notes),
+        }, { onConflict: "id" });
+        if (error) { console.error("Asset:", JSON.stringify(error)); errors++; }
+        else { success++; validAssetIds.add(id); }
+      }
+      results.assets = { success, errors };
+    }
+
+    if (assetPayments.length) {
+      let success = 0, errors = 0;
+      for (const ap of assetPayments) {
+        const assetId = asString(ap.asset_id ?? ap.assetId);
+        if (!assetId || !validAssetIds.has(assetId)) { errors++; continue; }
+        const fundId = asString(ap.fund_id ?? ap.fundId);
+        const { error } = await supabase.from("asset_payments").upsert({
+          id: asString(ap.id) ?? crypto.randomUUID(),
+          user_id: resolveRowUserId(ap.user_id),
+          asset_id: assetId,
+          due_date: asString(ap.due_date ?? ap.dueDate) ?? new Date().toISOString().split("T")[0],
+          paid_date: asString(ap.paid_date ?? ap.paidDate),
+          amount: asNumber(ap.amount),
+          fund_id: fundId && validFundIds.has(fundId) ? fundId : null,
+          status: asString(ap.status) ?? "pending",
+          note: asString(ap.note),
+        }, { onConflict: "id" });
+        if (error) { console.error("AssetPayment:", JSON.stringify(error)); errors++; } else success++;
+      }
+      results.asset_payments = { success, errors };
+    }
+
+    if (assetImprovements.length) {
+      let success = 0, errors = 0;
+      for (const ai of assetImprovements) {
+        const assetId = asString(ai.asset_id ?? ai.assetId);
+        if (!assetId || !validAssetIds.has(assetId)) { errors++; continue; }
+        const fundId = asString(ai.fund_id ?? ai.fundId);
+        const { error } = await supabase.from("asset_improvements").upsert({
+          id: asString(ai.id) ?? crypto.randomUUID(),
+          user_id: resolveRowUserId(ai.user_id),
+          asset_id: assetId,
+          name: asString(ai.name) ?? "تحسين",
+          amount: asNumber(ai.amount),
+          fund_id: fundId && validFundIds.has(fundId) ? fundId : null,
+          date: asString(ai.date) ?? new Date().toISOString().split("T")[0],
+          note: asString(ai.note),
+        }, { onConflict: "id" });
+        if (error) { console.error("AssetImprovement:", JSON.stringify(error)); errors++; } else success++;
+      }
+      results.asset_improvements = { success, errors };
+    }
+
+    // Container expenses
+    if (containerExpenses.length) {
+      let success = 0, errors = 0;
+      for (const ce of containerExpenses) {
+        const containerId = asString(ce.container_id ?? ce.containerId);
+        if (!containerId || !validContainerIds.has(containerId)) { errors++; continue; }
+        const contactId = asString(ce.contact_id ?? ce.contactId);
+        const fundId = asString(ce.fund_id ?? ce.fundId);
+        const { error } = await supabase.from("container_expenses").upsert({
+          id: asString(ce.id) ?? crypto.randomUUID(),
+          user_id: resolveRowUserId(ce.user_id),
+          container_id: containerId,
+          contact_id: contactId && validContactIds.has(contactId) ? contactId : null,
+          fund_id: fundId && validFundIds.has(fundId) ? fundId : null,
+          description: asString(ce.description) ?? "",
+          amount: asNumber(ce.amount),
+          date: asString(ce.date) ?? new Date().toISOString().split("T")[0],
+          notes: asString(ce.notes),
+        }, { onConflict: "id" });
+        if (error) { console.error("ContainerExpense:", JSON.stringify(error)); errors++; } else success++;
+      }
+      results.container_expenses = { success, errors };
+    }
+
     // 12. Recalculate fund balances from actual ledger entries
     const fundIdsToReconcile = new Set<string>(validFundIds);
     const { data: companyFunds } = await supabase
