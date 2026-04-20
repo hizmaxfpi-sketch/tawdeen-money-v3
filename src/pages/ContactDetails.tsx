@@ -239,18 +239,21 @@ export function ContactDetails() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-gradient-primary text-primary-foreground shadow-lg">
-        <div className="container flex h-14 items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-primary-foreground/10">
-            <ArrowRight className="h-5 w-5" />
-          </button>
-          <h1 className="text-sm font-bold flex-1">تفاصيل الحساب الدفتري</h1>
-        </div>
-      </header>
+    <div className="min-h-screen bg-background flex flex-col md:flex-row">
+      <Sidebar currentPage="accounts" onNavigate={(page) => navigate(`/?page=${page}`)} />
 
-      <main className="container max-w-lg mx-auto px-4 py-4 space-y-4">
+      <div className="flex-1 flex flex-col min-h-screen md:mr-64 rtl:md:mr-64 ltr:md:ml-64">
+        {/* Header */}
+        <header className="sticky top-0 z-40 bg-gradient-primary text-primary-foreground shadow-lg">
+          <div className="container max-w-5xl mx-auto flex h-14 items-center gap-3 px-4">
+            <button onClick={() => navigate(-1)} className="p-2 rounded-full hover:bg-primary-foreground/10">
+              <ArrowRight className="h-5 w-5" />
+            </button>
+            <h1 className="text-sm font-bold flex-1">تفاصيل الحساب الدفتري</h1>
+          </div>
+        </header>
+
+        <main className="container max-w-lg mx-auto px-4 py-4 space-y-4 md:max-w-4xl lg:max-w-5xl pb-24">
         {/* Account Info Card */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
