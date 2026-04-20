@@ -118,15 +118,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: activeRole } = await supabase
-      .from("user_roles")
-      .select("company_id")
-      .eq("user_id", userId)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    const currentCompanyId = activeRole?.company_id ?? null;
-    if (!currentCompanyId) {
+    const currentCompanyId = (roleRow as any)?.company_id ?? null;
+    if (!currentCompanyId && !isPlatformAdmin) {
       return new Response(JSON.stringify({ error: "لم يتم العثور على شركة مرتبطة بحسابك" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
