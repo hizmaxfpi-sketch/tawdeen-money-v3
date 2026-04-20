@@ -56,20 +56,33 @@ export function useProduction() {
     setLoading(false);
   }, [user]);
 
+  // Debounced reload to coalesce many realtime events into one fetch
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleReload = useCallback(() => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => {
+      reloadTimerRef.current = null;
+      loadAll();
+    }, 1500);
+  }, [loadAll]);
+
   useEffect(() => { loadAll(); }, [loadAll]);
 
   useEffect(() => {
     if (!user) return;
     const ch = supabase
       .channel('production-' + user.id)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_materials' }, () => loadAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_products' }, () => loadAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_sales' }, () => loadAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_bom' }, () => loadAll())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_services' as any }, () => loadAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_materials' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_products' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_sales' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'product_bom' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'production_services' as any }, scheduleReload)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [user, loadAll]);
+    return () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      supabase.removeChannel(ch);
+    };
+  }, [user, scheduleReload]);
 
   // Materials
   const addMaterial = async (data: { name: string; code?: string; unit: string; notes?: string }): Promise<void> => {
