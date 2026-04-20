@@ -61,7 +61,8 @@ export function BusinessPage({
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [assetForm, setAssetForm] = useState({
     name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
-    depreciationRate: '', notes: '', fundId: '', vendorId: '',
+    depreciationRate: '', depreciationPeriod: 'yearly' as 'yearly' | 'monthly',
+    notes: '', fundId: '', vendorId: '',
     paymentType: 'full', installmentCount: '1', depreciationFundId: '',
   });
 
@@ -109,11 +110,14 @@ export function BusinessPage({
 
   const handleAddAsset = async () => {
     if (!assetForm.name || !assetForm.value) return;
+    // Convert monthly rate to yearly for storage (engine works in yearly)
+    const enteredRate = Number(assetForm.depreciationRate) || 0;
+    const yearlyRate = assetForm.depreciationPeriod === 'monthly' ? enteredRate * 12 : enteredRate;
     await addAsset({
       name: assetForm.name,
       value: Number(assetForm.value),
       purchaseDate: assetForm.purchaseDate,
-      depreciationRate: Number(assetForm.depreciationRate) || 0,
+      depreciationRate: yearlyRate,
       notes: assetForm.notes || undefined,
       fundId: assetForm.fundId || undefined,
       vendorId: assetForm.vendorId || undefined,
@@ -123,7 +127,8 @@ export function BusinessPage({
     });
     setAssetForm({
       name: '', value: '', purchaseDate: new Date().toISOString().slice(0, 10),
-      depreciationRate: '', notes: '', fundId: '', vendorId: '',
+      depreciationRate: '', depreciationPeriod: 'yearly',
+      notes: '', fundId: '', vendorId: '',
       paymentType: 'full', installmentCount: '1', depreciationFundId: '',
     });
     setShowAddAsset(false);
@@ -256,10 +261,29 @@ export function BusinessPage({
                       <Input type="date" value={assetForm.purchaseDate} onChange={e => setAssetForm(f => ({ ...f, purchaseDate: e.target.value }))} />
                     </div>
                   </div>
-                  <div>
-                    <Label>نسبة الإهلاك السنوية %</Label>
-                    <Input type="number" value={assetForm.depreciationRate} onChange={e => setAssetForm(f => ({ ...f, depreciationRate: e.target.value }))} placeholder="مثل: 20" />
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <div>
+                      <Label>نسبة الإهلاك %</Label>
+                      <Input type="number" value={assetForm.depreciationRate} onChange={e => setAssetForm(f => ({ ...f, depreciationRate: e.target.value }))} placeholder="مثل: 20" />
+                    </div>
+                    <div>
+                      <Label>الفترة</Label>
+                      <Select value={assetForm.depreciationPeriod} onValueChange={(v: 'monthly' | 'yearly') => setAssetForm(f => ({ ...f, depreciationPeriod: v }))}>
+                        <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="yearly">سنوي</SelectItem>
+                          <SelectItem value="monthly">شهري</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+                  {assetForm.depreciationRate && Number(assetForm.value) > 0 && (
+                    <p className="text-[10px] text-muted-foreground -mt-1.5">
+                      {assetForm.depreciationPeriod === 'monthly'
+                        ? `يعادل ${(Number(assetForm.depreciationRate) * 12).toFixed(2)}% سنوياً • إهلاك شهري ≈ $${(Number(assetForm.value) * Number(assetForm.depreciationRate) / 100).toFixed(2)}`
+                        : `إهلاك شهري ≈ $${(Number(assetForm.value) * Number(assetForm.depreciationRate) / 100 / 12).toFixed(2)}`}
+                    </p>
+                  )}
 
                   {/* Fund */}
                   <div>

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Package, Trash2, ShoppingCart, Edit2, Eye } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, Package, Trash2, ShoppingCart, Edit2, Eye, Search, X } from 'lucide-react';
 import { ProductionPreviewDialog } from './ProductionPreviewDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,11 @@ export function MaterialsTab({ materials, fundOptions, contacts, onAdd, onUpdate
   const [openEdit, setOpenEdit] = useState<ProductionMaterial | null>(null);
   const [openPreview, setOpenPreview] = useState(false);
 
+  // Search & filter state
+  const [search, setSearch] = useState('');
+  const [stockFilter, setStockFilter] = useState<'all' | 'in' | 'out'>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'qty_desc' | 'qty_asc' | 'value_desc'>('name');
+
   // Add form state
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
@@ -41,6 +46,26 @@ export function MaterialsTab({ materials, fundOptions, contacts, onAdd, onUpdate
 
   const reset = () => { setName(''); setCode(''); setUnit('pcs'); setNotes(''); };
   const resetP = () => { setPQty(''); setPPrice(''); setPContact(''); setPFund(''); setPPaid(''); };
+
+  const filteredMaterials = useMemo(() => {
+    let list = materials;
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(m =>
+        m.name.toLowerCase().includes(q) ||
+        (m.code || '').toLowerCase().includes(q) ||
+        (m.notes || '').toLowerCase().includes(q)
+      );
+    }
+    if (stockFilter === 'in') list = list.filter(m => m.quantity > 0);
+    else if (stockFilter === 'out') list = list.filter(m => m.quantity <= 0);
+    const sorted = [...list];
+    if (sortBy === 'qty_desc') sorted.sort((a, b) => b.quantity - a.quantity);
+    else if (sortBy === 'qty_asc') sorted.sort((a, b) => a.quantity - b.quantity);
+    else if (sortBy === 'value_desc') sorted.sort((a, b) => (b.quantity * b.avg_cost) - (a.quantity * a.avg_cost));
+    else sorted.sort((a, b) => a.name.localeCompare(b.name));
+    return sorted;
+  }, [materials, search, stockFilter, sortBy]);
 
   const handleAdd = async () => {
     if (!name.trim()) return;
@@ -94,14 +119,67 @@ export function MaterialsTab({ materials, fundOptions, contacts, onAdd, onUpdate
 
       <ProductionPreviewDialog open={openPreview} onOpenChange={setOpenPreview} kind="materials" materials={materials} />
 
+      {/* Search & Filters */}
+      {materials.length > 0 && (
+        <div className="space-y-1.5 bg-muted/30 rounded-lg p-2">
+          <div className="relative">
+            <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="ابحث بالاسم أو الكود..."
+              className="h-8 text-xs pr-7"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="مسح"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <Select value={stockFilter} onValueChange={(v: any) => setStockFilter(v)}>
+              <SelectTrigger className="h-7 text-[11px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">الكل ({materials.length})</SelectItem>
+                <SelectItem value="in" className="text-xs">متوفر</SelectItem>
+                <SelectItem value="out" className="text-xs">نافد</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+              <SelectTrigger className="h-7 text-[11px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name" className="text-xs">حسب الاسم</SelectItem>
+                <SelectItem value="qty_desc" className="text-xs">الكمية (الأعلى)</SelectItem>
+                <SelectItem value="qty_asc" className="text-xs">الكمية (الأقل)</SelectItem>
+                <SelectItem value="value_desc" className="text-xs">القيمة (الأعلى)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {(search || stockFilter !== 'all') && (
+            <p className="text-[10px] text-muted-foreground text-center">
+              عرض {filteredMaterials.length} من {materials.length}
+            </p>
+          )}
+        </div>
+      )}
+
       {materials.length === 0 ? (
         <div className="text-center py-8 text-xs text-muted-foreground">
           <Package className="h-8 w-8 mx-auto mb-2 opacity-30" />
           لا توجد مواد خام بعد
         </div>
+      ) : filteredMaterials.length === 0 ? (
+        <div className="text-center py-6 text-xs text-muted-foreground">
+          <Search className="h-7 w-7 mx-auto mb-2 opacity-30" />
+          لا توجد نتائج مطابقة
+        </div>
       ) : (
         <div className="space-y-1.5">
-          {materials.map(m => (
+          {filteredMaterials.map(m => (
             <div key={m.id} className="rounded-lg bg-card border border-border p-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -109,6 +187,9 @@ export function MaterialsTab({ materials, fundOptions, contacts, onAdd, onUpdate
                     <Package className="h-3.5 w-3.5 text-primary shrink-0" />
                     <span className="text-sm font-semibold truncate">{m.name}</span>
                     {m.code && <span className="text-[10px] text-muted-foreground">[{m.code}]</span>}
+                    {m.quantity <= 0 && (
+                      <span className="text-[9px] bg-destructive/15 text-destructive px-1.5 py-0.5 rounded">نافد</span>
+                    )}
                   </div>
                   <div className="flex gap-3 mt-1 text-[11px]">
                     <span className="text-foreground">المتوفر: <strong>{m.quantity}</strong> {m.unit}</span>
