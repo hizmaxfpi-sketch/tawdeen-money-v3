@@ -552,6 +552,21 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
                   <p className="text-[9px] text-muted-foreground mt-1">
                     سيتم احتساب هذا المبلغ تلقائياً كل شهر، يمكنك تعديله عند المراجعة
                   </p>
+                  {accountOptions.length > 0 && (
+                    <div className="mt-2">
+                      <Label className="text-xs">ربط بحساب دفتري (اختياري)</Label>
+                      <Select value={linkedAccountId || 'none'} onValueChange={v => setLinkedAccountId(v === 'none' ? '' : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="بدون ربط" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none" className="text-xs">بدون ربط</SelectItem>
+                          {accountOptions.map(a => <SelectItem key={a.id} value={a.id} className="text-xs">{a.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[9px] text-muted-foreground mt-1">
+                        عند الترحيل، سيُسجَّل القيد على هذا الحساب مباشرة
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
