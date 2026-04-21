@@ -871,6 +871,181 @@ export type Database = {
           },
         ]
       }
+      obligation_draft_items: {
+        Row: {
+          absence_days: number
+          absence_deduction: number
+          account_id: string | null
+          advance_deduction: number
+          base_amount: number
+          bonus: number
+          created_at: string
+          draft_id: string
+          id: string
+          item_id: string | null
+          name: string
+          net_amount: number
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          absence_days?: number
+          absence_deduction?: number
+          account_id?: string | null
+          advance_deduction?: number
+          base_amount?: number
+          bonus?: number
+          created_at?: string
+          draft_id: string
+          id?: string
+          item_id?: string | null
+          name: string
+          net_amount?: number
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          absence_days?: number
+          absence_deduction?: number
+          account_id?: string | null
+          advance_deduction?: number
+          base_amount?: number
+          bonus?: number
+          created_at?: string
+          draft_id?: string
+          id?: string
+          item_id?: string | null
+          name?: string
+          net_amount?: number
+          notes?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "obligation_draft_items_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "obligation_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "obligation_draft_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "obligation_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      obligation_drafts: {
+        Row: {
+          created_at: string
+          due_date: string
+          fund_id: string | null
+          id: string
+          notes: string | null
+          obligation_id: string
+          period_month: number
+          period_year: number
+          posted_at: string | null
+          status: string
+          total_amount: number
+          transaction_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          due_date: string
+          fund_id?: string | null
+          id?: string
+          notes?: string | null
+          obligation_id: string
+          period_month: number
+          period_year: number
+          posted_at?: string | null
+          status?: string
+          total_amount?: number
+          transaction_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          due_date?: string
+          fund_id?: string | null
+          id?: string
+          notes?: string | null
+          obligation_id?: string
+          period_month?: number
+          period_year?: number
+          posted_at?: string | null
+          status?: string
+          total_amount?: number
+          transaction_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "obligation_drafts_obligation_id_fkey"
+            columns: ["obligation_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_obligations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      obligation_items: {
+        Row: {
+          account_id: string | null
+          base_amount: number
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          obligation_id: string
+          updated_at: string
+          user_id: string
+          working_days: number
+        }
+        Insert: {
+          account_id?: string | null
+          base_amount?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          obligation_id: string
+          updated_at?: string
+          user_id: string
+          working_days?: number
+        }
+        Update: {
+          account_id?: string | null
+          base_amount?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          obligation_id?: string
+          updated_at?: string
+          user_id?: string
+          working_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "obligation_items_obligation_id_fkey"
+            columns: ["obligation_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_obligations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_admins: {
         Row: {
           created_at: string
@@ -1392,6 +1567,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      recurring_obligations: {
+        Row: {
+          category: string
+          created_at: string
+          created_by_name: string | null
+          default_fund_id: string | null
+          due_day: number
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          obligation_type: string
+          posted_count: number
+          start_date: string
+          total_months: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by_name?: string | null
+          default_fund_id?: string | null
+          due_day?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          obligation_type?: string
+          posted_count?: number
+          start_date?: string
+          total_months?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by_name?: string | null
+          default_fund_id?: string | null
+          due_day?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          obligation_type?: string
+          posted_count?: number
+          start_date?: string
+          total_months?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       shipment_payments: {
         Row: {
@@ -2058,6 +2287,10 @@ export type Database = {
         Args: { p_shipment_id: string }
         Returns: undefined
       }
+      generate_obligation_drafts: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
       get_company_status: { Args: never; Returns: string }
       get_current_user_name: { Args: never; Returns: string }
       get_enabled_modules: { Args: never; Returns: string[] }
@@ -2074,6 +2307,16 @@ export type Database = {
       }
       is_module_enabled: { Args: { _module: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
+      post_obligation_draft: {
+        Args: {
+          p_created_by_name: string
+          p_date: string
+          p_draft_id: string
+          p_fund_id: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       process_shipment_payment: {
         Args: {
           p_amount: number
