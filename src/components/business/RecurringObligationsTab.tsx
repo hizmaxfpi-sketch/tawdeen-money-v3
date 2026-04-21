@@ -666,23 +666,32 @@ function DraftEditDialog({ draft, obligation, draftItems, fundOptions, obs, onCl
   );
 }
 
-function DraftItemRow({ item, obs }: { item: any; obs: ReturnType<typeof useRecurringObligations> }) {
+function DraftItemRow({ item, obs, isSalary = false }: { item: any; obs: ReturnType<typeof useRecurringObligations>; isSalary?: boolean }) {
   const [base, setBase] = useState(item.base_amount.toString());
   const [absence, setAbsence] = useState(item.absence_days.toString());
   const [advance, setAdvance] = useState(item.advance_deduction.toString());
   const [bonus, setBonus] = useState(item.bonus.toString());
 
   const dailyRate = Number(base) / 30;
-  const absDeduction = dailyRate * (Number(absence) || 0);
-  const net = (Number(base) || 0) - absDeduction - (Number(advance) || 0) + (Number(bonus) || 0);
+  const absDeduction = isSalary ? dailyRate * (Number(absence) || 0) : 0;
+  const net = isSalary
+    ? (Number(base) || 0) - absDeduction - (Number(advance) || 0) + (Number(bonus) || 0)
+    : (Number(base) || 0);
 
   const save = () => {
-    obs.updateDraftItem(item.id, {
+    obs.updateDraftItem(item.id, isSalary ? {
       base_amount: Number(base) || 0,
       absence_days: Number(absence) || 0,
       absence_deduction: absDeduction,
       advance_deduction: Number(advance) || 0,
       bonus: Number(bonus) || 0,
+      net_amount: net,
+    } : {
+      base_amount: Number(base) || 0,
+      absence_days: 0,
+      absence_deduction: 0,
+      advance_deduction: 0,
+      bonus: 0,
       net_amount: net,
     });
   };
@@ -693,30 +702,39 @@ function DraftItemRow({ item, obs }: { item: any; obs: ReturnType<typeof useRecu
         <span className="text-xs font-bold">{item.name}</span>
         <span className="text-sm font-bold text-expense">${net.toLocaleString('en-US', { maximumFractionDigits: 2 })}</span>
       </div>
-      <div className="grid grid-cols-4 gap-1">
+      {isSalary ? (
+        <>
+          <div className="grid grid-cols-4 gap-1">
+            <div>
+              <Label className="text-[9px] text-muted-foreground">الأساسي</Label>
+              <Input type="number" value={base} onChange={e => setBase(e.target.value)} onBlur={save} className="h-6 text-[10px] px-1" />
+            </div>
+            <div>
+              <Label className="text-[9px] text-muted-foreground">غياب (يوم)</Label>
+              <Input type="number" value={absence} onChange={e => setAbsence(e.target.value)} onBlur={save} className="h-6 text-[10px] px-1" />
+            </div>
+            <div>
+              <Label className="text-[9px] text-muted-foreground">سلفة</Label>
+              <Input type="number" value={advance} onChange={e => setAdvance(e.target.value)} onBlur={save} className="h-6 text-[10px] px-1" />
+            </div>
+            <div>
+              <Label className="text-[9px] text-muted-foreground">علاوة</Label>
+              <Input type="number" value={bonus} onChange={e => setBonus(e.target.value)} onBlur={save} className="h-6 text-[10px] px-1" />
+            </div>
+          </div>
+          {(Number(absence) > 0 || Number(advance) > 0 || Number(bonus) > 0) && (
+            <p className="text-[9px] text-muted-foreground">
+              {Number(absence) > 0 && `خصم غياب: $${absDeduction.toFixed(2)} `}
+              {Number(advance) > 0 && `• سلفة: $${Number(advance).toFixed(2)} `}
+              {Number(bonus) > 0 && `• علاوة: +$${Number(bonus).toFixed(2)}`}
+            </p>
+          )}
+        </>
+      ) : (
         <div>
-          <Label className="text-[9px] text-muted-foreground">الأساسي</Label>
-          <Input type="number" value={base} onChange={e => setBase(e.target.value)} onBlur={save} className="h-6 text-[10px] px-1" />
+          <Label className="text-[9px] text-muted-foreground">المبلغ</Label>
+          <Input type="number" value={base} onChange={e => setBase(e.target.value)} onBlur={save} className="h-7 text-xs px-1.5" />
         </div>
-        <div>
-          <Label className="text-[9px] text-muted-foreground">غياب (يوم)</Label>
-          <Input type="number" value={absence} onChange={e => setAbsence(e.target.value)} onBlur={save} className="h-6 text-[10px] px-1" />
-        </div>
-        <div>
-          <Label className="text-[9px] text-muted-foreground">سلفة</Label>
-          <Input type="number" value={advance} onChange={e => setAdvance(e.target.value)} onBlur={save} className="h-6 text-[10px] px-1" />
-        </div>
-        <div>
-          <Label className="text-[9px] text-muted-foreground">علاوة</Label>
-          <Input type="number" value={bonus} onChange={e => setBonus(e.target.value)} onBlur={save} className="h-6 text-[10px] px-1" />
-        </div>
-      </div>
-      {(Number(absence) > 0 || Number(advance) > 0 || Number(bonus) > 0) && (
-        <p className="text-[9px] text-muted-foreground">
-          {Number(absence) > 0 && `خصم غياب: $${absDeduction.toFixed(2)} `}
-          {Number(advance) > 0 && `• سلفة: $${Number(advance).toFixed(2)} `}
-          {Number(bonus) > 0 && `• علاوة: +$${Number(bonus).toFixed(2)}`}
-        </p>
       )}
     </div>
   );
