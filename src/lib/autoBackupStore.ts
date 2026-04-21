@@ -48,7 +48,11 @@ export async function saveBackup(data: any, userId: string | null | undefined): 
     (data?.debts?.length || 0) +
     (data?.projects?.length || 0) +
     (data?.shipments?.length || 0) +
-    (data?.containers?.length || 0);
+    (data?.containers?.length || 0) +
+    (data?.recurring_obligations?.length || 0) +
+    (data?.obligation_items?.length || 0) +
+    (data?.obligation_drafts?.length || 0) +
+    (data?.obligation_draft_items?.length || 0);
 
   const record: BackupRecord = {
     id,

@@ -121,6 +121,8 @@ export function useSupabaseFinance() {
     let materialPurchases: any[] = [], productionRuns: any[] = [], productionSales: any[] = [];
     let productBom: any[] = [], productionSaleServices: any[] = [], productionSaleExpenses: any[] = [];
     let assets: any[] = [], assetPayments: any[] = [], assetImprovements: any[] = [];
+    let recurringObligations: any[] = [], obligationItems: any[] = [];
+    let obligationDrafts: any[] = [], obligationDraftItems: any[] = [];
     try {
       [
         containers, shipments, shipmentPayments, currencies, companySettings,
@@ -129,6 +131,7 @@ export function useSupabaseFinance() {
         materialPurchases, productionRuns, productionSales,
         productBom, productionSaleServices, productionSaleExpenses,
         assets, assetPayments, assetImprovements,
+        recurringObligations, obligationItems, obligationDrafts, obligationDraftItems,
       ] = await Promise.all([
         supabase.from('containers').select('*').then(r => r.data || []),
         supabase.from('shipments').select('*').then(r => r.data || []),
@@ -149,6 +152,10 @@ export function useSupabaseFinance() {
         supabase.from('assets').select('*').then(r => r.data || []),
         supabase.from('asset_payments').select('*').then(r => r.data || []),
         supabase.from('asset_improvements').select('*').then(r => r.data || []),
+        supabase.from('recurring_obligations').select('*').then(r => r.data || []),
+        supabase.from('obligation_items').select('*').then(r => r.data || []),
+        supabase.from('obligation_drafts').select('*').then(r => r.data || []),
+        supabase.from('obligation_draft_items').select('*').then(r => r.data || []),
       ]);
     } catch (e) {
       console.warn('Error fetching additional tables for backup:', e);
@@ -198,12 +205,16 @@ export function useSupabaseFinance() {
       assets,
       asset_payments: assetPayments,
       asset_improvements: assetImprovements,
+      recurring_obligations: recurringObligations,
+      obligation_items: obligationItems,
+      obligation_drafts: obligationDrafts,
+      obligation_draft_items: obligationDraftItems,
       backupMeta: {
         companyId: activeRole?.company_id || null,
         exportedByUserId: user.id,
       },
       exportedAt: new Date().toISOString(),
-      backupVersion: 5,
+      backupVersion: 6,
     };
   }, [fetchAllRows, user]);
 
