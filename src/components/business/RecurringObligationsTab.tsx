@@ -562,7 +562,7 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>إلغاء</Button>
-          <Button size="sm" onClick={save} disabled={saving || !name}>
+          <Button size="sm" onClick={save} disabled={saving || !name || (!obligation && !isMultiItem && !(Number(fixedAmount) > 0))}>
             {saving ? 'جاري الحفظ...' : (obligation ? 'تحديث' : 'إنشاء')}
           </Button>
         </DialogFooter>
