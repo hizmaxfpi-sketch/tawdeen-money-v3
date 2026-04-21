@@ -45,6 +45,7 @@ export function RecurringObligationsTab({ fundOptions, accountOptions }: Props) 
 
   return (
     <div className="space-y-3">
+      <ObligationsSummaryPanel obligations={obs.obligations} items={obs.items} />
       <Tabs value={tab} onValueChange={(v: any) => setTab(v)} className="w-full">
         <TabsList className="w-full grid grid-cols-3">
           <TabsTrigger value="pending" className="text-xs gap-1">
