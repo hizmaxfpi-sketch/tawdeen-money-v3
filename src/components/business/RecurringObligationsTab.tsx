@@ -389,6 +389,7 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
   const [qiName, setQiName] = useState('');
   const [qiAmount, setQiAmount] = useState('');
   const [qiAccount, setQiAccount] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const addQuickItem = () => {
     if (!qiName || !qiAmount) return;
@@ -397,27 +398,32 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
   };
 
   const save = async () => {
-    if (!name) return;
-    const typeData = OBLIGATION_TYPES.find(t => t.value === type)!;
-    const payload = {
-      name, obligation_type: type, category: typeData.category,
-      default_fund_id: fundId || null,
-      due_day: Math.min(28, Math.max(1, Number(dueDay) || 1)),
-      start_date: startDate,
-      total_months: hasLimit ? Number(totalMonths) || null : null,
-      is_active: obligation?.is_active ?? true,
-      notes: notes || null,
-    };
-    if (obligation) {
-      await obs.updateObligation(obligation.id, payload);
-    } else {
-      const items = quickItems.map(qi => ({
-        name: qi.name, base_amount: Number(qi.amount), working_days: 30,
-        account_id: qi.accountId || null, is_active: true, notes: null,
-      }));
-      await obs.addObligation(payload, items);
+    if (!name || saving) return;
+    setSaving(true);
+    try {
+      const typeData = OBLIGATION_TYPES.find(t => t.value === type)!;
+      const payload = {
+        name, obligation_type: type, category: typeData.category,
+        default_fund_id: fundId || null,
+        due_day: Math.min(28, Math.max(1, Number(dueDay) || 1)),
+        start_date: startDate,
+        total_months: hasLimit ? Number(totalMonths) || null : null,
+        is_active: obligation?.is_active ?? true,
+        notes: notes || null,
+      };
+      if (obligation) {
+        await obs.updateObligation(obligation.id, payload);
+      } else {
+        const items = quickItems.map(qi => ({
+          name: qi.name, base_amount: Number(qi.amount), working_days: 30,
+          account_id: qi.accountId || null, is_active: true, notes: null,
+        }));
+        await obs.addObligation(payload, items);
+      }
+      onClose();
+    } finally {
+      setSaving(false);
     }
-    onClose();
   };
 
   return (
@@ -516,8 +522,10 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={onClose}>إلغاء</Button>
-          <Button size="sm" onClick={save}>{obligation ? 'تحديث' : 'إنشاء'}</Button>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>إلغاء</Button>
+          <Button size="sm" onClick={save} disabled={saving || !name}>
+            {saving ? 'جاري الحفظ...' : (obligation ? 'تحديث' : 'إنشاء')}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
