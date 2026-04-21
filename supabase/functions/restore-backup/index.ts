@@ -885,6 +885,113 @@ Deno.serve(async (req) => {
       results.container_expenses = { success, errors };
     }
 
+    // Recurring Obligations + Items + Drafts
+    const validObligationIds = new Set<string>();
+    const validObligationItemIds = new Set<string>();
+    const validDraftIds = new Set<string>();
+
+    if (recurringObligations.length) {
+      let success = 0, errors = 0;
+      for (const ob of recurringObligations) {
+        const id = asString(ob.id) ?? crypto.randomUUID();
+        const fundId = asString(ob.default_fund_id ?? ob.defaultFundId);
+        const { error } = await supabase.from("recurring_obligations").upsert({
+          id,
+          user_id: resolveRowUserId(ob.user_id),
+          name: asString(ob.name) ?? "التزام",
+          category: asString(ob.category) ?? "salaries",
+          obligation_type: asString(ob.obligation_type ?? ob.obligationType) ?? "salary",
+          start_date: asString(ob.start_date ?? ob.startDate) ?? new Date().toISOString().split("T")[0],
+          due_day: asNumber(ob.due_day ?? ob.dueDay, 1),
+          total_months: ob.total_months ?? ob.totalMonths ?? null,
+          posted_count: asNumber(ob.posted_count ?? ob.postedCount),
+          is_active: ob.is_active ?? ob.isActive ?? true,
+          default_fund_id: fundId && validFundIds.has(fundId) ? fundId : null,
+          notes: asString(ob.notes),
+          created_by_name: asString(ob.created_by_name ?? ob.createdByName),
+        }, { onConflict: "id" });
+        if (error) { console.error("Obligation:", JSON.stringify(error)); errors++; }
+        else { success++; validObligationIds.add(id); }
+      }
+      results.recurring_obligations = { success, errors };
+    }
+
+    if (obligationItems.length) {
+      let success = 0, errors = 0;
+      for (const it of obligationItems) {
+        const obId = asString(it.obligation_id ?? it.obligationId);
+        if (!obId || !validObligationIds.has(obId)) { errors++; continue; }
+        const id = asString(it.id) ?? crypto.randomUUID();
+        const { error } = await supabase.from("obligation_items").upsert({
+          id,
+          user_id: resolveRowUserId(it.user_id),
+          obligation_id: obId,
+          name: asString(it.name) ?? "بند",
+          base_amount: asNumber(it.base_amount ?? it.baseAmount),
+          working_days: asNumber(it.working_days ?? it.workingDays, 30),
+          account_id: asString(it.account_id ?? it.accountId),
+          is_active: it.is_active ?? it.isActive ?? true,
+          notes: asString(it.notes),
+        }, { onConflict: "id" });
+        if (error) { console.error("ObligationItem:", JSON.stringify(error)); errors++; }
+        else { success++; validObligationItemIds.add(id); }
+      }
+      results.obligation_items = { success, errors };
+    }
+
+    if (obligationDrafts.length) {
+      let success = 0, errors = 0;
+      for (const d of obligationDrafts) {
+        const obId = asString(d.obligation_id ?? d.obligationId);
+        if (!obId || !validObligationIds.has(obId)) { errors++; continue; }
+        const id = asString(d.id) ?? crypto.randomUUID();
+        const fundId = asString(d.fund_id ?? d.fundId);
+        const { error } = await supabase.from("obligation_drafts").upsert({
+          id,
+          user_id: resolveRowUserId(d.user_id),
+          obligation_id: obId,
+          period_year: asNumber(d.period_year ?? d.periodYear),
+          period_month: asNumber(d.period_month ?? d.periodMonth),
+          due_date: asString(d.due_date ?? d.dueDate) ?? new Date().toISOString().split("T")[0],
+          total_amount: asNumber(d.total_amount ?? d.totalAmount),
+          status: asString(d.status) ?? "draft",
+          fund_id: fundId && validFundIds.has(fundId) ? fundId : null,
+          transaction_id: asString(d.transaction_id ?? d.transactionId),
+          posted_at: asString(d.posted_at ?? d.postedAt),
+          notes: asString(d.notes),
+        }, { onConflict: "id" });
+        if (error) { console.error("ObligationDraft:", JSON.stringify(error)); errors++; }
+        else { success++; validDraftIds.add(id); }
+      }
+      results.obligation_drafts = { success, errors };
+    }
+
+    if (obligationDraftItems.length) {
+      let success = 0, errors = 0;
+      for (const di of obligationDraftItems) {
+        const draftId = asString(di.draft_id ?? di.draftId);
+        if (!draftId || !validDraftIds.has(draftId)) { errors++; continue; }
+        const itemId = asString(di.item_id ?? di.itemId);
+        const { error } = await supabase.from("obligation_draft_items").upsert({
+          id: asString(di.id) ?? crypto.randomUUID(),
+          user_id: resolveRowUserId(di.user_id),
+          draft_id: draftId,
+          item_id: itemId && validObligationItemIds.has(itemId) ? itemId : null,
+          name: asString(di.name) ?? "بند",
+          base_amount: asNumber(di.base_amount ?? di.baseAmount),
+          absence_days: asNumber(di.absence_days ?? di.absenceDays),
+          absence_deduction: asNumber(di.absence_deduction ?? di.absenceDeduction),
+          advance_deduction: asNumber(di.advance_deduction ?? di.advanceDeduction),
+          bonus: asNumber(di.bonus),
+          net_amount: asNumber(di.net_amount ?? di.netAmount),
+          account_id: asString(di.account_id ?? di.accountId),
+          notes: asString(di.notes),
+        }, { onConflict: "id" });
+        if (error) { console.error("ObligationDraftItem:", JSON.stringify(error)); errors++; } else success++;
+      }
+      results.obligation_draft_items = { success, errors };
+    }
+
     // 12. Recalculate fund balances from actual ledger entries
     const fundIdsToReconcile = new Set<string>(validFundIds);
     const { data: companyFunds } = await supabase
