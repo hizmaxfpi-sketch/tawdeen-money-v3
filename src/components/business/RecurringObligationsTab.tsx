@@ -419,10 +419,19 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
       if (obligation) {
         await obs.updateObligation(obligation.id, payload);
       } else {
-        const items = quickItems.map(qi => ({
-          name: qi.name, base_amount: Number(qi.amount), working_days: 30,
-          account_id: qi.accountId || null, is_active: true, notes: null,
-        }));
+        let items: Array<{ name: string; base_amount: number; working_days: number; account_id: string | null; is_active: boolean; notes: null }> = [];
+        if (isMultiItem) {
+          items = quickItems.map(qi => ({
+            name: qi.name, base_amount: Number(qi.amount), working_days: 30,
+            account_id: qi.accountId || null, is_active: true, notes: null,
+          }));
+        } else if (Number(fixedAmount) > 0) {
+          // Single-item obligation (rent / subscription / installment / other)
+          items = [{
+            name: name, base_amount: Number(fixedAmount), working_days: 30,
+            account_id: null, is_active: true, notes: null,
+          }];
+        }
         await obs.addObligation(payload, items);
       }
       onClose();
