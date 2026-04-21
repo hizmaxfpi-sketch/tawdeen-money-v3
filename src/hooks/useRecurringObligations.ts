@@ -108,7 +108,7 @@ export function useRecurringObligations() {
       });
   }, [user, loadAll]);
 
-  // ==== Obligation CRUD ====
+  // ==== Obligation CRUD (optimistic — no full reload) ====
   const addObligation = useCallback(async (
     payload: Omit<RecurringObligation, 'id' | 'user_id' | 'created_at' | 'posted_count' | 'created_by_name'>,
     initialItems: Array<Omit<ObligationItem, 'id' | 'obligation_id' | 'user_id'>> = []
@@ -119,49 +119,53 @@ export function useRecurringObligations() {
       .insert({ ...payload, user_id: user.id, created_by_name: profile?.full_name || null })
       .select().single();
     if (error) { toast.error('فشل إنشاء الالتزام'); return null; }
+    // Optimistic insert
+    setObligations(prev => [data as RecurringObligation, ...prev]);
     if (initialItems.length > 0) {
-      await supabase.from('obligation_items').insert(
+      const { data: itemsData } = await supabase.from('obligation_items').insert(
         initialItems.map(it => ({ ...it, obligation_id: data.id, user_id: user.id }))
-      );
+      ).select();
+      if (itemsData) setItems(prev => [...prev, ...(itemsData as ObligationItem[])]);
     }
-    await loadAll();
     toast.success('تم إنشاء الالتزام');
     return data as RecurringObligation;
-  }, [user, profile, loadAll]);
+  }, [user, profile]);
 
   const updateObligation = useCallback(async (id: string, patch: Partial<RecurringObligation>) => {
+    // Optimistic update
+    setObligations(prev => prev.map(o => o.id === id ? { ...o, ...patch } : o));
     const { error } = await supabase.from('recurring_obligations').update(patch).eq('id', id);
-    if (error) { toast.error('فشل التحديث'); return; }
-    await loadAll();
+    if (error) { toast.error('فشل التحديث'); await loadAll(); return; }
   }, [loadAll]);
 
   const deleteObligation = useCallback(async (id: string) => {
+    setObligations(prev => prev.filter(o => o.id !== id));
+    setItems(prev => prev.filter(i => i.obligation_id !== id));
     const { error } = await supabase.from('recurring_obligations').delete().eq('id', id);
-    if (error) { toast.error('فشل الحذف'); return; }
-    await loadAll();
+    if (error) { toast.error('فشل الحذف'); await loadAll(); return; }
     toast.success('تم الحذف');
   }, [loadAll]);
 
   // ==== Item CRUD ====
   const addItem = useCallback(async (obligationId: string, payload: Omit<ObligationItem, 'id' | 'obligation_id' | 'user_id'>) => {
     if (!user) return;
-    const { error } = await supabase.from('obligation_items').insert({
+    const { data, error } = await supabase.from('obligation_items').insert({
       ...payload, obligation_id: obligationId, user_id: user.id,
-    });
+    }).select().single();
     if (error) { toast.error('فشل الإضافة'); return; }
-    await loadAll();
-  }, [user, loadAll]);
+    if (data) setItems(prev => [...prev, data as ObligationItem]);
+  }, [user]);
 
   const updateItem = useCallback(async (id: string, patch: Partial<ObligationItem>) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, ...patch } : i));
     const { error } = await supabase.from('obligation_items').update(patch).eq('id', id);
-    if (error) { toast.error('فشل التحديث'); return; }
-    await loadAll();
+    if (error) { toast.error('فشل التحديث'); await loadAll(); return; }
   }, [loadAll]);
 
   const deleteItem = useCallback(async (id: string) => {
+    setItems(prev => prev.filter(i => i.id !== id));
     const { error } = await supabase.from('obligation_items').delete().eq('id', id);
-    if (error) { toast.error('فشل الحذف'); return; }
-    await loadAll();
+    if (error) { toast.error('فشل الحذف'); await loadAll(); return; }
   }, [loadAll]);
 
   // ==== Draft Item adjustments ====
@@ -213,7 +217,7 @@ export function useRecurringObligations() {
 
   // ==== Post draft ====
   const postDraft = useCallback(async (draftId: string, fundId: string, date: string) => {
-    if (!user) return;
+    if (!user) return false;
     const { error } = await supabase.rpc('post_obligation_draft', {
       p_draft_id: draftId,
       p_fund_id: fundId,
@@ -222,22 +226,28 @@ export function useRecurringObligations() {
       p_created_by_name: profile?.full_name || null,
     });
     if (error) { toast.error('فشل الترحيل: ' + error.message); return false; }
-    await loadAll();
+    // Optimistic: mark draft as posted locally
+    setDrafts(prev => prev.map(d => d.id === draftId
+      ? { ...d, status: 'posted' as DraftStatus, fund_id: fundId, posted_at: new Date().toISOString() }
+      : d));
     toast.success('تم ترحيل الالتزام إلى المصاريف');
+    // Background refresh to pick up new transaction & posted_count
+    loadAll();
     return true;
   }, [user, profile, loadAll]);
 
   const skipDraft = useCallback(async (draftId: string) => {
+    setDrafts(prev => prev.map(d => d.id === draftId ? { ...d, status: 'skipped' as DraftStatus } : d));
     const { error } = await supabase.from('obligation_drafts').update({ status: 'skipped' }).eq('id', draftId);
-    if (error) { toast.error('فشل'); return; }
-    await loadAll();
+    if (error) { toast.error('فشل'); await loadAll(); return; }
     toast.success('تم تخطي المسودة');
   }, [loadAll]);
 
   const deleteDraft = useCallback(async (draftId: string) => {
+    setDrafts(prev => prev.filter(d => d.id !== draftId));
+    setDraftItems(prev => prev.filter(di => di.draft_id !== draftId));
     const { error } = await supabase.from('obligation_drafts').delete().eq('id', draftId);
-    if (error) { toast.error('فشل الحذف'); return; }
-    await loadAll();
+    if (error) { toast.error('فشل الحذف'); await loadAll(); return; }
   }, [loadAll]);
 
   return {

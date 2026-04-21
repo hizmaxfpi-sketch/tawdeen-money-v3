@@ -57,6 +57,12 @@ export function useBusinessTransactions(transactions: Transaction[], options: Op
 
       const isCustom = tx.category.startsWith('custom_');
 
+      // الالتزامات الشهرية المرحّلة تُحسب ضمن مصاريف الأعمال
+      if (tx.sourceType === 'obligation' && tx.type === 'out') {
+        businessExpenses += tx.amount;
+        continue;
+      }
+
       if (isManual) {
         if ((DIRECT_REVENUE_CATEGORIES.includes(tx.category) || isCustom) && tx.type === 'in') {
           directRevenue += tx.amount;
@@ -78,10 +84,12 @@ export function isBusinessTransaction(tx: Transaction): boolean {
   if (tx.projectId) return false;
 
   // القيود العرضية الخاصة بالإنتاج تظهر في سجل الأعمال للعرض فقط
-  // بدون أي أثر على الصندوق لأنها موثقة محاسبياً مسبقاً
   if (tx.sourceType === 'production_sale_expense' || tx.sourceType === 'production_cogs') return true;
 
-  // استبعاد بقية قيود الإنتاج من سجل عمليات الأعمال (المبيعات/المشتريات/السداد/COGS)
+  // الالتزامات الشهرية المرحّلة تظهر كمصاريف في سجل الأعمال
+  if (tx.sourceType === 'obligation') return true;
+
+  // استبعاد بقية قيود الإنتاج من سجل عمليات الأعمال
   const PRODUCTION_SOURCES = new Set([
     'production_sale', 'production_sale_payment',
     'production_purchase', 'production_purchase_payment',
