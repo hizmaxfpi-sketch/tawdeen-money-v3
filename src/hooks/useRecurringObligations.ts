@@ -1,0 +1,251 @@
+import { useCallback, useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+
+export type ObligationType = 'salary' | 'rent' | 'subscription' | 'installment' | 'other';
+export type DraftStatus = 'draft' | 'posted' | 'skipped';
+
+export interface RecurringObligation {
+  id: string;
+  user_id: string;
+  name: string;
+  obligation_type: ObligationType;
+  category: string;
+  default_fund_id: string | null;
+  due_day: number;
+  start_date: string;
+  total_months: number | null;
+  posted_count: number;
+  is_active: boolean;
+  notes: string | null;
+  created_by_name: string | null;
+  created_at: string;
+}
+
+export interface ObligationItem {
+  id: string;
+  obligation_id: string;
+  user_id: string;
+  name: string;
+  base_amount: number;
+  working_days: number;
+  account_id: string | null;
+  is_active: boolean;
+  notes: string | null;
+}
+
+export interface ObligationDraft {
+  id: string;
+  obligation_id: string;
+  user_id: string;
+  period_year: number;
+  period_month: number;
+  due_date: string;
+  total_amount: number;
+  status: DraftStatus;
+  fund_id: string | null;
+  transaction_id: string | null;
+  posted_at: string | null;
+  notes: string | null;
+}
+
+export interface ObligationDraftItem {
+  id: string;
+  draft_id: string;
+  item_id: string | null;
+  user_id: string;
+  name: string;
+  base_amount: number;
+  absence_days: number;
+  absence_deduction: number;
+  advance_deduction: number;
+  bonus: number;
+  net_amount: number;
+  account_id: string | null;
+  notes: string | null;
+}
+
+export function useRecurringObligations() {
+  const { user } = useAuth();
+  const profile = (user?.user_metadata?.full_name ? { full_name: user.user_metadata.full_name as string } : null);
+  const [obligations, setObligations] = useState<RecurringObligation[]>([]);
+  const [items, setItems] = useState<ObligationItem[]>([]);
+  const [drafts, setDrafts] = useState<ObligationDraft[]>([]);
+  const [draftItems, setDraftItems] = useState<ObligationDraftItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadAll = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const [o, i, d, di] = await Promise.all([
+        supabase.from('recurring_obligations').select('*').order('created_at', { ascending: false }),
+        supabase.from('obligation_items').select('*').order('created_at', { ascending: true }),
+        supabase.from('obligation_drafts').select('*').order('due_date', { ascending: false }),
+        supabase.from('obligation_draft_items').select('*'),
+      ]);
+      if (o.data) setObligations(o.data as RecurringObligation[]);
+      if (i.data) setItems(i.data as ObligationItem[]);
+      if (d.data) setDrafts(d.data as ObligationDraft[]);
+      if (di.data) setDraftItems(di.data as ObligationDraftItem[]);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Auto-generate drafts on mount (today >= due_day)
+  useEffect(() => {
+    if (!user) return;
+    supabase.rpc('generate_obligation_drafts', { p_user_id: user.id })
+      .then(({ data, error }) => {
+        if (!error && (data ?? 0) > 0) {
+          loadAll();
+          toast.info(`تم إنشاء ${data} مسودة التزام جديدة للمراجعة`);
+        }
+      });
+  }, [user, loadAll]);
+
+  // ==== Obligation CRUD ====
+  const addObligation = useCallback(async (
+    payload: Omit<RecurringObligation, 'id' | 'user_id' | 'created_at' | 'posted_count' | 'created_by_name'>,
+    initialItems: Array<Omit<ObligationItem, 'id' | 'obligation_id' | 'user_id'>> = []
+  ) => {
+    if (!user) return null;
+    const { data, error } = await supabase
+      .from('recurring_obligations')
+      .insert({ ...payload, user_id: user.id, created_by_name: profile?.full_name || null })
+      .select().single();
+    if (error) { toast.error('فشل إنشاء الالتزام'); return null; }
+    if (initialItems.length > 0) {
+      await supabase.from('obligation_items').insert(
+        initialItems.map(it => ({ ...it, obligation_id: data.id, user_id: user.id }))
+      );
+    }
+    await loadAll();
+    toast.success('تم إنشاء الالتزام');
+    return data as RecurringObligation;
+  }, [user, profile, loadAll]);
+
+  const updateObligation = useCallback(async (id: string, patch: Partial<RecurringObligation>) => {
+    const { error } = await supabase.from('recurring_obligations').update(patch).eq('id', id);
+    if (error) { toast.error('فشل التحديث'); return; }
+    await loadAll();
+  }, [loadAll]);
+
+  const deleteObligation = useCallback(async (id: string) => {
+    const { error } = await supabase.from('recurring_obligations').delete().eq('id', id);
+    if (error) { toast.error('فشل الحذف'); return; }
+    await loadAll();
+    toast.success('تم الحذف');
+  }, [loadAll]);
+
+  // ==== Item CRUD ====
+  const addItem = useCallback(async (obligationId: string, payload: Omit<ObligationItem, 'id' | 'obligation_id' | 'user_id'>) => {
+    if (!user) return;
+    const { error } = await supabase.from('obligation_items').insert({
+      ...payload, obligation_id: obligationId, user_id: user.id,
+    });
+    if (error) { toast.error('فشل الإضافة'); return; }
+    await loadAll();
+  }, [user, loadAll]);
+
+  const updateItem = useCallback(async (id: string, patch: Partial<ObligationItem>) => {
+    const { error } = await supabase.from('obligation_items').update(patch).eq('id', id);
+    if (error) { toast.error('فشل التحديث'); return; }
+    await loadAll();
+  }, [loadAll]);
+
+  const deleteItem = useCallback(async (id: string) => {
+    const { error } = await supabase.from('obligation_items').delete().eq('id', id);
+    if (error) { toast.error('فشل الحذف'); return; }
+    await loadAll();
+  }, [loadAll]);
+
+  // ==== Draft Item adjustments ====
+  const updateDraftItem = useCallback(async (id: string, patch: Partial<ObligationDraftItem>) => {
+    // Recompute net if any of the components changed
+    const current = draftItems.find(d => d.id === id);
+    if (current) {
+      const merged = { ...current, ...patch };
+      const dailyRate = merged.base_amount / 30;
+      const absenceDeduction = patch.absence_days !== undefined ? dailyRate * (patch.absence_days || 0) : merged.absence_deduction;
+      const net = (merged.base_amount || 0) - (absenceDeduction || 0) - (merged.advance_deduction || 0) + (merged.bonus || 0);
+      patch = { ...patch, absence_deduction: absenceDeduction, net_amount: net };
+    }
+    const { error } = await supabase.from('obligation_draft_items').update(patch).eq('id', id);
+    if (error) { toast.error('فشل التحديث'); return; }
+    // Recompute draft total
+    const item = draftItems.find(d => d.id === id);
+    if (item) {
+      const all = draftItems.filter(d => d.draft_id === item.draft_id).map(d => d.id === id ? { ...d, ...patch } as ObligationDraftItem : d);
+      const total = all.reduce((s, d) => s + (d.net_amount || 0), 0);
+      await supabase.from('obligation_drafts').update({ total_amount: total }).eq('id', item.draft_id);
+    }
+    await loadAll();
+  }, [draftItems, loadAll]);
+
+  const addDraftItem = useCallback(async (draftId: string, payload: Omit<ObligationDraftItem, 'id' | 'draft_id' | 'user_id'>) => {
+    if (!user) return;
+    const { error } = await supabase.from('obligation_draft_items').insert({
+      ...payload, draft_id: draftId, user_id: user.id,
+    });
+    if (error) { toast.error('فشل الإضافة'); return; }
+    const all = [...draftItems.filter(d => d.draft_id === draftId), payload as any];
+    const total = all.reduce((s, d) => s + (d.net_amount || 0), 0);
+    await supabase.from('obligation_drafts').update({ total_amount: total }).eq('id', draftId);
+    await loadAll();
+  }, [user, draftItems, loadAll]);
+
+  const removeDraftItem = useCallback(async (id: string) => {
+    const item = draftItems.find(d => d.id === id);
+    const { error } = await supabase.from('obligation_draft_items').delete().eq('id', id);
+    if (error) { toast.error('فشل الحذف'); return; }
+    if (item) {
+      const remaining = draftItems.filter(d => d.draft_id === item.draft_id && d.id !== id);
+      const total = remaining.reduce((s, d) => s + (d.net_amount || 0), 0);
+      await supabase.from('obligation_drafts').update({ total_amount: total }).eq('id', item.draft_id);
+    }
+    await loadAll();
+  }, [draftItems, loadAll]);
+
+  // ==== Post draft ====
+  const postDraft = useCallback(async (draftId: string, fundId: string, date: string) => {
+    if (!user) return;
+    const { error } = await supabase.rpc('post_obligation_draft', {
+      p_draft_id: draftId,
+      p_fund_id: fundId,
+      p_date: date,
+      p_user_id: user.id,
+      p_created_by_name: profile?.full_name || null,
+    });
+    if (error) { toast.error('فشل الترحيل: ' + error.message); return false; }
+    await loadAll();
+    toast.success('تم ترحيل الالتزام إلى المصاريف');
+    return true;
+  }, [user, profile, loadAll]);
+
+  const skipDraft = useCallback(async (draftId: string) => {
+    const { error } = await supabase.from('obligation_drafts').update({ status: 'skipped' }).eq('id', draftId);
+    if (error) { toast.error('فشل'); return; }
+    await loadAll();
+    toast.success('تم تخطي المسودة');
+  }, [loadAll]);
+
+  const deleteDraft = useCallback(async (draftId: string) => {
+    const { error } = await supabase.from('obligation_drafts').delete().eq('id', draftId);
+    if (error) { toast.error('فشل الحذف'); return; }
+    await loadAll();
+  }, [loadAll]);
+
+  return {
+    obligations, items, drafts, draftItems, loading,
+    addObligation, updateObligation, deleteObligation,
+    addItem, updateItem, deleteItem,
+    updateDraftItem, addDraftItem, removeDraftItem,
+    postDraft, skipDraft, deleteDraft,
+    refresh: loadAll,
+  };
+}
