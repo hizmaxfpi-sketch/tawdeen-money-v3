@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Pencil, Trash2, Power, ChevronDown, ChevronUp, CheckCircle2, X, Calendar, Users, Receipt, Wallet, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { useRecurringObligations, ObligationType, RecurringObligation, ObligationItem, ObligationDraft } from '@/hooks/useRecurringObligations';
 import { FundOption, AccountOption } from '@/types/finance';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 const OBLIGATION_TYPES: { value: ObligationType; label: string; category: string; icon: any }[] = [
@@ -39,6 +40,33 @@ export function RecurringObligationsTab({ fundOptions, accountOptions }: Props) 
   const [expandedObligation, setExpandedObligation] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<ObligationDraft | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'obligation' | 'draft'; id: string } | null>(null);
+  const [ledgerAccountOptions, setLedgerAccountOptions] = useState<AccountOption[]>([]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    supabase
+      .from('ledger_accounts')
+      .select('id, name, type, balance')
+      .order('name', { ascending: true })
+      .then(({ data, error }) => {
+        if (ignore || error || !data) return;
+        setLedgerAccountOptions(
+          data.map((account) => ({
+            id: account.id,
+            name: account.name,
+            type: account.type as AccountOption['type'],
+            balance: Number(account.balance) || 0,
+          }))
+        );
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const effectiveAccountOptions = ledgerAccountOptions.length > 0 ? ledgerAccountOptions : accountOptions;
 
   const pendingDrafts = useMemo(() => obs.drafts.filter(d => d.status === 'draft'), [obs.drafts]);
   const postedDrafts = useMemo(() => obs.drafts.filter(d => d.status !== 'draft'), [obs.drafts]);
@@ -157,7 +185,7 @@ export function RecurringObligationsTab({ fundOptions, accountOptions }: Props) 
                     </div>
                     {expanded && (
                       <ItemsManager obligation={ob} items={obs.items.filter(i => i.obligation_id === ob.id)}
-                        accountOptions={accountOptions} obs={obs} />
+                        accountOptions={effectiveAccountOptions} obs={obs} />
                     )}
                   </CardContent>
                 </Card>
@@ -202,7 +230,7 @@ export function RecurringObligationsTab({ fundOptions, accountOptions }: Props) 
         <ObligationFormDialog
           obligation={editingObligation}
           fundOptions={fundOptions}
-          accountOptions={accountOptions}
+          accountOptions={effectiveAccountOptions}
           obs={obs}
           onClose={() => { setShowForm(false); setEditingObligation(null); }}
         />
