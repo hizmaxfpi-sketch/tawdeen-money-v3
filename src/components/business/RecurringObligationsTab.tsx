@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Pencil, Trash2, Power, ChevronDown, ChevronUp, CheckCircle2, X, Calendar, Users, Receipt } from 'lucide-react';
+import { Plus, Pencil, Trash2, Power, ChevronDown, ChevronUp, CheckCircle2, X, Calendar, Users, Receipt, Wallet, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
