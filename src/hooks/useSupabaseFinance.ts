@@ -205,6 +205,10 @@ export function useSupabaseFinance() {
       assets,
       asset_payments: assetPayments,
       asset_improvements: assetImprovements,
+      recurring_obligations: recurringObligations,
+      obligation_items: obligationItems,
+      obligation_drafts: obligationDrafts,
+      obligation_draft_items: obligationDraftItems,
       backupMeta: {
         companyId: activeRole?.company_id || null,
         exportedByUserId: user.id,
