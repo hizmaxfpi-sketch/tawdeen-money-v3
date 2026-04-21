@@ -108,6 +108,11 @@ Deno.serve(async (req) => {
     const assets = asArray(body?.assets);
     const assetPayments = asArray(body?.asset_payments ?? body?.assetPayments);
     const assetImprovements = asArray(body?.asset_improvements ?? body?.assetImprovements);
+    // Obligations module
+    const recurringObligations = asArray(body?.recurring_obligations ?? body?.recurringObligations);
+    const obligationItems = asArray(body?.obligation_items ?? body?.obligationItems);
+    const obligationDrafts = asArray(body?.obligation_drafts ?? body?.obligationDrafts);
+    const obligationDraftItems = asArray(body?.obligation_draft_items ?? body?.obligationDraftItems);
     const backupMeta = body?.backupMeta ?? body?.backup_meta ?? {};
 
     const totalItems = contacts.length + funds.length + transactions.length + debts.length + projects.length + containers.length + shipments.length + currencies.length + productionMaterials.length + productionProducts.length + productionSales.length + assets.length;
