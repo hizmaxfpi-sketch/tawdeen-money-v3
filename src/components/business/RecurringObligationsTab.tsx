@@ -392,6 +392,8 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
   const [qiAccount, setQiAccount] = useState('');
   // Single fixed amount (for rent / subscription / installment / other)
   const [fixedAmount, setFixedAmount] = useState('');
+  // Optional ledger account link for single-item obligations
+  const [linkedAccountId, setLinkedAccountId] = useState('');
   const [saving, setSaving] = useState(false);
 
   const isMultiItem = type === 'salary';
@@ -429,7 +431,7 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
           // Single-item obligation (rent / subscription / installment / other)
           items = [{
             name: name, base_amount: Number(fixedAmount), working_days: 30,
-            account_id: null, is_active: true, notes: null,
+            account_id: linkedAccountId || null, is_active: true, notes: null,
           }];
         }
         await obs.addObligation(payload, items);
@@ -550,6 +552,21 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
                   <p className="text-[9px] text-muted-foreground mt-1">
                     سيتم احتساب هذا المبلغ تلقائياً كل شهر، يمكنك تعديله عند المراجعة
                   </p>
+                  {accountOptions.length > 0 && (
+                    <div className="mt-2">
+                      <Label className="text-xs">ربط بحساب دفتري (اختياري)</Label>
+                      <Select value={linkedAccountId || 'none'} onValueChange={v => setLinkedAccountId(v === 'none' ? '' : v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="بدون ربط" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none" className="text-xs">بدون ربط</SelectItem>
+                          {accountOptions.map(a => <SelectItem key={a.id} value={a.id} className="text-xs">{a.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[9px] text-muted-foreground mt-1">
+                        عند الترحيل، سيُسجَّل القيد على هذا الحساب مباشرة
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
