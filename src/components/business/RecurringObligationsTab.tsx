@@ -385,12 +385,16 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
   const [totalMonths, setTotalMonths] = useState(obligation?.total_months?.toString() || '12');
   const [notes, setNotes] = useState(obligation?.notes || '');
 
-  // Quick item entry on creation
+  // Quick item entry on creation (for salary = multi-items)
   const [quickItems, setQuickItems] = useState<{ name: string; amount: string; accountId: string }[]>([]);
   const [qiName, setQiName] = useState('');
   const [qiAmount, setQiAmount] = useState('');
   const [qiAccount, setQiAccount] = useState('');
+  // Single fixed amount (for rent / subscription / installment / other)
+  const [fixedAmount, setFixedAmount] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const isMultiItem = type === 'salary';
 
   const addQuickItem = () => {
     if (!qiName || !qiAmount) return;
