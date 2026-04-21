@@ -214,7 +214,7 @@ export function useSupabaseFinance() {
         exportedByUserId: user.id,
       },
       exportedAt: new Date().toISOString(),
-      backupVersion: 5,
+      backupVersion: 6,
     };
   }, [fetchAllRows, user]);
 
