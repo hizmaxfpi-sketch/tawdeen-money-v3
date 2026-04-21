@@ -392,6 +392,8 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
   const [qiAccount, setQiAccount] = useState('');
   // Single fixed amount (for rent / subscription / installment / other)
   const [fixedAmount, setFixedAmount] = useState('');
+  // Optional ledger account link for single-item obligations
+  const [linkedAccountId, setLinkedAccountId] = useState('');
   const [saving, setSaving] = useState(false);
 
   const isMultiItem = type === 'salary';
