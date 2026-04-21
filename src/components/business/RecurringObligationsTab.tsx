@@ -620,7 +620,7 @@ function DraftEditDialog({ draft, obligation, draftItems, fundOptions, obs, onCl
 
         <div className="space-y-2">
           {draftItems.map(item => (
-            <DraftItemRow key={item.id} item={item} obs={obs} />
+            <DraftItemRow key={item.id} item={item} obs={obs} isSalary={obligation.obligation_type === 'salary'} />
           ))}
 
           {draftItems.length === 0 && (
