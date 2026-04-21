@@ -17,6 +17,8 @@ const SETTINGS_KEY = 'tawdeen_autobackup_settings';
 const TRACKED_TABLES = [
   'transactions', 'funds', 'contacts', 'debts',
   'projects', 'shipments', 'containers',
+  'recurring_obligations', 'obligation_items',
+  'obligation_drafts', 'obligation_draft_items',
 ] as const;
 
 export interface AutoBackupSettings {
