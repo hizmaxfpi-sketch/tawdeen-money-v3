@@ -94,19 +94,32 @@ export function useRecurringObligations() {
     }
   }, [user]);
 
+  const generateDrafts = useCallback(async (silent = false) => {
+    if (!user) return 0;
+    const { data, error } = await supabase.rpc('generate_obligation_drafts', { p_user_id: user.id });
+    if (error) {
+      if (!silent) toast.error('تعذر تحديث المستحقات');
+      return 0;
+    }
+
+    const created = Number(data ?? 0);
+    if (created > 0) {
+      await loadAll();
+      if (!silent) {
+        toast.info(`تم إنشاء ${created} مسودة التزام جديدة للمراجعة`);
+      }
+    }
+
+    return created;
+  }, [user, loadAll]);
+
   useEffect(() => { loadAll(); }, [loadAll]);
 
   // Auto-generate drafts on mount (today >= due_day)
   useEffect(() => {
     if (!user) return;
-    supabase.rpc('generate_obligation_drafts', { p_user_id: user.id })
-      .then(({ data, error }) => {
-        if (!error && (data ?? 0) > 0) {
-          loadAll();
-          toast.info(`تم إنشاء ${data} مسودة التزام جديدة للمراجعة`);
-        }
-      });
-  }, [user, loadAll]);
+    generateDrafts();
+  }, [user, generateDrafts]);
 
   // ==== Obligation CRUD (optimistic — no full reload) ====
   const addObligation = useCallback(async (
@@ -127,16 +140,18 @@ export function useRecurringObligations() {
       ).select();
       if (itemsData) setItems(prev => [...prev, ...(itemsData as ObligationItem[])]);
     }
+    await generateDrafts(true);
     toast.success('تم إنشاء الالتزام');
     return data as RecurringObligation;
-  }, [user, profile]);
+  }, [user, profile, generateDrafts]);
 
   const updateObligation = useCallback(async (id: string, patch: Partial<RecurringObligation>) => {
     // Optimistic update
     setObligations(prev => prev.map(o => o.id === id ? { ...o, ...patch } : o));
     const { error } = await supabase.from('recurring_obligations').update(patch).eq('id', id);
     if (error) { toast.error('فشل التحديث'); await loadAll(); return; }
-  }, [loadAll]);
+    await generateDrafts(true);
+  }, [loadAll, generateDrafts]);
 
   const deleteObligation = useCallback(async (id: string) => {
     // Snapshot draft IDs belonging to this obligation so we can also clear their items locally
