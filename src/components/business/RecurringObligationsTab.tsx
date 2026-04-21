@@ -666,3 +666,132 @@ function DraftItemRow({ item, obs }: { item: any; obs: ReturnType<typeof useRecu
     </div>
   );
 }
+
+// =============== Summary Panel (top of page) ===============
+const CATEGORY_META: Record<string, { label: string; icon: any; color: string }> = {
+  salary: { label: 'رواتب', icon: Users, color: 'text-blue-500' },
+  rent: { label: 'إيجارات', icon: Receipt, color: 'text-purple-500' },
+  subscription: { label: 'اشتراكات', icon: Receipt, color: 'text-cyan-500' },
+  installment: { label: 'أقساط', icon: Calendar, color: 'text-amber-500' },
+  other: { label: 'أخرى', icon: Receipt, color: 'text-muted-foreground' },
+};
+
+const QUICK_PERIODS = [1, 3, 6, 12];
+
+function ObligationsSummaryPanel({ obligations, items }: {
+  obligations: RecurringObligation[];
+  items: ObligationItem[];
+}) {
+  const [months, setMonths] = useState<number>(1);
+  const [customMode, setCustomMode] = useState(false);
+
+  // Compute monthly amount per obligation, then projected total over `months`
+  const summary = useMemo(() => {
+    const byCategory: Record<string, { monthly: number; projected: number; count: number }> = {};
+    let totalMonthly = 0;
+    let totalProjected = 0;
+
+    for (const ob of obligations) {
+      if (!ob.is_active) continue;
+      const obItems = items.filter(i => i.obligation_id === ob.id && i.is_active);
+      const monthly = obItems.reduce((s, i) => s + (i.base_amount || 0), 0);
+
+      // Determine effective months for projection
+      // For installments with total_months: cap at remaining months
+      let effectiveMonths = months;
+      if (ob.total_months && ob.total_months > 0) {
+        const remaining = Math.max(0, ob.total_months - (ob.posted_count || 0));
+        effectiveMonths = Math.min(months, remaining);
+      }
+      const projected = monthly * effectiveMonths;
+
+      const key = CATEGORY_META[ob.obligation_type] ? ob.obligation_type : 'other';
+      if (!byCategory[key]) byCategory[key] = { monthly: 0, projected: 0, count: 0 };
+      byCategory[key].monthly += monthly;
+      byCategory[key].projected += projected;
+      byCategory[key].count += 1;
+
+      totalMonthly += monthly;
+      totalProjected += projected;
+    }
+
+    return { byCategory, totalMonthly, totalProjected };
+  }, [obligations, items, months]);
+
+  const fmt = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+  const categoriesWithData = Object.entries(summary.byCategory).filter(([, v]) => v.monthly > 0);
+
+  return (
+    <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+      <CardContent className="py-3 space-y-3">
+        {/* Period selector */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1">
+            <TrendingUp className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-bold">خطة الالتزامات</span>
+          </div>
+          <div className="flex items-center gap-1">
+            {QUICK_PERIODS.map(p => (
+              <Button key={p} size="sm" variant={!customMode && months === p ? 'default' : 'outline'}
+                className="h-6 px-2 text-[10px]"
+                onClick={() => { setMonths(p); setCustomMode(false); }}>
+                {p === 1 ? 'شهر' : `${p} أشهر`}
+              </Button>
+            ))}
+            <Input type="number" min={1} max={120}
+              value={customMode ? months : ''}
+              placeholder="…"
+              onFocus={() => setCustomMode(true)}
+              onChange={e => {
+                const v = Math.max(1, Math.min(120, Number(e.target.value) || 1));
+                setMonths(v);
+                setCustomMode(true);
+              }}
+              className="h-6 w-12 text-[10px] px-1.5 text-center" />
+          </div>
+        </div>
+
+        {/* Total card */}
+        <div className="rounded-lg bg-background/80 border border-border p-2.5 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] text-muted-foreground">
+              {months === 1 ? 'إجمالي الالتزامات الشهرية' : `إجمالي ${months} أشهر`}
+            </p>
+            <p className="text-lg font-bold text-expense">{fmt(summary.totalProjected)}</p>
+            {months > 1 && (
+              <p className="text-[9px] text-muted-foreground">شهرياً: {fmt(summary.totalMonthly)}</p>
+            )}
+          </div>
+          <Wallet className="h-8 w-8 text-primary/30" />
+        </div>
+
+        {/* Per-category cards */}
+        {categoriesWithData.length === 0 ? (
+          <p className="text-[10px] text-muted-foreground text-center py-1">
+            لا توجد التزامات نشطة. أضف التزاماً لتظهر الخطة.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-1.5">
+            {categoriesWithData.map(([key, v]) => {
+              const meta = CATEGORY_META[key] || CATEGORY_META.other;
+              const Icon = meta.icon;
+              return (
+                <div key={key} className="rounded-lg bg-background/60 border border-border/60 p-2">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <Icon className={cn('h-3 w-3', meta.color)} />
+                    <span className="text-[10px] font-medium">{meta.label}</span>
+                    <span className="text-[9px] text-muted-foreground mr-auto">({v.count})</span>
+                  </div>
+                  <p className="text-xs font-bold">{fmt(v.projected)}</p>
+                  {months > 1 && (
+                    <p className="text-[9px] text-muted-foreground">{fmt(v.monthly)}/شهر</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
