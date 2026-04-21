@@ -217,7 +217,7 @@ export function useRecurringObligations() {
 
   // ==== Post draft ====
   const postDraft = useCallback(async (draftId: string, fundId: string, date: string) => {
-    if (!user) return;
+    if (!user) return false;
     const { error } = await supabase.rpc('post_obligation_draft', {
       p_draft_id: draftId,
       p_fund_id: fundId,
@@ -226,22 +226,28 @@ export function useRecurringObligations() {
       p_created_by_name: profile?.full_name || null,
     });
     if (error) { toast.error('فشل الترحيل: ' + error.message); return false; }
-    await loadAll();
+    // Optimistic: mark draft as posted locally
+    setDrafts(prev => prev.map(d => d.id === draftId
+      ? { ...d, status: 'posted' as DraftStatus, fund_id: fundId, posted_at: new Date().toISOString() }
+      : d));
     toast.success('تم ترحيل الالتزام إلى المصاريف');
+    // Background refresh to pick up new transaction & posted_count
+    loadAll();
     return true;
   }, [user, profile, loadAll]);
 
   const skipDraft = useCallback(async (draftId: string) => {
+    setDrafts(prev => prev.map(d => d.id === draftId ? { ...d, status: 'skipped' as DraftStatus } : d));
     const { error } = await supabase.from('obligation_drafts').update({ status: 'skipped' }).eq('id', draftId);
-    if (error) { toast.error('فشل'); return; }
-    await loadAll();
+    if (error) { toast.error('فشل'); await loadAll(); return; }
     toast.success('تم تخطي المسودة');
   }, [loadAll]);
 
   const deleteDraft = useCallback(async (draftId: string) => {
+    setDrafts(prev => prev.filter(d => d.id !== draftId));
+    setDraftItems(prev => prev.filter(di => di.draft_id !== draftId));
     const { error } = await supabase.from('obligation_drafts').delete().eq('id', draftId);
-    if (error) { toast.error('فشل الحذف'); return; }
-    await loadAll();
+    if (error) { toast.error('فشل الحذف'); await loadAll(); return; }
   }, [loadAll]);
 
   return {
