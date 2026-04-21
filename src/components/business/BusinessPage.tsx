@@ -21,6 +21,7 @@ import { UnifiedTransactionLog } from '@/components/shared/UnifiedTransactionLog
 import { Textarea } from '@/components/ui/textarea';
 import { BusinessTransactionForm } from './BusinessTransactionForm';
 import { AssetDetailsSheet } from './AssetDetailsSheet';
+import { RecurringObligationsTab } from './RecurringObligationsTab';
 import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
 import { cn } from '@/lib/utils';
 
@@ -173,10 +174,16 @@ export function BusinessPage({
       </div>
 
       <Tabs defaultValue="transactions" className="w-full">
-        <TabsList className="w-full grid grid-cols-2">
-          <TabsTrigger value="transactions">العمليات</TabsTrigger>
-          <TabsTrigger value="assets">الأصول</TabsTrigger>
+        <TabsList className="w-full grid grid-cols-3">
+          <TabsTrigger value="transactions" className="text-xs">العمليات</TabsTrigger>
+          <TabsTrigger value="obligations" className="text-xs">الالتزامات</TabsTrigger>
+          <TabsTrigger value="assets" className="text-xs">الأصول</TabsTrigger>
         </TabsList>
+
+        {/* Recurring Obligations Tab */}
+        <TabsContent value="obligations" className="space-y-3 mt-3">
+          <RecurringObligationsTab fundOptions={fundOptions} accountOptions={accountOptions} />
+        </TabsContent>
 
         {/* Operations Tab */}
         <TabsContent value="transactions" className="space-y-3 mt-3">
