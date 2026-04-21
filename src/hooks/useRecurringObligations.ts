@@ -67,7 +67,8 @@ export interface ObligationDraftItem {
 }
 
 export function useRecurringObligations() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  const profile = (user?.user_metadata?.full_name ? { full_name: user.user_metadata.full_name as string } : null);
   const [obligations, setObligations] = useState<RecurringObligation[]>([]);
   const [items, setItems] = useState<ObligationItem[]>([]);
   const [drafts, setDrafts] = useState<ObligationDraft[]>([]);
