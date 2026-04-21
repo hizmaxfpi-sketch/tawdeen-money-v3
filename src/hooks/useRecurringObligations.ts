@@ -139,12 +139,16 @@ export function useRecurringObligations() {
   }, [loadAll]);
 
   const deleteObligation = useCallback(async (id: string) => {
+    // Snapshot draft IDs belonging to this obligation so we can also clear their items locally
+    const draftIdsToRemove = drafts.filter(d => d.obligation_id === id).map(d => d.id);
     setObligations(prev => prev.filter(o => o.id !== id));
     setItems(prev => prev.filter(i => i.obligation_id !== id));
+    setDrafts(prev => prev.filter(d => d.obligation_id !== id));
+    setDraftItems(prev => prev.filter(di => !draftIdsToRemove.includes(di.draft_id)));
     const { error } = await supabase.from('recurring_obligations').delete().eq('id', id);
     if (error) { toast.error('فشل الحذف'); await loadAll(); return; }
     toast.success('تم الحذف');
-  }, [loadAll]);
+  }, [drafts, loadAll]);
 
   // ==== Item CRUD ====
   const addItem = useCallback(async (obligationId: string, payload: Omit<ObligationItem, 'id' | 'obligation_id' | 'user_id'>) => {
