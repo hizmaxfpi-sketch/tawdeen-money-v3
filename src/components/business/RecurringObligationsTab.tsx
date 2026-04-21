@@ -431,7 +431,7 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
           // Single-item obligation (rent / subscription / installment / other)
           items = [{
             name: name, base_amount: Number(fixedAmount), working_days: 30,
-            account_id: null, is_active: true, notes: null,
+            account_id: linkedAccountId || null, is_active: true, notes: null,
           }];
         }
         await obs.addObligation(payload, items);
