@@ -385,12 +385,16 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
   const [totalMonths, setTotalMonths] = useState(obligation?.total_months?.toString() || '12');
   const [notes, setNotes] = useState(obligation?.notes || '');
 
-  // Quick item entry on creation
+  // Quick item entry on creation (for salary = multi-items)
   const [quickItems, setQuickItems] = useState<{ name: string; amount: string; accountId: string }[]>([]);
   const [qiName, setQiName] = useState('');
   const [qiAmount, setQiAmount] = useState('');
   const [qiAccount, setQiAccount] = useState('');
+  // Single fixed amount (for rent / subscription / installment / other)
+  const [fixedAmount, setFixedAmount] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const isMultiItem = type === 'salary';
 
   const addQuickItem = () => {
     if (!qiName || !qiAmount) return;
@@ -415,10 +419,19 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
       if (obligation) {
         await obs.updateObligation(obligation.id, payload);
       } else {
-        const items = quickItems.map(qi => ({
-          name: qi.name, base_amount: Number(qi.amount), working_days: 30,
-          account_id: qi.accountId || null, is_active: true, notes: null,
-        }));
+        let items: Array<{ name: string; base_amount: number; working_days: number; account_id: string | null; is_active: boolean; notes: null }> = [];
+        if (isMultiItem) {
+          items = quickItems.map(qi => ({
+            name: qi.name, base_amount: Number(qi.amount), working_days: 30,
+            account_id: qi.accountId || null, is_active: true, notes: null,
+          }));
+        } else if (Number(fixedAmount) > 0) {
+          // Single-item obligation (rent / subscription / installment / other)
+          items = [{
+            name: name, base_amount: Number(fixedAmount), working_days: 30,
+            account_id: null, is_active: true, notes: null,
+          }];
+        }
         await obs.addObligation(payload, items);
       }
       onClose();
@@ -480,39 +493,64 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
             </div>
           )}
 
-          {/* Quick items only when creating */}
+          {/* Items section — adapts to obligation type */}
           {!obligation && (
             <div className="border-t border-border pt-2.5 space-y-2">
-              <Label className="text-xs font-bold">البنود (اختياري - يمكنك إضافتها لاحقاً)</Label>
-              {quickItems.length > 0 && (
-                <div className="space-y-1">
-                  {quickItems.map((qi, i) => (
-                    <div key={i} className="flex items-center justify-between bg-muted/50 rounded px-2 py-1">
-                      <span className="text-xs">{qi.name}</span>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs font-bold">${qi.amount}</span>
-                        <Button size="sm" variant="ghost" className="h-5 w-5 p-0"
-                          onClick={() => setQuickItems(prev => prev.filter((_, idx) => idx !== i))}>
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
+              {isMultiItem ? (
+                <>
+                  <Label className="text-xs font-bold">الموظفون (يمكنك إضافتهم لاحقاً)</Label>
+                  {quickItems.length > 0 && (
+                    <div className="space-y-1">
+                      {quickItems.map((qi, i) => (
+                        <div key={i} className="flex items-center justify-between bg-muted/50 rounded px-2 py-1">
+                          <span className="text-xs">{qi.name}</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-bold">${qi.amount}</span>
+                            <Button size="sm" variant="ghost" className="h-5 w-5 p-0"
+                              onClick={() => setQuickItems(prev => prev.filter((_, idx) => idx !== i))}>
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                  <div className="grid grid-cols-[1fr_80px_auto] gap-1">
+                    <Input placeholder="اسم الموظف" value={qiName} onChange={e => setQiName(e.target.value)} className="h-7 text-xs" />
+                    <Input type="number" placeholder="الراتب" value={qiAmount} onChange={e => setQiAmount(e.target.value)} className="h-7 text-xs" />
+                    <Button size="sm" className="h-7 px-2" onClick={addQuickItem}><Plus className="h-3 w-3" /></Button>
+                  </div>
+                  {accountOptions.length > 0 && (
+                    <Select value={qiAccount || 'none'} onValueChange={v => setQiAccount(v === 'none' ? '' : v)}>
+                      <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="ربط بحساب (اختياري للموظف التالي)" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none" className="text-xs">بدون ربط</SelectItem>
+                        {accountOptions.map(a => <SelectItem key={a.id} value={a.id} className="text-xs">{a.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </>
+              ) : (
+                <div>
+                  <Label className="text-xs font-bold">
+                    مبلغ الالتزام الشهري *
+                  </Label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    value={fixedAmount}
+                    onChange={e => setFixedAmount(e.target.value)}
+                    className="h-9 text-sm font-bold"
+                    placeholder={
+                      type === 'rent' ? 'مثلاً: 500' :
+                      type === 'subscription' ? 'مثلاً: 50' :
+                      type === 'installment' ? 'قيمة القسط الشهري' : 'المبلغ'
+                    }
+                  />
+                  <p className="text-[9px] text-muted-foreground mt-1">
+                    سيتم احتساب هذا المبلغ تلقائياً كل شهر، يمكنك تعديله عند المراجعة
+                  </p>
                 </div>
-              )}
-              <div className="grid grid-cols-[1fr_80px_auto] gap-1">
-                <Input placeholder="الاسم" value={qiName} onChange={e => setQiName(e.target.value)} className="h-7 text-xs" />
-                <Input type="number" placeholder="مبلغ" value={qiAmount} onChange={e => setQiAmount(e.target.value)} className="h-7 text-xs" />
-                <Button size="sm" className="h-7 px-2" onClick={addQuickItem}><Plus className="h-3 w-3" /></Button>
-              </div>
-              {type === 'salary' && accountOptions.length > 0 && (
-                <Select value={qiAccount || 'none'} onValueChange={v => setQiAccount(v === 'none' ? '' : v)}>
-                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="ربط بحساب (اختياري للبند التالي)" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none" className="text-xs">بدون ربط</SelectItem>
-                    {accountOptions.map(a => <SelectItem key={a.id} value={a.id} className="text-xs">{a.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
               )}
             </div>
           )}
@@ -524,7 +562,7 @@ function ObligationFormDialog({ obligation, fundOptions, accountOptions, obs, on
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>إلغاء</Button>
-          <Button size="sm" onClick={save} disabled={saving || !name}>
+          <Button size="sm" onClick={save} disabled={saving || !name || (!obligation && !isMultiItem && !(Number(fixedAmount) > 0))}>
             {saving ? 'جاري الحفظ...' : (obligation ? 'تحديث' : 'إنشاء')}
           </Button>
         </DialogFooter>
