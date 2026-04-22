@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { AnimatePresence } from 'framer-motion';
@@ -8,13 +8,14 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { FloatingAddButton } from '@/components/layout/FloatingAddButton';
 import { Dashboard } from '@/components/dashboard/Dashboard';
-import { FundsPage } from '@/components/funds/FundsPage';
-import { LedgerAccountsPage } from '@/components/ledger/LedgerAccountsPage';
-import { ReportsPage } from '@/components/reports/ReportsPage';
-import { ShippingPage } from '@/components/shipping/ShippingPage';
-import { ProjectsPage } from '@/components/projects/ProjectsPage';
-import { BusinessPage } from '@/components/business/BusinessPage';
-import { ProductionPage } from '@/components/production/ProductionPage';
+// ✅ Lazy-load heavy module pages — they are only fetched when the user navigates to them
+const FundsPage = lazy(() => import('@/components/funds/FundsPage').then(m => ({ default: m.FundsPage })));
+const LedgerAccountsPage = lazy(() => import('@/components/ledger/LedgerAccountsPage').then(m => ({ default: m.LedgerAccountsPage })));
+const ReportsPage = lazy(() => import('@/components/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
+const ShippingPage = lazy(() => import('@/components/shipping/ShippingPage').then(m => ({ default: m.ShippingPage })));
+const ProjectsPage = lazy(() => import('@/components/projects/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
+const BusinessPage = lazy(() => import('@/components/business/BusinessPage').then(m => ({ default: m.BusinessPage })));
+const ProductionPage = lazy(() => import('@/components/production/ProductionPage').then(m => ({ default: m.ProductionPage })));
 import { useProduction } from '@/hooks/useProduction';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { CoachMarks } from '@/components/onboarding/CoachMarks';
