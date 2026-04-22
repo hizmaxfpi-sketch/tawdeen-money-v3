@@ -26,6 +26,7 @@ import { useScrollToTop } from '@/hooks/useScrollToTop';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useBusinessTransactions } from '@/hooks/useBusinessTransactions';
+import { useDashboardSnapshot } from '@/hooks/useDashboardSnapshot';
 import { useEnabledModules, ModuleKey } from '@/hooks/useEnabledModules';
 import { TransactionType, Transaction } from '@/types/finance';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -104,7 +105,7 @@ const Index = () => {
     projectsLoadingMore, loadMoreProjects,
     addTransaction, updateTransaction, deleteTransaction, loadMoreTransactions,
     addFund, addProject, updateProject, deleteProject,
-    getStats, getFundOptions, getAccountOptions, getProjectStats,
+    getFundOptions, getAccountOptions, getProjectStats,
     getMonthlyTrend, getExpenseBreakdown, exportData, importData, transferFunds, refreshAll,
   } = useSupabaseFinance();
 
@@ -113,35 +114,17 @@ const Index = () => {
   const { contacts } = useSupabaseContacts();
   const { summary: productionSummary } = useProduction();
   const productionEnabled = isEnabled('production');
-  // لوحة التحكم: تجميع كل الإيرادات في مكان واحد (يدوية + مبيعات الإنتاج)
-  // وكل المصاريف (يدوية + تكلفة المواد المستهلكة + مصاريف البيع) → نتيجة = الربح الحقيقي
+
+  // ✅ المصدر الموحد للأرقام: نداء RPC واحد محسوب في الخادم
+  const { snapshot } = useDashboardSnapshot();
+
+  // الإيرادات/المصاريف من العمليات النقدية فقط (للـ business view)
   const { directRevenue, businessExpenses } = useBusinessTransactions(transactions, {
     extraRevenue: productionEnabled ? productionSummary.totalSales : 0,
     extraExpenses: productionEnabled ? (productionSummary.totalCost + productionSummary.totalExpenses) : 0,
   });
 
   const fundLinkedTransactions = transactions.filter(t => t.fundId && t.fundId !== '');
-
-  // Compute ledger totals from contacts (synced from v_contact_balance)
-  const ledgerTotals = useMemo(() => {
-    let debit = 0, credit = 0;
-    for (const c of contacts) {
-      debit += c.totalDebit || 0;
-      credit += c.totalCredit || 0;
-    }
-    return { debit, credit, net: debit - credit };
-  }, [contacts]);
-
-  // Compute project profit (only realized/completed projects)
-  const projectProfit = useMemo(() =>
-    projects.filter(p => p.status === 'completed').reduce((s, p) => s + (p.profit || 0), 0), [projects]);
-
-  // Compute container profit (only realized: status = 'delivered')
-  // الأرباح تُرحَّل كإيراد فقط عند تسليم الحاوية فعلياً
-  const containerProfit = useMemo(() =>
-    containers
-      .filter(c => (c as any).status === 'delivered')
-      .reduce((s, c) => s + (Number((c as any).profit || 0)), 0), [containers]);
 
   const handleOpenForm = (type: TransactionType = 'in') => {
     setDefaultTransactionType(type);
@@ -156,7 +139,17 @@ const Index = () => {
     }
   };
 
-  const stats = useMemo(() => getStats(), [getStats]);
+  // ✅ كل الإحصائيات من snapshot — مصدر واحد، أرقام موحدة في كل الشاشات
+  const stats = useMemo(() => ({
+    totalLiquidity: snapshot.totalLiquidity,
+    netCompanyProfit: snapshot.netCompanyProfit,
+    totalExpenses: snapshot.totalExpenses,
+    totalReceivables: snapshot.totalReceivables,
+    totalPayables: snapshot.totalPayables,
+    liquidityChange: 0,
+    profitChange: 0,
+  }), [snapshot]);
+
   const fundOptions = useMemo(() => getFundOptions(), [getFundOptions]);
   const accountOptions = useMemo(() => getAccountOptions(), [getAccountOptions]);
   const projectStats = useMemo(() => getProjectStats(), [getProjectStats]);
@@ -210,11 +203,11 @@ const Index = () => {
             onDeleteTransaction={perms.canDelete('transactions') ? handleDeleteTransaction : undefined}
             hasMore={hasMoreTransactions}
             onLoadMore={loadMoreTransactions}
-            ledgerDebit={ledgerTotals.debit}
-            ledgerCredit={ledgerTotals.credit}
-            ledgerNet={ledgerTotals.net}
-            projectProfit={projectProfit}
-            containerProfit={containerProfit}
+            ledgerDebit={snapshot.ledgerDebit}
+            ledgerCredit={snapshot.ledgerCredit}
+            ledgerNet={snapshot.ledgerNet}
+            projectProfit={snapshot.projectProfit}
+            containerProfit={snapshot.containerProfit}
             directRevenue={directRevenue}
             businessExpenses={businessExpenses}
             onExpensesClick={() => handleNavigate('business')}
@@ -224,9 +217,9 @@ const Index = () => {
             showBusiness={isEnabled('business')}
             showFunds={isEnabled('funds')}
             showProduction={isEnabled('production')}
-            productionSales={productionSummary.totalSales}
-            productionMaterialsValue={productionSummary.materialsValue}
-            productionProductsValue={productionSummary.productsValue}
+            productionSales={snapshot.productionSales}
+            productionMaterialsValue={snapshot.productionMaterialsValue}
+            productionProductsValue={snapshot.productionProductsValue}
           />
         );
       case 'funds':

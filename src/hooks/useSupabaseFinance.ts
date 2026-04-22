@@ -20,7 +20,8 @@ export function useSupabaseFinance() {
   const debtsHook = useDebts();
   const contactsHook = useSupabaseContacts();
 
-  // إحصائيات من DB مباشرة (مصدر الحقيقة الوحيد)
+  // ⚠️ DEPRECATED: استخدم useDashboardSnapshot مباشرة للأرقام الموحدة.
+  // هذا الاستدعاء محفوظ للتوافق مع الشاشات القديمة، ويستخدم نفس RPC الموحد.
   const [dbStats, setDbStats] = useState<FinanceStats>({
     totalLiquidity: 0, netCompanyProfit: 0, totalExpenses: 0,
     totalReceivables: 0, totalPayables: 0, liquidityChange: 0, profitChange: 0,
@@ -28,7 +29,8 @@ export function useSupabaseFinance() {
 
   const fetchStats = useCallback(async () => {
     if (!user) return;
-    const { data, error } = await (supabase.rpc as any)('get_financial_summary');
+    // نستخدم RPC الموحد get_dashboard_snapshot كمصدر وحيد للحقيقة
+    const { data, error } = await (supabase.rpc as any)('get_dashboard_snapshot');
     if (!error && data) {
       const d = data as any;
       setDbStats({
@@ -43,8 +45,7 @@ export function useSupabaseFinance() {
     }
   }, [user]);
 
-  // جلب الإحصائيات عند تغير البيانات
-  // Debounce stats fetching to avoid cascade of RPC calls
+  // جلب الإحصائيات عند تغير البيانات (بـ debounce لمنع التتابع)
   const statsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!user) return;

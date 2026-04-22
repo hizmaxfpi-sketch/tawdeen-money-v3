@@ -2293,6 +2293,7 @@ export type Database = {
       }
       get_company_status: { Args: never; Returns: string }
       get_current_user_name: { Args: never; Returns: string }
+      get_dashboard_snapshot: { Args: never; Returns: Json }
       get_enabled_modules: { Args: never; Returns: string[] }
       get_financial_summary: { Args: never; Returns: Json }
       get_production_summary: { Args: never; Returns: Json }
