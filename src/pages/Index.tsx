@@ -111,7 +111,9 @@ const Index = () => {
   } = useSupabaseFinance();
 
   const { currencies, updateExchangeRate } = useCurrencies();
-  const { containers, shipments } = useSupabaseShipping();
+  // Heavy data — only fetch when their respective pages are active or needed by Dashboard
+  const needsShipping = currentPage === 'shipping' || currentPage === 'reports';
+  const { containers, shipments } = useSupabaseShipping({ enabled: needsShipping });
   const { contacts } = useSupabaseContacts();
   const { summary: productionSummary } = useProduction();
   const productionEnabled = isEnabled('production');
