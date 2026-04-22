@@ -619,3 +619,202 @@ export function UnifiedTransactionLog({
     </div>
   );
 }
+
+// ============= Virtualized Transaction List =============
+// Renders rows with a virtualizer when list is long (>30) to avoid mounting hundreds of nodes.
+// Removes the per-item stagger animation that compounded into seconds of jank on long lists.
+interface TxListProps {
+  items: Transaction[];
+  maxHeight: string;
+  expandedId: string | null;
+  displayCurrencyCode: string;
+  currencies: Currency[];
+  onClick: (tx: Transaction) => void;
+  getTransactionIcon: (tx: Transaction) => JSX.Element;
+  getCategoryLabel: (c: string) => string;
+  getSourceLabel: (s: string) => string;
+  formatDescription: (tx: Transaction) => string;
+  formatDate: (s: string) => string;
+  formatFullDate: (s: string) => string;
+  emptyLabel: string;
+  labels: {
+    date: string; typeLabel: string; debit: string; credit: string;
+    currency: string; exchangeRate: string; time: string;
+    user: string; notes: string; clickAgain: string;
+  };
+}
+
+function TransactionList(props: TxListProps) {
+  const { items, maxHeight, expandedId } = props;
+  const parentRef = useRef<HTMLDivElement>(null);
+  const VIRT_THRESHOLD = 30;
+
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (index) => (items[index]?.id === expandedId ? 220 : 56),
+    overscan: 6,
+    getItemKey: (index) => items[index]?.id || index,
+  });
+
+  // Re-measure when expandedId toggles so the row grows/shrinks smoothly
+  useEffect(() => {
+    virtualizer.measure();
+  }, [expandedId, virtualizer]);
+
+  if (items.length === 0) {
+    return (
+      <div className="overflow-y-auto scrollbar-hide" style={{ maxHeight }}>
+        <p className="text-center py-6 text-sm text-muted-foreground">{props.emptyLabel}</p>
+      </div>
+    );
+  }
+
+  // Small lists: render directly (no virtualization overhead)
+  if (items.length <= VIRT_THRESHOLD) {
+    return (
+      <div className="space-y-1.5 overflow-y-auto scrollbar-hide" style={{ maxHeight }}>
+        {items.map(tx => <TxRow key={tx.id} tx={tx} {...props} />)}
+      </div>
+    );
+  }
+
+  // Large lists: virtualized
+  return (
+    <div ref={parentRef} className="overflow-y-auto scrollbar-hide" style={{ maxHeight, contain: 'strict' }}>
+      <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative' }}>
+        {virtualizer.getVirtualItems().map(vItem => {
+          const tx = items[vItem.index];
+          return (
+            <div
+              key={vItem.key}
+              ref={virtualizer.measureElement}
+              data-index={vItem.index}
+              style={{
+                position: 'absolute',
+                top: 0, left: 0, width: '100%',
+                transform: `translateY(${vItem.start}px)`,
+                paddingBottom: 6,
+              }}
+            >
+              <TxRow tx={tx} {...props} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+interface TxRowProps extends Omit<TxListProps, 'items' | 'maxHeight' | 'emptyLabel'> {
+  tx: Transaction;
+}
+
+function TxRow({
+  tx, expandedId, displayCurrencyCode, currencies, onClick,
+  getTransactionIcon, getCategoryLabel, getSourceLabel,
+  formatDescription, formatDate, formatFullDate, labels,
+}: TxRowProps) {
+  const isExpanded = expandedId === tx.id;
+  return (
+    <div
+      onClick={() => onClick(tx)}
+      className={cn(
+        "cursor-pointer rounded-lg transition-colors duration-150 border",
+        isExpanded
+          ? "bg-accent/50 border-primary/30 shadow-md"
+          : "bg-transparent border-transparent hover:bg-muted/50"
+      )}
+    >
+      <div className="flex items-center gap-2.5 p-2">
+        <div className={cn(
+          "flex h-8 w-8 items-center justify-center rounded-full shrink-0",
+          tx.type === 'in' ? "bg-income-light text-income" : "bg-expense-light text-expense",
+          tx.sourceType === 'shipment_invoice' || tx.sourceType === 'shipment_payment' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" :
+          tx.sourceType === 'project_client' || tx.sourceType === 'project_vendor' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" : ""
+        )}>
+          {getTransactionIcon(tx)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-medium truncate">{formatDescription(tx)}</p>
+            {tx.sourceType && tx.sourceType !== 'manual' && (
+              <span className="shrink-0 px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                {getSourceLabel(tx.sourceType)}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">{getCategoryLabel(tx.category)}</span>
+            <span className="text-xs text-muted-foreground">•</span>
+            <span className="text-xs text-muted-foreground">{formatDate(tx.date)}</span>
+            {tx.createdAt && (
+              <>
+                <span className="text-xs text-muted-foreground">•</span>
+                <span className="text-[10px] text-muted-foreground">{formatTime(tx.createdAt)}</span>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-0.5">
+          <span className={cn("text-sm font-bold", tx.type === 'in' ? "text-income" : "text-expense")}>
+            {tx.type === 'in' ? '+' : '-'}
+            {displayCurrencyCode === 'USD'
+              ? `$${tx.amount.toLocaleString()}`
+              : formatWithCurrency(convertForDisplay(tx.amount, displayCurrencyCode, currencies), displayCurrencyCode, currencies)
+            }
+          </span>
+          {tx.currencyCode && tx.currencyCode !== 'USD' && displayCurrencyCode === 'USD' && (
+            <span className="text-[9px] text-muted-foreground">
+              {(() => { const orig = getOriginalAmount(tx); return `${orig.code} ${orig.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`; })()}
+            </span>
+          )}
+        </div>
+        <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform shrink-0", isExpanded && "rotate-180")} />
+      </div>
+
+      {isExpanded && (
+        <div className="overflow-hidden">
+          <div className="px-3 pb-2 pt-1 border-t border-border/50 space-y-1.5">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div><span className="text-muted-foreground">{labels.date}:</span><span className="mr-1 font-medium">{formatFullDate(tx.date)}</span></div>
+              <div><span className="text-muted-foreground">{labels.typeLabel}:</span><span className="mr-1 font-medium">{tx.type === 'in' ? labels.debit : labels.credit}</span></div>
+              {tx.currencyCode && tx.currencyCode !== 'USD' && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">{labels.currency}:</span>
+                  <span className="mr-1 font-medium">
+                    {(() => { const orig = getOriginalAmount(tx); return `${orig.code} ${orig.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })} (${labels.exchangeRate}: ${orig.rate})`; })()}
+                  </span>
+                </div>
+              )}
+              {tx.createdAt && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">{labels.time}:</span>
+                  <span className="mr-1 font-medium">{formatDateTime(tx.createdAt)}</span>
+                </div>
+              )}
+              {tx.createdByName && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">{labels.user}:</span>
+                  <span className="mr-1 font-medium text-primary">{tx.createdByName}</span>
+                </div>
+              )}
+            </div>
+            {tx.notes && (
+              <div className="text-xs">
+                <span className="text-muted-foreground">{labels.notes}:</span>
+                <p className="mt-0.5 text-foreground bg-muted/50 p-1.5 rounded text-[11px]">{tx.notes}</p>
+              </div>
+            )}
+            <div className="flex items-center justify-center pt-1">
+              <span className="text-[10px] text-primary flex items-center gap-1">
+                <Edit3 className="h-3 w-3" />
+                {labels.clickAgain}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
