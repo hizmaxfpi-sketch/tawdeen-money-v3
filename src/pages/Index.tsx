@@ -217,9 +217,9 @@ const Index = () => {
             showBusiness={isEnabled('business')}
             showFunds={isEnabled('funds')}
             showProduction={isEnabled('production')}
-            productionSales={productionSummary.totalSales}
-            productionMaterialsValue={productionSummary.materialsValue}
-            productionProductsValue={productionSummary.productsValue}
+            productionSales={snapshot.productionSales}
+            productionMaterialsValue={snapshot.productionMaterialsValue}
+            productionProductsValue={snapshot.productionProductsValue}
           />
         );
       case 'funds':
