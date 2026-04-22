@@ -260,148 +260,47 @@ export function UnifiedTransactionLog({
         )}
       </AnimatePresence>
 
-      <div className="space-y-1.5 overflow-y-auto scrollbar-hide" style={{ maxHeight }}>
-        {filteredTransactions.length === 0 ? (
-          <p className="text-center py-6 text-sm text-muted-foreground">{t('common.noTransactions')}</p>
-        ) : (
-          filteredTransactions.map((transaction, index) => {
-            const isExpanded = expandedId === transaction.id;
-            return (
-              <motion.div
-                key={transaction.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.03 }}
-                onClick={() => handleTransactionClick(transaction)}
-                className={cn(
-                  "cursor-pointer rounded-lg transition-all duration-300 border",
-                  isExpanded 
-                    ? "bg-accent/50 border-primary/30 shadow-md" 
-                    : "bg-transparent border-transparent hover:bg-muted/50"
-                )}
-              >
-                <div className="flex items-center gap-2.5 p-2">
-                  <div className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full shrink-0 transition-colors",
-                    transaction.type === 'in' ? "bg-income-light text-income" : "bg-expense-light text-expense",
-                    transaction.sourceType === 'shipment_invoice' || transaction.sourceType === 'shipment_payment' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" :
-                    transaction.sourceType === 'project_client' || transaction.sourceType === 'project_vendor' ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" : ""
-                  )}>
-                    {getTransactionIcon(transaction)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-medium truncate">{formatDescription(transaction)}</p>
-                      {transaction.sourceType && transaction.sourceType !== 'manual' && (
-                        <span className="shrink-0 px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-                          {getSourceLabel(transaction.sourceType)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-muted-foreground">{getCategoryLabel(transaction.category)}</span>
-                      <span className="text-xs text-muted-foreground">•</span>
-                      <span className="text-xs text-muted-foreground">{formatDate(transaction.date)}</span>
-                      {transaction.createdAt && (
-                        <>
-                          <span className="text-xs text-muted-foreground">•</span>
-                          <span className="text-[10px] text-muted-foreground">{formatTime(transaction.createdAt)}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-0.5">
-                    <span className={cn("text-sm font-bold", transaction.type === 'in' ? "text-income" : "text-expense")}>
-                      {transaction.type === 'in' ? '+' : '-'}
-                      {displayCurrencyCode === 'USD'
-                        ? `$${transaction.amount.toLocaleString()}`
-                        : formatWithCurrency(convertForDisplay(transaction.amount, displayCurrencyCode, currencies), displayCurrencyCode, currencies)
-                      }
-                    </span>
-                    {transaction.currencyCode && transaction.currencyCode !== 'USD' && displayCurrencyCode === 'USD' && (
-                      <span className="text-[9px] text-muted-foreground">
-                        {(() => { const orig = getOriginalAmount(transaction); return `${orig.code} ${orig.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`; })()}
-                      </span>
-                    )}
-                  </div>
-                  <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform shrink-0", isExpanded && "rotate-180")} />
-                </div>
-                
-                <AnimatePresence>
-                  {isExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="px-3 pb-2 pt-1 border-t border-border/50 space-y-1.5">
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div>
-                            <span className="text-muted-foreground">{t('tx.date')}:</span>
-                            <span className="mr-1 font-medium">{formatFullDate(transaction.date)}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">{t('common.typeLabel')}:</span>
-                            <span className="mr-1 font-medium">{transaction.type === 'in' ? t('tx.debit') : t('tx.credit')}</span>
-                          </div>
-                          {transaction.currencyCode && transaction.currencyCode !== 'USD' && (
-                            <div className="col-span-2">
-                              <span className="text-muted-foreground">{t('tx.currency')}:</span>
-                              <span className="mr-1 font-medium">
-                                {(() => { const orig = getOriginalAmount(transaction); return `${orig.code} ${orig.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })} (${t('tx.exchangeRate')}: ${orig.rate})`; })()}
-                              </span>
-                            </div>
-                          )}
-                          {transaction.createdAt && (
-                            <div className="col-span-2">
-                              <span className="text-muted-foreground">{t('activity.time')}:</span>
-                              <span className="mr-1 font-medium">{formatDateTime(transaction.createdAt)}</span>
-                            </div>
-                          )}
-                          {transaction.createdByName && (
-                            <div className="col-span-2">
-                              <span className="text-muted-foreground">{t('activity.user')}:</span>
-                              <span className="mr-1 font-medium text-primary">{transaction.createdByName}</span>
-                            </div>
-                          )}
-                        </div>
-                        {transaction.notes && (
-                          <div className="text-xs">
-                            <span className="text-muted-foreground">{t('tx.notes')}:</span>
-                            <p className="mt-0.5 text-foreground bg-muted/50 p-1.5 rounded text-[11px]">{transaction.notes}</p>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-center pt-1">
-                          <span className="text-[10px] text-primary flex items-center gap-1">
-                            <Edit3 className="h-3 w-3" />
-                            {t('tx.clickAgain')}
-                          </span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            );
-          })
-        )}
+      <TransactionList
+        items={filteredTransactions}
+        maxHeight={maxHeight}
+        expandedId={expandedId}
+        displayCurrencyCode={displayCurrencyCode}
+        currencies={currencies}
+        onClick={handleTransactionClick}
+        getTransactionIcon={getTransactionIcon}
+        getCategoryLabel={getCategoryLabel}
+        getSourceLabel={getSourceLabel}
+        formatDescription={formatDescription}
+        formatDate={formatDate}
+        formatFullDate={formatFullDate}
+        emptyLabel={t('common.noTransactions')}
+        labels={{
+          date: t('tx.date'),
+          typeLabel: t('common.typeLabel'),
+          debit: t('tx.debit'),
+          credit: t('tx.credit'),
+          currency: t('tx.currency'),
+          exchangeRate: t('tx.exchangeRate'),
+          time: t('activity.time'),
+          user: t('activity.user'),
+          notes: t('tx.notes'),
+          clickAgain: t('tx.clickAgain'),
+        }}
+      />
 
-        {hasMore && onLoadMore && (
-          <div className="flex justify-center pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onLoadMore}
-              className="h-8 text-[11px] gap-1.5 px-6 border-primary/20 hover:bg-primary/5 text-primary"
-            >
-              <ChevronDown className="h-3.5 w-3.5" />
-              {t('common.loadMore')}
-            </Button>
-          </div>
-        )}
-      </div>
+      {hasMore && onLoadMore && (
+        <div className="flex justify-center pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onLoadMore}
+            className="h-8 text-[11px] gap-1.5 px-6 border-primary/20 hover:bg-primary/5 text-primary"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+            {t('common.loadMore')}
+          </Button>
+        </div>
+      )}
 
       {/* Transaction Details Modal */}
       <Dialog open={!!editingTransaction} onOpenChange={(open) => !open && setEditingTransaction(null)}>
