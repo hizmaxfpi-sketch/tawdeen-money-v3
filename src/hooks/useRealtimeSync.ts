@@ -8,7 +8,7 @@ type TableName = 'funds' | 'transactions' | 'contacts' | 'containers' | 'shipmen
  * يستمع لتغييرات الجداول عبر Realtime ويستدعي callback عند أي تغيير.
  * يُستخدم لإبطال الكاش وإعادة جلب البيانات تلقائياً مع debounce لمنع الجلب المتكرر.
  */
-export function useRealtimeSync(tables: TableName[], onChangeCallback: () => void, debounceMs = 1500) {
+export function useRealtimeSync(tables: TableName[], onChangeCallback: () => void, debounceMs = 800) {
   const { user } = useAuth();
   const callbackRef = useRef(onChangeCallback);
   callbackRef.current = onChangeCallback;
