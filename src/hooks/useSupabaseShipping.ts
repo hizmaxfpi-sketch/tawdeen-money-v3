@@ -7,7 +7,8 @@ import { useRealtimeSync } from './useRealtimeSync';
 import { cacheSet, cacheGet } from '@/lib/offlineCache';
 import { guardOffline } from '@/lib/offlineGuard';
 
-export function useSupabaseShipping() {
+export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
+  const enabled = opts.enabled !== false; // default: true (backward compatibility)
   const { user } = useAuth();
   const PAGE_SIZE = 50;
   const [containers, setContainers] = useState<Container[]>(() => cacheGet<Container[]>('containers') || []);
@@ -143,11 +144,11 @@ export function useSupabaseShipping() {
   }, [user, shipmentPage, shipmentsInitial]);
 
   useEffect(() => {
-    if (user) { fetchContainers(true); fetchShipments(true); }
-  }, [user]);
+    if (user && enabled) { fetchContainers(true); fetchShipments(true); }
+  }, [user, enabled]);
 
-  // Realtime: auto-refresh when containers or shipments change
-  const rt = useRealtimeSync(['containers', 'shipments'], () => {
+  // Realtime: auto-refresh when containers or shipments change (only when enabled)
+  const rt = useRealtimeSync(enabled ? ['containers', 'shipments'] : [], () => {
     fetchContainers(true);
     fetchShipments(true);
   });
