@@ -163,12 +163,11 @@ export function useTransactions() {
     }
     // مزامنة أرصدة الحسابات في الخلفية (لا ننتظر)
     (supabase.rpc as any)('sync_contact_balances').catch(() => {});
-    realtimeRef.current.suppressNext();
-    // جلب سريع: أول صفحة فقط
+    // إبطال الكاش وترك Realtime يجلب البيانات (يمنع التكرار)
     _cachedTransactions = null; _cacheTime = 0;
-    await fetchTransactions(true, false);
+    realtimeRef.current.suppressNext(500); // اسمح لـ Realtime بالتحديث بعد 500ms
     return data;
-  }, [user, fetchTransactions]);
+  }, [user]);
 
   // تحديث عملية موجودة (UPDATE وليس INSERT)
   const updateTransaction = useCallback(async (transactionId: string, updates: Omit<Transaction, 'id' | 'createdAt'> & { contactId?: string; currencyCode?: string; exchangeRate?: number }) => {
@@ -195,10 +194,9 @@ export function useTransactions() {
       logToActivity(user.id, 'transaction_modified', 'transaction', transactionId, updates.description, { amount: updates.amount, type: updates.type, category: updates.category });
     }
     (supabase.rpc as any)('sync_contact_balances').catch(() => {});
-    realtimeRef.current.suppressNext();
     _cachedTransactions = null; _cacheTime = 0;
-    await fetchTransactions(true, false);
-  }, [user, fetchTransactions]);
+    realtimeRef.current.suppressNext(500);
+  }, [user]);
 
   // استخدام RPC للحذف الذري
   const deleteTransaction = useCallback(async (transactionId: string) => {
@@ -213,11 +211,12 @@ export function useTransactions() {
     if (user && txToDelete) {
       logToActivity(user.id, 'transaction_deleted', 'transaction', transactionId, txToDelete.description, { amount: txToDelete.amount, type: txToDelete.type, category: txToDelete.category }, 'deleted');
     }
+    // تحديث متفائل: إزالة العملية فوراً من القائمة
+    setTransactions(prev => prev.filter(t => t.id !== transactionId));
     (supabase.rpc as any)('sync_contact_balances').catch(() => {});
-    realtimeRef.current.suppressNext();
     _cachedTransactions = null; _cacheTime = 0;
-    await fetchTransactions(true, false);
-  }, [user, transactions, fetchTransactions]);
+    realtimeRef.current.suppressNext(500);
+  }, [user, transactions]);
 
   const getMonthlyTrend = useCallback((): TrendData[] => calculateMonthlyTrend(transactions), [transactions]);
 

@@ -156,12 +156,12 @@ const Index = () => {
     }
   };
 
-  const stats = getStats();
-  const fundOptions = getFundOptions();
-  const accountOptions = getAccountOptions();
-  const projectStats = getProjectStats();
-  const monthlyTrend = getMonthlyTrend();
-  const expenseBreakdown = getExpenseBreakdown();
+  const stats = useMemo(() => getStats(), [getStats]);
+  const fundOptions = useMemo(() => getFundOptions(), [getFundOptions]);
+  const accountOptions = useMemo(() => getAccountOptions(), [getAccountOptions]);
+  const projectStats = useMemo(() => getProjectStats(), [getProjectStats]);
+  const monthlyTrend = useMemo(() => getMonthlyTrend(), [getMonthlyTrend]);
+  const expenseBreakdown = useMemo(() => getExpenseBreakdown(), [getExpenseBreakdown]);
 
   const handleEditTransaction = (transaction: Transaction) => {
     setEditingTransaction(transaction);

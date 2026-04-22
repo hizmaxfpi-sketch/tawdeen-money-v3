@@ -86,12 +86,11 @@ export function useFunds() {
       .single();
     if (error) { toast.error('خطأ في إضافة الصندوق'); console.error(error); return; }
     toast.success('تم إضافة الصندوق بنجاح');
-    if (user && data) await logToActivity(user.id, 'fund_created', 'fund', (data as any).id, fund.name, { type: fund.type });
-    realtimeRef.current.suppressNext();
+    if (user && data) logToActivity(user.id, 'fund_created', 'fund', (data as any).id, fund.name, { type: fund.type });
     invalidateCache();
-    await fetchFunds();
+    realtimeRef.current.suppressNext(500);
     return data;
-  }, [user, fetchFunds]);
+  }, [user, invalidateCache]);
 
   const updateFund = useCallback(async (id: string, updates: Partial<Fund>) => {
     if (guardOffline()) return;
@@ -100,26 +99,29 @@ export function useFunds() {
     if (updates.description !== undefined) updateData.description = updates.description;
     if (updates.type !== undefined) updateData.type = updates.type;
     if (updates.balance !== undefined) updateData.balance = updates.balance;
-    
+
+    // تحديث متفائل
+    setFunds(prev => prev.map(f => f.id === id ? { ...f, ...updates } as Fund : f));
+
     const { error } = await supabase.from('funds').update(updateData).eq('id', id);
     if (error) { toast.error('خطأ في تحديث الصندوق'); return; }
-    if (user) await logToActivity(user.id, 'fund_updated', 'fund', id, updates.name || '', { updates: Object.keys(updateData) });
-    realtimeRef.current.suppressNext();
+    if (user) logToActivity(user.id, 'fund_updated', 'fund', id, updates.name || '', { updates: Object.keys(updateData) });
     invalidateCache();
-    await fetchFunds();
-  }, [fetchFunds]);
+    realtimeRef.current.suppressNext(500);
+  }, [user, invalidateCache]);
 
   const deleteFund = useCallback(async (id: string) => {
     if (guardOffline()) return;
     const fund = funds.find(f => f.id === id);
+    // تحديث متفائل
+    setFunds(prev => prev.filter(f => f.id !== id));
     const { error } = await supabase.from('funds').delete().eq('id', id);
     if (error) { toast.error('خطأ في حذف الصندوق'); return; }
     toast.success('تم حذف الصندوق');
-    if (user && fund) await logToActivity(user.id, 'fund_deleted', 'fund', id, fund.name, { type: fund.type, balance: fund.balance }, 'deleted');
-    realtimeRef.current.suppressNext();
+    if (user && fund) logToActivity(user.id, 'fund_deleted', 'fund', id, fund.name, { type: fund.type, balance: fund.balance }, 'deleted');
     invalidateCache();
-    await fetchFunds();
-  }, [user, funds, fetchFunds, invalidateCache]);
+    realtimeRef.current.suppressNext(500);
+  }, [user, funds, invalidateCache]);
 
   const transferFunds = useCallback(async (fromFundId: string, toFundId: string, amount: number, note?: string) => {
     if (!user) return;
@@ -137,10 +139,9 @@ export function useFunds() {
     });
     if (error) { toast.error('خطأ في التحويل'); console.error(error); return; }
     toast.success('تم التحويل بنجاح');
-    realtimeRef.current.suppressNext();
     invalidateCache();
-    await fetchFunds();
-  }, [user, fetchFunds, invalidateCache]);
+    realtimeRef.current.suppressNext(500);
+  }, [user, invalidateCache]);
 
   const getFundOptions = useCallback((): FundOption[] =>
     funds.map(f => ({ id: f.id, name: f.name, type: f.type, balance: f.balance })),

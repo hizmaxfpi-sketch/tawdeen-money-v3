@@ -52,9 +52,9 @@ export function useSupabaseFinance() {
     statsTimerRef.current = setTimeout(() => {
       fetchStats();
       statsTimerRef.current = null;
-    }, 800);
+    }, 1500);
     return () => { if (statsTimerRef.current) clearTimeout(statsTimerRef.current); };
-  }, [user, fundsHook.funds, txHook.transactions, debtsHook.debts]);
+  }, [user, fundsHook.funds.length, txHook.transactions.length, debtsHook.debts.length]);
 
   const getStats = useCallback((): FinanceStats => dbStats, [dbStats]);
 
