@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { AnimatePresence } from 'framer-motion';
@@ -8,13 +8,14 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { FloatingAddButton } from '@/components/layout/FloatingAddButton';
 import { Dashboard } from '@/components/dashboard/Dashboard';
-import { FundsPage } from '@/components/funds/FundsPage';
-import { LedgerAccountsPage } from '@/components/ledger/LedgerAccountsPage';
-import { ReportsPage } from '@/components/reports/ReportsPage';
-import { ShippingPage } from '@/components/shipping/ShippingPage';
-import { ProjectsPage } from '@/components/projects/ProjectsPage';
-import { BusinessPage } from '@/components/business/BusinessPage';
-import { ProductionPage } from '@/components/production/ProductionPage';
+// ✅ Lazy-load heavy module pages — they are only fetched when the user navigates to them
+const FundsPage = lazy(() => import('@/components/funds/FundsPage').then(m => ({ default: m.FundsPage })));
+const LedgerAccountsPage = lazy(() => import('@/components/ledger/LedgerAccountsPage').then(m => ({ default: m.LedgerAccountsPage })));
+const ReportsPage = lazy(() => import('@/components/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
+const ShippingPage = lazy(() => import('@/components/shipping/ShippingPage').then(m => ({ default: m.ShippingPage })));
+const ProjectsPage = lazy(() => import('@/components/projects/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
+const BusinessPage = lazy(() => import('@/components/business/BusinessPage').then(m => ({ default: m.BusinessPage })));
+const ProductionPage = lazy(() => import('@/components/production/ProductionPage').then(m => ({ default: m.ProductionPage })));
 import { useProduction } from '@/hooks/useProduction';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { CoachMarks } from '@/components/onboarding/CoachMarks';
@@ -110,7 +111,9 @@ const Index = () => {
   } = useSupabaseFinance();
 
   const { currencies, updateExchangeRate } = useCurrencies();
-  const { containers, shipments } = useSupabaseShipping();
+  // Heavy data — only fetch when their respective pages are active or needed by Dashboard
+  const needsShipping = currentPage === 'shipping' || currentPage === 'reports';
+  const { containers, shipments } = useSupabaseShipping({ enabled: needsShipping });
   const { contacts } = useSupabaseContacts();
   const { summary: productionSummary } = useProduction();
   const productionEnabled = isEnabled('production');
@@ -292,7 +295,7 @@ const Index = () => {
       )}>
         <Header />
         <main className="container max-w-lg mx-auto px-3 py-3 pb-24 md:max-w-4xl lg:max-w-5xl">
-          {renderPage()}
+          <Suspense fallback={<ListSkeleton />}>{renderPage()}</Suspense>
         </main>
         {!showTransactionForm && perms.canCreate('transactions') && <FloatingAddButton onClick={() => handleOpenForm('in')} />}
         <div className="md:hidden">
