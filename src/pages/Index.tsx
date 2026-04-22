@@ -203,11 +203,11 @@ const Index = () => {
             onDeleteTransaction={perms.canDelete('transactions') ? handleDeleteTransaction : undefined}
             hasMore={hasMoreTransactions}
             onLoadMore={loadMoreTransactions}
-            ledgerDebit={ledgerTotals.debit}
-            ledgerCredit={ledgerTotals.credit}
-            ledgerNet={ledgerTotals.net}
-            projectProfit={projectProfit}
-            containerProfit={containerProfit}
+            ledgerDebit={snapshot.ledgerDebit}
+            ledgerCredit={snapshot.ledgerCredit}
+            ledgerNet={snapshot.ledgerNet}
+            projectProfit={snapshot.projectProfit}
+            containerProfit={snapshot.containerProfit}
             directRevenue={directRevenue}
             businessExpenses={businessExpenses}
             onExpensesClick={() => handleNavigate('business')}
