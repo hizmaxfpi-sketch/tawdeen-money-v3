@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUpCircle, ArrowDownCircle, Filter, Search, ChevronDown, Edit3, Download, FileText, FileSpreadsheet, Trash2, X, Paperclip, Eye, Calendar, Printer, Globe, Ship, Briefcase, ArrowLeftRight, Landmark } from 'lucide-react';
 import { generateHDPreviewPDF } from '@/utils/hdPreview';
@@ -84,15 +85,18 @@ export function UnifiedTransactionLog({
 
   const displayTitle = title || t('reports.transactionLog');
 
-  const filteredTransactions = transactions
-    .filter(t => {
-      const matchesType = filter === 'all' || t.type === filter;
-      const matchesSearch = (t.description || '').toLowerCase().includes(search.toLowerCase());
-      const matchesDateFrom = !dateFrom || t.date >= dateFrom;
-      const matchesDateTo = !dateTo || t.date <= dateTo;
-      return matchesType && matchesSearch && matchesDateFrom && matchesDateTo;
-    })
-    .sort(compareTransactionsByBusinessDateDesc);
+  // ✅ Memoized filter+sort — runs only when inputs change (was running every render)
+  const filteredTransactions = useMemo(() => {
+    return transactions
+      .filter(tx => {
+        const matchesType = filter === 'all' || tx.type === filter;
+        const matchesSearch = (tx.description || '').toLowerCase().includes(search.toLowerCase());
+        const matchesDateFrom = !dateFrom || tx.date >= dateFrom;
+        const matchesDateTo = !dateTo || tx.date <= dateTo;
+        return matchesType && matchesSearch && matchesDateFrom && matchesDateTo;
+      })
+      .sort(compareTransactionsByBusinessDateDesc);
+  }, [transactions, filter, search, dateFrom, dateTo]);
 
   useEffect(() => {
     const handleScroll = () => {
