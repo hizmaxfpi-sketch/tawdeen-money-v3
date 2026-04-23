@@ -100,12 +100,32 @@ export function TransactionForm({
 
   const handleSubmit = async () => {
     if (!amount || !description || !fundId || submittingRef.current) return;
+
+    const parsedAmount = parseFloat(amount);
+    const finalAmount = currencyCode === 'USD' ? parsedAmount : parsedAmount / effectiveRate;
+
+    // ✅ منع الصرف من صندوق رصيده غير كاف (للعمليات اليدوية)
+    if (type === 'out') {
+      const selectedFund = fundOptions.find(f => f.id === fundId);
+      if (selectedFund) {
+        // عند التعديل: نسمح بنفس قيمة العملية الأصلية لأنها مخصومة مسبقاً
+        const originalAmount = editTransaction && editTransaction.type === 'out' && editTransaction.fundId === fundId
+          ? editTransaction.amount
+          : 0;
+        const effectiveBalance = selectedFund.balance + originalAmount;
+        if (finalAmount > effectiveBalance + 0.0001) {
+          // toast بدون import إضافي عبر event غير مرغوب — نستعمل alert محلي
+          (await import('sonner')).toast.error(
+            `${t('tx.insufficientBalance') || 'رصيد الصندوق غير كافٍ'} (${selectedFund.name}: $${effectiveBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })})`
+          );
+          return;
+        }
+      }
+    }
+
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      const parsedAmount = parseFloat(amount);
-      const finalAmount = currencyCode === 'USD' ? parsedAmount : parsedAmount / effectiveRate;
-
       await onSubmit({
         type, category,
         amount: Number(finalAmount.toFixed(4)),
