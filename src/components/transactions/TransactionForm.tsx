@@ -14,6 +14,7 @@ import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
 import { Currency, CURRENCY_FLAGS } from '@/hooks/useCurrencies';
 import { DocumentAttachment } from '@/components/shared/DocumentAttachment';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { toast } from 'sonner';
 
 interface TransactionFormProps {
   onSubmit: (transaction: Omit<Transaction, 'id' | 'createdAt'> & { contactId?: string; currencyCode?: string; exchangeRate?: number }) => Promise<any>;
@@ -114,9 +115,8 @@ export function TransactionForm({
           : 0;
         const effectiveBalance = selectedFund.balance + originalAmount;
         if (finalAmount > effectiveBalance + 0.0001) {
-          // toast بدون import إضافي عبر event غير مرغوب — نستعمل alert محلي
-          (await import('sonner')).toast.error(
-            `${t('tx.insufficientBalance') || 'رصيد الصندوق غير كافٍ'} (${selectedFund.name}: $${effectiveBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })})`
+          toast.error(
+            `${t('tx.insufficientBalance')} (${selectedFund.name}: $${effectiveBalance.toLocaleString('en-US', { maximumFractionDigits: 2 })})`
           );
           return;
         }
