@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react';
 import { motion, useMotionValue, animate } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 
 interface FloatingAddButtonProps {
   onClick: () => void;
@@ -37,7 +37,7 @@ function loadPosition() {
   };
 }
 
-export function FloatingAddButton({ onClick }: FloatingAddButtonProps) {
+export const FloatingAddButton = forwardRef<HTMLButtonElement, FloatingAddButtonProps>(function FloatingAddButton({ onClick }, ref) {
   const [mounted, setMounted] = useState(false);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -89,6 +89,7 @@ export function FloatingAddButton({ onClick }: FloatingAddButtonProps) {
 
   return (
     <motion.button
+      ref={ref}
       drag
       dragMomentum={false}
       dragElastic={0.1}
@@ -105,4 +106,4 @@ export function FloatingAddButton({ onClick }: FloatingAddButtonProps) {
       <Plus className="h-6 w-6" />
     </motion.button>
   );
-}
+});
