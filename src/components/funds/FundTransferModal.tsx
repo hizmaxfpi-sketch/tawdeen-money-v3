@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { X, ArrowLeftRight, DollarSign, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,8 @@ export function FundTransferModal({ funds, currencies = [], onTransfer, onClose 
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   const fromFund = funds.find(f => f.id === fromFundId);
   const selectedCurrencyData = currencies.find(c => c.code === selectedCurrency);
@@ -30,9 +32,16 @@ export function FundTransferModal({ funds, currencies = [], onTransfer, onClose 
     parseFloat(amount) > 0 && (fromFund ? parseFloat(amount) <= fromFund.balance : false);
 
   const handleSubmit = async () => {
-    if (!isValidTransfer) return;
-    await onTransfer(fromFundId, toFundId, parseFloat(amount), note || undefined, selectedCurrency);
-    onClose();
+    if (!isValidTransfer || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
+      await onTransfer(fromFundId, toFundId, parseFloat(amount), note || undefined, selectedCurrency);
+      onClose();
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -163,10 +172,10 @@ export function FundTransferModal({ funds, currencies = [], onTransfer, onClose 
             </Button>
             <Button 
               onClick={handleSubmit} 
-              disabled={!isValidTransfer}
+              disabled={!isValidTransfer || submitting}
               className="flex-1 h-9 text-xs"
             >
-              تنفيذ التحويل
+              {submitting ? '...' : 'تنفيذ التحويل'}
             </Button>
           </div>
         </div>

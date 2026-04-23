@@ -2,7 +2,8 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
-import { ArrowRight, TrendingUp, TrendingDown, Wallet, Landmark, CreditCard, Eye, Scale, Edit2, Trash2, RefreshCw } from 'lucide-react';
+import { ArrowRight, TrendingUp, TrendingDown, Wallet, Landmark, CreditCard, Eye, Scale, Edit2, Trash2, RefreshCw, LayoutGrid, List } from 'lucide-react';
+import { usePersistedFilter } from '@/hooks/usePersistedFilters';
 import { Fund, Transaction, FundType } from '@/types/finance';
 import { Currency, CURRENCY_FLAGS } from '@/hooks/useCurrencies';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,7 @@ export function FundDetails({ funds, transactions, currencies = [], onUpdateFund
   const [showPreview, setShowPreview] = useState(false);
   const [activeCurrencyTab, setActiveCurrencyTab] = useState('all');
   const [displayCurrency, setDisplayCurrency] = useState('USD');
+  const [viewMode, setViewMode] = usePersistedFilter<'table' | 'cards'>('fund-statement-view', 'table');
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editName, setEditName] = useState('');
@@ -369,64 +371,88 @@ export function FundDetails({ funds, transactions, currencies = [], onUpdateFund
           </div>
         )}
 
-        {/* Professional Ledger Table */}
+        {/* ✅ Unified Fund Statement (Table OR Cards via toggle — same data source) */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
           className="rounded-xl bg-card shadow-sm border border-border overflow-hidden">
-          <div className="p-3 border-b border-border">
-            <h3 className="text-sm font-bold">سجل العمليات المالية ({formatNumber(stats.transactionCount)})</h3>
+          <div className="p-3 border-b border-border flex items-center justify-between gap-2">
+            <h3 className="text-sm font-bold">كشف حساب الصندوق ({formatNumber(stats.transactionCount)})</h3>
+            <div className="flex gap-0.5 p-0.5 bg-muted rounded-lg shrink-0">
+              <button
+                onClick={() => setViewMode('table')}
+                className={cn("p-1.5 rounded-md transition-all flex items-center gap-1 text-[10px] font-medium",
+                  viewMode === 'table' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+                title="عرض جدولي"
+              >
+                <List className="h-3.5 w-3.5" /> جدول
+              </button>
+              <button
+                onClick={() => setViewMode('cards')}
+                className={cn("p-1.5 rounded-md transition-all flex items-center gap-1 text-[10px] font-medium",
+                  viewMode === 'cards' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+                title="عرض بطاقات"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" /> بطاقات
+              </button>
+            </div>
           </div>
-          {ledgerRows.length === 0 ? (
-            <p className="text-center py-8 text-sm text-muted-foreground">لا توجد عمليات مسجلة</p>
-          ) : (
-            <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="text-center text-[11px] font-bold px-2">التاريخ</TableHead>
-                    <TableHead className="text-center text-[11px] font-bold px-2">البيان</TableHead>
-                    <TableHead className="text-center text-[11px] font-bold text-emerald-600 px-2">مدين</TableHead>
-                    <TableHead className="text-center text-[11px] font-bold text-rose-600 px-2">دائن</TableHead>
-                    <TableHead className="text-center text-[11px] font-bold px-2">الرصيد</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {ledgerRows.map((row) => (
-                    <TableRow key={row.id} className="text-xs">
-                      <TableCell className="text-center px-2 py-2 text-[11px] whitespace-nowrap">
-                        {formatDateGregorian(row.date)}
-                      </TableCell>
-                      <TableCell className="text-center px-2 py-2 text-[11px] max-w-[120px] truncate">
-                        {row.description || '-'}
-                      </TableCell>
-                      <TableCell className="text-center px-2 py-2 text-[11px] text-emerald-600 font-semibold">
-                        {row.type === 'in' ? `$${formatAmount(row.amount)}` : '-'}
-                      </TableCell>
-                      <TableCell className="text-center px-2 py-2 text-[11px] text-rose-600 font-semibold">
-                        {row.type === 'out' ? `$${formatAmount(row.amount)}` : '-'}
-                      </TableCell>
-                      <TableCell className={cn("text-center px-2 py-2 text-[11px] font-bold",
-                        row.runningBalance > 0 ? "text-emerald-600" : row.runningBalance < 0 ? "text-rose-600" : "")}>
-                        ${formatAmount(Math.abs(row.runningBalance))}
-                      </TableCell>
+
+          {viewMode === 'table' ? (
+            ledgerRows.length === 0 ? (
+              <p className="text-center py-8 text-sm text-muted-foreground">لا توجد عمليات مسجلة</p>
+            ) : (
+              <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="text-center text-[11px] font-bold px-2">التاريخ</TableHead>
+                      <TableHead className="text-center text-[11px] font-bold px-2">البيان</TableHead>
+                      <TableHead className="text-center text-[11px] font-bold text-emerald-600 px-2">مدين</TableHead>
+                      <TableHead className="text-center text-[11px] font-bold text-rose-600 px-2">دائن</TableHead>
+                      <TableHead className="text-center text-[11px] font-bold px-2">الرصيد</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {ledgerRows.map((row) => (
+                      <TableRow key={row.id} className="text-xs">
+                        <TableCell className="text-center px-2 py-2 text-[11px] whitespace-nowrap">
+                          {formatDateGregorian(row.date)}
+                        </TableCell>
+                        <TableCell className="text-center px-2 py-2 text-[11px] max-w-[140px] truncate">
+                          {row.description || '-'}
+                        </TableCell>
+                        <TableCell className="text-center px-2 py-2 text-[11px] text-emerald-600 font-semibold">
+                          {row.type === 'in' ? `$${formatAmount(row.amount)}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-center px-2 py-2 text-[11px] text-rose-600 font-semibold">
+                          {row.type === 'out' ? `$${formatAmount(row.amount)}` : '-'}
+                        </TableCell>
+                        <TableCell className={cn("text-center px-2 py-2 text-[11px] font-bold",
+                          row.runningBalance > 0 ? "text-emerald-600" : row.runningBalance < 0 ? "text-rose-600" : "")}>
+                          ${formatAmount(Math.abs(row.runningBalance))}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )
+          ) : (
+            <div className="p-2">
+              <UnifiedTransactionLog 
+                transactions={displayTransactions}
+                title=""
+                showExport={true}
+                maxHeight="480px"
+                currencies={currencies}
+                displayCurrencyCode={displayCurrency}
+                onDisplayCurrencyChange={setDisplayCurrency}
+                onDeleteTransaction={onDeleteTransaction}
+              />
             </div>
           )}
         </motion.div>
-
-        {/* Transaction Log with delete support for manual transactions */}
-        <UnifiedTransactionLog 
-          transactions={displayTransactions}
-          title={activeCurrencyTab === 'all' ? 'سجل عمليات الصندوق' : `عمليات ${activeCurrencyTab}`}
-          showExport={true}
-          maxHeight="400px"
-          currencies={currencies}
-          displayCurrencyCode={displayCurrency}
-          onDisplayCurrencyChange={setDisplayCurrency}
-          onDeleteTransaction={onDeleteTransaction}
-        />
 
         {/* Legal Footer */}
         <div className="text-center">
