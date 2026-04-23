@@ -23,6 +23,7 @@ import { AccountingLedgerReport } from './AccountingLedgerReport';
 import { ProductionReport } from './ProductionReport';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useEnabledModules } from '@/hooks/useEnabledModules';
+import { usePersistedFilter } from '@/hooks/usePersistedFilters';
 
 import { Currency } from '@/hooks/useCurrencies';
 import { CurrencyDisplaySelector, convertForDisplay, getCurrencySymbol } from '@/components/shared/CurrencyDisplaySelector';
@@ -60,7 +61,8 @@ export function ReportsPage({
   const accountsOn = isEnabled('accounts');
   const productionOn = isEnabled('production');
   const defaultTab = shippingOn ? 'shipping' : accountsOn ? 'ledger' : projectsOn ? 'projects' : productionOn ? 'production' : 'general';
-  const [activeTab, setActiveTab] = useState(defaultTab);
+  // ✅ Persist last-used reports tab across navigation
+  const [activeTab, setActiveTab] = usePersistedFilter<string>('reports-active-tab', defaultTab);
   useEffect(() => {
     if ((activeTab === 'shipping' && !shippingOn) ||
         (activeTab === 'projects' && !projectsOn) ||
@@ -68,7 +70,7 @@ export function ReportsPage({
         (activeTab === 'production' && !productionOn)) {
       setActiveTab(defaultTab);
     }
-  }, [shippingOn, projectsOn, accountsOn, productionOn, activeTab, defaultTab]);
+  }, [shippingOn, projectsOn, accountsOn, productionOn, activeTab, defaultTab, setActiveTab]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewContent, setPreviewContent] = useState<'shipping-summary' | 'container-detail' | 'shipment-detail' | 'projects' | 'general' | 'activity' | null>(null);
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
@@ -105,12 +107,12 @@ export function ReportsPage({
   const sym = getCurrencySymbol(displayCurrency, currencies);
   const fmtC = (v: number) => `${sym}${conv(v).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 
-  // Filters
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [filterClient, setFilterClient] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterFund, setFilterFund] = useState('all');
+  // ✅ Persist filter state across navigation
+  const [dateFrom, setDateFrom] = usePersistedFilter('reports-date-from', '');
+  const [dateTo, setDateTo] = usePersistedFilter('reports-date-to', '');
+  const [filterClient, setFilterClient] = usePersistedFilter('reports-filter-client', 'all');
+  const [filterStatus, setFilterStatus] = usePersistedFilter('reports-filter-status', 'all');
+  const [filterFund, setFilterFund] = usePersistedFilter('reports-filter-fund', 'all');
   const [filterContainerIds, setFilterContainerIds] = useState<Set<string>>(new Set());
 
   // Project-specific filters
