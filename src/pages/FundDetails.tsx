@@ -2,7 +2,8 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
-import { ArrowRight, TrendingUp, TrendingDown, Wallet, Landmark, CreditCard, Eye, Scale, Edit2, Trash2, RefreshCw } from 'lucide-react';
+import { ArrowRight, TrendingUp, TrendingDown, Wallet, Landmark, CreditCard, Eye, Scale, Edit2, Trash2, RefreshCw, LayoutGrid, List } from 'lucide-react';
+import { usePersistedFilter } from '@/hooks/usePersistedFilters';
 import { Fund, Transaction, FundType } from '@/types/finance';
 import { Currency, CURRENCY_FLAGS } from '@/hooks/useCurrencies';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,7 @@ export function FundDetails({ funds, transactions, currencies = [], onUpdateFund
   const [showPreview, setShowPreview] = useState(false);
   const [activeCurrencyTab, setActiveCurrencyTab] = useState('all');
   const [displayCurrency, setDisplayCurrency] = useState('USD');
+  const [viewMode, setViewMode] = usePersistedFilter<'table' | 'cards'>('fund-statement-view', 'table');
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editName, setEditName] = useState('');
