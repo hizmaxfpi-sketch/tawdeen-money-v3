@@ -17,6 +17,7 @@ import { useLanguage } from '@/i18n/LanguageContext';
 
 interface FundsPageProps {
   funds: Fund[];
+  totalLiquidity?: number;
   onAddFund?: (fund: Omit<Fund, 'id' | 'createdAt' | 'balance'>) => Promise<any>;
   onTransferFunds?: (fromFundId: string, toFundId: string, amount: number, note?: string, currencyCode?: string) => Promise<any>;
   onRefresh?: () => void;
@@ -26,7 +27,7 @@ const FUND_ICONS: Record<string, typeof Wallet> = {
   cash: Wallet, bank: Landmark, wallet: CreditCard, safe: Vault, other: CircleDollarSign,
 };
 
-export function FundsPage({ funds, onAddFund, onTransferFunds, onRefresh }: FundsPageProps) {
+export function FundsPage({ funds, totalLiquidity, onAddFund, onTransferFunds, onRefresh }: FundsPageProps) {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const permissions = useUserPermissions();
@@ -41,7 +42,7 @@ export function FundsPage({ funds, onAddFund, onTransferFunds, onRefresh }: Fund
   const [selectedTypes, setSelectedTypes] = usePersistedFilter<string[]>('funds-types', []);
   const [viewMode, setViewMode] = usePersistedFilter<'grid' | 'list'>('funds-view', 'grid');
 
-  const totalBalance = funds.reduce((sum, f) => sum + f.balance, 0);
+  const totalBalance = totalLiquidity ?? funds.reduce((sum, f) => sum + f.balance, 0);
   const canCreateFunds = !!onAddFund && permissions.canCreate('funds');
   const canTransferFunds = !!onTransferFunds && permissions.canEdit('funds');
   const canManageCurrencies = permissions.canEdit('funds');
