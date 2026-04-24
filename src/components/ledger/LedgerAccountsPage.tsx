@@ -38,11 +38,19 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 type ViewMode = 'grid' | 'list';
 
-export function LedgerAccountsPage() {
+interface LedgerAccountsPageProps {
+  transactions: Transaction[];
+  ledgerSummary?: {
+    ledgerDebit: number;
+    ledgerCredit: number;
+    ledgerNet: number;
+  };
+}
+
+export function LedgerAccountsPage({ transactions, ledgerSummary }: LedgerAccountsPageProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { contacts, deleteContact, getStats, syncBalances } = useSupabaseContacts();
-  const { transactions } = useSupabaseFinance();
+  const { contacts, deleteContact, syncBalances } = useSupabaseContacts();
   const perms = useUserPermissions();
   const canEdit = perms.canEdit('contacts');
   const canDelete = perms.canDelete('contacts');
@@ -60,8 +68,6 @@ export function LedgerAccountsPage() {
   const [loadingStatement, setLoadingStatement] = useState(false);
   const statementRef = useRef<HTMLDivElement>(null);
   const [showFilteredPreview, setShowFilteredPreview] = useState(false);
-
-  const stats = getStats();
 
   // Get all unique types from actual contacts in DB, with custom types expanded
   const availableTypes = useMemo(() => {
@@ -108,11 +114,11 @@ export function LedgerAccountsPage() {
       return summary;
     }, { totalTransactions: 0, totalDebit: 0, totalCredit: 0 });
     const totalTransactions = totals.totalTransactions;
-    const totalDebit = totals.totalDebit;
-    const totalCredit = totals.totalCredit;
-    const netBalance = totalDebit - totalCredit;
+    const totalDebit = ledgerSummary?.ledgerDebit ?? totals.totalDebit;
+    const totalCredit = ledgerSummary?.ledgerCredit ?? totals.totalCredit;
+    const netBalance = ledgerSummary?.ledgerNet ?? (totalDebit - totalCredit);
     return { totalTransactions, totalIncome: totalDebit, totalExpenses: totalCredit, netBalance };
-  }, [contacts, contactLedgerSummaries]);
+  }, [contacts, contactLedgerSummaries, ledgerSummary]);
 
   const handleSyncBalances = async () => {
     setIsSyncing(true);

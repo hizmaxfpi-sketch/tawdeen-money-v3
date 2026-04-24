@@ -234,6 +234,7 @@ export function BusinessPage({
 
           <UnifiedTransactionLog
             transactions={businessTxs}
+            storageKey="business"
             onEditTransaction={onEditTransaction}
             onDeleteTransaction={onDeleteTransaction}
             showDateRange={true}

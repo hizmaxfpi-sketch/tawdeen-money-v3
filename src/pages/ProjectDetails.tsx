@@ -389,6 +389,7 @@ export function ProjectDetails() {
           <UnifiedTransactionLog 
             transactions={projectTransactions}
             title="سجل العمليات المالية للمشروع"
+            storageKey={`project-${project.id}`}
             showExport={true}
             maxHeight="400px"
             onEditTransaction={openTransactionEditor}

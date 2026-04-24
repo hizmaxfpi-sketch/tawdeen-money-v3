@@ -394,6 +394,7 @@ export function ContactDetails() {
           <UnifiedTransactionLog 
             transactions={contactTransactions}
             title="سجل العمليات المالية"
+            storageKey={`contact-${contact.id}`}
             showExport={true}
             maxHeight="500px"
             currencies={currencies}

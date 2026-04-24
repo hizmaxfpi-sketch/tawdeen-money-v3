@@ -41,6 +41,7 @@ import { useLanguage } from '@/i18n/LanguageContext';
 interface UnifiedTransactionLogProps {
   transactions: Transaction[];
   title?: string;
+  storageKey?: string;
   showExport?: boolean;
   showDateRange?: boolean;
   showPreviewButton?: boolean;
@@ -57,6 +58,7 @@ interface UnifiedTransactionLogProps {
 export function UnifiedTransactionLog({ 
   transactions, 
   title,
+  storageKey = 'default',
   showExport = true,
   showDateRange = false,
   showPreviewButton = false,
@@ -70,16 +72,17 @@ export function UnifiedTransactionLog({
   onDisplayCurrencyChange,
 }: UnifiedTransactionLogProps) {
   const { t, language } = useLanguage();
-  const [filter, setFilter] = usePersistedFilter<'all' | 'in' | 'out'>('txlog-filter', 'all');
-  const [search, setSearch] = usePersistedFilter('txlog-search', '');
+  const persistKey = `txlog-${storageKey}`;
+  const [filter, setFilter] = usePersistedFilter<'all' | 'in' | 'out'>(`${persistKey}-filter`, 'all');
+  const [search, setSearch] = usePersistedFilter(`${persistKey}-search`, '');
   const [showFilters, setShowFilters] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const [hdPreviewTransaction, setHdPreviewTransaction] = useState<Transaction | null>(null);
   const [showReportPreview, setShowReportPreview] = useState(false);
-  const [dateFrom, setDateFrom] = usePersistedFilter('txlog-datefrom', '');
-  const [dateTo, setDateTo] = usePersistedFilter('txlog-dateto', '');
+  const [dateFrom, setDateFrom] = usePersistedFilter(`${persistKey}-datefrom`, '');
+  const [dateTo, setDateTo] = usePersistedFilter(`${persistKey}-dateto`, '');
   const containerRef = useRef<HTMLDivElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
 

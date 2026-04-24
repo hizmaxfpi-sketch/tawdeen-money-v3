@@ -113,7 +113,8 @@ const Index = () => {
   const { currencies, updateExchangeRate } = useCurrencies();
   // Heavy data — only fetch when their respective pages are active or needed by Dashboard
   const needsShipping = currentPage === 'shipping' || currentPage === 'reports';
-  const { containers, shipments } = useSupabaseShipping({ enabled: needsShipping });
+  const shippingStore = useSupabaseShipping({ enabled: needsShipping });
+  const { containers, shipments } = shippingStore;
   const { contacts } = useSupabaseContacts();
   const { summary: productionSummary } = useProduction();
   const productionEnabled = isEnabled('production');
@@ -227,9 +228,9 @@ const Index = () => {
         );
       case 'funds':
         if (fundsLoading) return <ListSkeleton />;
-        return <FundsPage funds={funds} onAddFund={perms.canCreate('funds') ? addFund : undefined} onTransferFunds={perms.canEdit('funds') ? transferFunds : undefined} onRefresh={refreshAll} />;
+        return <FundsPage funds={funds} totalLiquidity={snapshot.totalLiquidity} onAddFund={perms.canCreate('funds') ? addFund : undefined} onTransferFunds={perms.canEdit('funds') ? transferFunds : undefined} onRefresh={refreshAll} />;
       case 'accounts':
-        return <LedgerAccountsPage />;
+        return <LedgerAccountsPage transactions={transactions} ledgerSummary={{ ledgerDebit: snapshot.ledgerDebit, ledgerCredit: snapshot.ledgerCredit, ledgerNet: snapshot.ledgerNet }} />;
       case 'business':
         return (
           <BusinessPage
@@ -277,7 +278,7 @@ const Index = () => {
           />
         );
       case 'shipping':
-        return <ShippingPage />;
+        return <ShippingPage shippingStore={shippingStore} funds={funds} fundOptions={fundOptions} accountOptions={accountOptions} stats={shippingStore.getShippingStats()} />;
       case 'production':
         return <ProductionPage />;
       default:
