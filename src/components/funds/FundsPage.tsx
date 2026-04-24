@@ -106,6 +106,12 @@ export function FundsPage({ funds, totalLiquidity, onAddFund, onTransferFunds, o
       <div className="flex items-center justify-between">
         <h2 className="text-base font-bold">{t('funds.title')}</h2>
         <div className="flex gap-2">
+          {canManageCurrencies && (
+            <Button size="sm" variant="outline" onClick={handleReconcile} disabled={isReconciling} className="gap-1.5 h-8 text-xs" title="إعادة احتساب الأرصدة من العمليات الفعلية">
+              <Wrench className={cn("h-3.5 w-3.5", isReconciling && "animate-spin")} />
+              {isReconciling ? '...' : 'مزامنة الأرصدة'}
+            </Button>
+          )}
           {onRefresh && (
             <Button size="sm" variant="outline" onClick={onRefresh} className="gap-1.5 h-8 text-xs">
               <RefreshCw className="h-3.5 w-3.5" />{t('common.refresh')}
