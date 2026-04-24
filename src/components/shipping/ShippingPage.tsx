@@ -7,22 +7,29 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useSupabaseShipping } from '@/hooks/useSupabaseShipping';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
-import { useSupabaseFinance } from '@/hooks/useSupabaseFinance';
 import { useLanguage } from '@/i18n/LanguageContext';
-import { Container, Shipment } from '@/types/finance';
+import { Container, Shipment, Fund, ShippingStats, AccountOption } from '@/types/finance';
 import { ContainerCard } from './ContainerCard';
 import { ShippingDashboard } from './ShippingDashboard';
 import { PaymentModal } from './PaymentModal';
 import { toast } from 'sonner';
+import { useSupabaseShipping } from '@/hooks/useSupabaseShipping';
 
 type SortOption = 'date' | 'client' | 'goods';
 
-export function ShippingPage() {
+interface ShippingPageProps {
+  shippingStore?: ReturnType<typeof useSupabaseShipping>;
+  funds?: Fund[];
+  fundOptions?: Fund[];
+  accountOptions?: AccountOption[];
+  stats?: ShippingStats;
+}
+
+export function ShippingPage({ shippingStore: externalShippingStore, funds = [], fundOptions = [], accountOptions = [], stats: externalStats }: ShippingPageProps) {
   const navigate = useNavigate();
-  const shippingStore = useSupabaseShipping();
-  const financeStore = useSupabaseFinance();
+  const internalShippingStore = useSupabaseShipping();
+  const shippingStore = externalShippingStore || internalShippingStore;
   const perms = useUserPermissions();
   const { t } = useLanguage();
   const canEdit = perms.canEdit('shipping');
@@ -34,7 +41,7 @@ export function ShippingPage() {
   const [sortBy, setSortBy] = useState<SortOption>('date');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
-  const stats = shippingStore.getShippingStats();
+  const stats = externalStats || shippingStore.getShippingStats();
 
   const filteredContainers = useMemo(() => {
     let result = [...shippingStore.containers];
@@ -193,8 +200,8 @@ export function ShippingPage() {
             filteredContainers.map(container => (
               <ContainerCard key={container.id} container={container}
                 shipments={shippingStore.getContainerShipments(container.id)}
-                contacts={financeStore.getAccountOptions()}
-                funds={financeStore.getFundOptions()}
+                  contacts={accountOptions}
+                  funds={fundOptions}
                 onEdit={handleEditContainer} onDelete={handleDeleteContainer}
                 onAddShipment={handleNavigateAddShipment}
                 onEditShipment={(shipment) => navigate(`/shipping/edit-shipment/${shipment.id}`)}
@@ -253,7 +260,7 @@ export function ShippingPage() {
 
       <AnimatePresence>
         {paymentShipment && (
-          <PaymentModal shipment={paymentShipment} funds={financeStore.funds}
+          <PaymentModal shipment={paymentShipment} funds={funds}
             onSubmit={handleSubmitPayment} onClose={() => setPaymentShipment(null)} />
         )}
       </AnimatePresence>
