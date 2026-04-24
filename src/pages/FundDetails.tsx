@@ -443,6 +443,7 @@ export function FundDetails({ funds, transactions, currencies = [], onUpdateFund
               <UnifiedTransactionLog 
                 transactions={displayTransactions}
                 title=""
+                storageKey={`fund-${fund.id}`}
                 showExport={true}
                 maxHeight="480px"
                 currencies={currencies}
