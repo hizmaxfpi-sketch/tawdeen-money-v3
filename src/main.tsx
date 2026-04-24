@@ -37,4 +37,30 @@ if (lastVersion !== APP_VERSION) {
   sessionStorage.setItem('tawdeen-show-update-toast', 'true');
 }
 
+// ============= معالجة فشل تحميل الـ chunks (lazy imports) =============
+// عند تحديث النشر، الـ chunks القديمة في المتصفح قد لا تعود موجودة على السيرفر،
+// مما يسبب "Importing a module script failed" وشاشة بيضاء. نعيد التحميل مرة واحدة فقط.
+const RELOAD_FLAG = 'tawdeen-chunk-reload';
+function isChunkLoadError(msg: string) {
+  return /Importing a module script failed|Failed to fetch dynamically imported module|ChunkLoadError|Loading chunk \d+ failed/i.test(msg);
+}
+window.addEventListener('error', (e) => {
+  const msg = e?.message || String(e?.error || '');
+  if (isChunkLoadError(msg) && !sessionStorage.getItem(RELOAD_FLAG)) {
+    sessionStorage.setItem(RELOAD_FLAG, '1');
+    window.location.reload();
+  }
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = e?.reason?.message || String(e?.reason || '');
+  if (isChunkLoadError(msg) && !sessionStorage.getItem(RELOAD_FLAG)) {
+    sessionStorage.setItem(RELOAD_FLAG, '1');
+    window.location.reload();
+  }
+});
+// نظّف العلامة عند نجاح التحميل
+window.addEventListener('load', () => {
+  setTimeout(() => sessionStorage.removeItem(RELOAD_FLAG), 5000);
+});
+
 createRoot(document.getElementById("root")!).render(<App />);
