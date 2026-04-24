@@ -37,6 +37,21 @@ export function FundsPage({ funds, totalLiquidity, onAddFund, onTransferFunds, o
   const [showAddForm, setShowAddForm] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [isReconciling, setIsReconciling] = useState(false);
+
+  const handleReconcile = async () => {
+    setIsReconciling(true);
+    try {
+      const { error } = await (supabase.rpc as any)('recalculate_all_fund_balances');
+      if (error) throw error;
+      toast.success('تمت مزامنة أرصدة الصناديق من العمليات الفعلية');
+      onRefresh?.();
+    } catch (e: any) {
+      toast.error('تعذرت المزامنة: ' + (e?.message || 'خطأ غير معروف'));
+    } finally {
+      setIsReconciling(false);
+    }
+  };
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<FundType>('cash');
   const [newDescription, setNewDescription] = useState('');
