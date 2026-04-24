@@ -104,6 +104,8 @@ export function LedgerAccountsPage({ transactions, ledgerSummary }: LedgerAccoun
     return summaries;
   }, [transactions]);
 
+  // ✅ Source of truth: ledger contacts' own transactions, NOT dashboard snapshot.
+  // Dashboard snapshot is only a fallback display value if local data not yet loaded.
   const ledgerTransactionStats = useMemo(() => {
     const activeContacts = contacts.filter(c => c.status === 'active');
     const totals = activeContacts.reduce((summary, contact) => {
@@ -113,12 +115,13 @@ export function LedgerAccountsPage({ transactions, ledgerSummary }: LedgerAccoun
       summary.totalCredit += contactSummary.totalCredit;
       return summary;
     }, { totalTransactions: 0, totalDebit: 0, totalCredit: 0 });
-    const totalTransactions = totals.totalTransactions;
-    const totalDebit = ledgerSummary?.ledgerDebit ?? totals.totalDebit;
-    const totalCredit = ledgerSummary?.ledgerCredit ?? totals.totalCredit;
-    const netBalance = ledgerSummary?.ledgerNet ?? (totalDebit - totalCredit);
-    return { totalTransactions, totalIncome: totalDebit, totalExpenses: totalCredit, netBalance };
-  }, [contacts, contactLedgerSummaries, ledgerSummary]);
+    // Prefer locally-computed totals (always live & accurate); fall back to snapshot only if no data yet.
+    const hasLocal = transactions.length > 0 || activeContacts.length > 0;
+    const totalDebit = hasLocal ? totals.totalDebit : (ledgerSummary?.ledgerDebit ?? 0);
+    const totalCredit = hasLocal ? totals.totalCredit : (ledgerSummary?.ledgerCredit ?? 0);
+    const netBalance = totalDebit - totalCredit;
+    return { totalTransactions: totals.totalTransactions, totalIncome: totalDebit, totalExpenses: totalCredit, netBalance };
+  }, [contacts, contactLedgerSummaries, ledgerSummary, transactions.length]);
 
   const handleSyncBalances = async () => {
     setIsSyncing(true);
