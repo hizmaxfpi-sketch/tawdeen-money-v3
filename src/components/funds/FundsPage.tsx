@@ -42,7 +42,9 @@ export function FundsPage({ funds, totalLiquidity, onAddFund, onTransferFunds, o
   const [selectedTypes, setSelectedTypes] = usePersistedFilter<string[]>('funds-types', []);
   const [viewMode, setViewMode] = usePersistedFilter<'grid' | 'list'>('funds-view', 'grid');
 
-  const totalBalance = totalLiquidity ?? funds.reduce((sum, f) => sum + f.balance, 0);
+  // ✅ Source of truth: real fund balances from DB; snapshot only as last-resort fallback.
+  const localTotal = useMemo(() => funds.reduce((sum, f) => sum + Number(f.balance || 0), 0), [funds]);
+  const totalBalance = funds.length > 0 ? localTotal : (totalLiquidity ?? 0);
   const canCreateFunds = !!onAddFund && permissions.canCreate('funds');
   const canTransferFunds = !!onTransferFunds && permissions.canEdit('funds');
   const canManageCurrencies = permissions.canEdit('funds');
