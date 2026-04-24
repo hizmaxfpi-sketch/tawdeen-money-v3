@@ -129,6 +129,7 @@ export function Dashboard({
 
       <UnifiedTransactionLog 
         transactions={transactions} 
+        storageKey="dashboard"
         onEditTransaction={onEditTransaction}
         onDeleteTransaction={onDeleteTransaction}
         showDateRange={true}
