@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, Landmark, CreditCard, Plus, X, ArrowLeftRight, Search, Filter, LayoutGrid, List, Check, Vault, CircleDollarSign, RefreshCw } from 'lucide-react';
+import { Wallet, Landmark, CreditCard, Plus, X, ArrowLeftRight, Search, Filter, LayoutGrid, List, Check, Vault, CircleDollarSign, RefreshCw, Wrench } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Fund, FundType } from '@/types/finance';
 import { Button } from '@/components/ui/button';
