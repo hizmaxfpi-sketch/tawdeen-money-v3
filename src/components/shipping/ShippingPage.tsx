@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useLanguage } from '@/i18n/LanguageContext';
-import { Container, Shipment, Fund, ShippingStats, AccountOption } from '@/types/finance';
+import { Container, Shipment, Fund, FundOption, ShippingStats, AccountOption } from '@/types/finance';
 import { ContainerCard } from './ContainerCard';
 import { ShippingDashboard } from './ShippingDashboard';
 import { PaymentModal } from './PaymentModal';
@@ -21,7 +21,7 @@ type SortOption = 'date' | 'client' | 'goods';
 interface ShippingPageProps {
   shippingStore?: ReturnType<typeof useSupabaseShipping>;
   funds?: Fund[];
-  fundOptions?: Fund[];
+  fundOptions?: FundOption[];
   accountOptions?: AccountOption[];
   stats?: ShippingStats;
 }
