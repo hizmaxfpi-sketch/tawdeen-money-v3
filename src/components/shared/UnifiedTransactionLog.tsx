@@ -73,7 +73,9 @@ export function UnifiedTransactionLog({
 }: UnifiedTransactionLogProps) {
   const { t, language } = useLanguage();
   const persistKey = `txlog-${storageKey}`;
-  const [filter, setFilter] = usePersistedFilter<'all' | 'in' | 'out'>(`${persistKey}-filter`, 'all');
+  const [rawFilter, setFilter] = usePersistedFilter<'all' | 'in' | 'out'>(`${persistKey}-filter`, 'all');
+  // Defensive: only accept the 3 valid values; anything else falls back to 'all'
+  const filter: 'all' | 'in' | 'out' = (rawFilter === 'in' || rawFilter === 'out') ? rawFilter : 'all';
   const [search, setSearch] = usePersistedFilter(`${persistKey}-search`, '');
   const [showFilters, setShowFilters] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);

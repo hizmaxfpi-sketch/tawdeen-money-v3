@@ -61,15 +61,17 @@ export function ReportsPage({
   const accountsOn = isEnabled('accounts');
   const productionOn = isEnabled('production');
   const defaultTab = shippingOn ? 'shipping' : accountsOn ? 'ledger' : projectsOn ? 'projects' : productionOn ? 'production' : 'general';
-  // ✅ Persist last-used reports tab across navigation
-  const [activeTab, setActiveTab] = usePersistedFilter<string>('reports-active-tab', defaultTab);
+  // ✅ Persist last-used reports tab across navigation.
+  // Use a stable initial value ('general') so persistence is not overridden on mount.
+  const [activeTab, setActiveTab] = usePersistedFilter<string>('reports-active-tab', 'general');
+  // Only auto-switch if the currently-active tab points to a now-disabled module.
   useEffect(() => {
-    if ((activeTab === 'shipping' && !shippingOn) ||
-        (activeTab === 'projects' && !projectsOn) ||
-        (activeTab === 'ledger' && !accountsOn) ||
-        (activeTab === 'production' && !productionOn)) {
-      setActiveTab(defaultTab);
-    }
+    const tabIsDisabled =
+      (activeTab === 'shipping' && !shippingOn) ||
+      (activeTab === 'projects' && !projectsOn) ||
+      (activeTab === 'ledger' && !accountsOn) ||
+      (activeTab === 'production' && !productionOn);
+    if (tabIsDisabled) setActiveTab(defaultTab);
   }, [shippingOn, projectsOn, accountsOn, productionOn, activeTab, defaultTab, setActiveTab]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewContent, setPreviewContent] = useState<'shipping-summary' | 'container-detail' | 'shipment-detail' | 'projects' | 'general' | 'activity' | null>(null);

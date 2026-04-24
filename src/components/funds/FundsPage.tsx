@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, Landmark, CreditCard, Plus, X, ArrowLeftRight, Search, Filter, LayoutGrid, List, Check, Vault, CircleDollarSign, RefreshCw } from 'lucide-react';
+import { Wallet, Landmark, CreditCard, Plus, X, ArrowLeftRight, Search, Filter, LayoutGrid, List, Check, Vault, CircleDollarSign, RefreshCw, Wrench } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Fund, FundType } from '@/types/finance';
 import { Button } from '@/components/ui/button';
@@ -35,6 +37,21 @@ export function FundsPage({ funds, totalLiquidity, onAddFund, onTransferFunds, o
   const [showAddForm, setShowAddForm] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [isReconciling, setIsReconciling] = useState(false);
+
+  const handleReconcile = async () => {
+    setIsReconciling(true);
+    try {
+      const { error } = await (supabase.rpc as any)('recalculate_all_fund_balances');
+      if (error) throw error;
+      toast.success('تمت مزامنة أرصدة الصناديق من العمليات الفعلية');
+      onRefresh?.();
+    } catch (e: any) {
+      toast.error('تعذرت المزامنة: ' + (e?.message || 'خطأ غير معروف'));
+    } finally {
+      setIsReconciling(false);
+    }
+  };
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<FundType>('cash');
   const [newDescription, setNewDescription] = useState('');
@@ -42,7 +59,9 @@ export function FundsPage({ funds, totalLiquidity, onAddFund, onTransferFunds, o
   const [selectedTypes, setSelectedTypes] = usePersistedFilter<string[]>('funds-types', []);
   const [viewMode, setViewMode] = usePersistedFilter<'grid' | 'list'>('funds-view', 'grid');
 
-  const totalBalance = totalLiquidity ?? funds.reduce((sum, f) => sum + f.balance, 0);
+  // ✅ Source of truth: real fund balances from DB; snapshot only as last-resort fallback.
+  const localTotal = useMemo(() => funds.reduce((sum, f) => sum + Number(f.balance || 0), 0), [funds]);
+  const totalBalance = funds.length > 0 ? localTotal : (totalLiquidity ?? 0);
   const canCreateFunds = !!onAddFund && permissions.canCreate('funds');
   const canTransferFunds = !!onTransferFunds && permissions.canEdit('funds');
   const canManageCurrencies = permissions.canEdit('funds');
@@ -87,6 +106,12 @@ export function FundsPage({ funds, totalLiquidity, onAddFund, onTransferFunds, o
       <div className="flex items-center justify-between">
         <h2 className="text-base font-bold">{t('funds.title')}</h2>
         <div className="flex gap-2">
+          {canManageCurrencies && (
+            <Button size="sm" variant="outline" onClick={handleReconcile} disabled={isReconciling} className="gap-1.5 h-8 text-xs" title="إعادة احتساب الأرصدة من العمليات الفعلية">
+              <Wrench className={cn("h-3.5 w-3.5", isReconciling && "animate-spin")} />
+              {isReconciling ? '...' : 'مزامنة الأرصدة'}
+            </Button>
+          )}
           {onRefresh && (
             <Button size="sm" variant="outline" onClick={onRefresh} className="gap-1.5 h-8 text-xs">
               <RefreshCw className="h-3.5 w-3.5" />{t('common.refresh')}
