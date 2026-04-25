@@ -228,9 +228,9 @@ const Index = () => {
             onDeleteTransaction={perms.canDelete('transactions') ? handleDeleteTransaction : undefined}
             hasMore={hasMoreTransactions}
             onLoadMore={loadMoreTransactions}
-            ledgerDebit={snapshot.ledgerDebit}
-            ledgerCredit={snapshot.ledgerCredit}
-            ledgerNet={snapshot.ledgerNet}
+            ledgerDebit={liveLedger.ledgerDebit}
+            ledgerCredit={liveLedger.ledgerCredit}
+            ledgerNet={liveLedger.ledgerNet}
             projectProfit={snapshot.projectProfit}
             containerProfit={snapshot.containerProfit}
             directRevenue={directRevenue}
