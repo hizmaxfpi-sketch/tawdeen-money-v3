@@ -15,12 +15,12 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
-import { UnifiedTransactionLog } from '@/components/shared/UnifiedTransactionLog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDateGregorian, formatAmount, formatNumber } from '@/utils/formatUtils';
 import { compareTransactionsByBusinessDateAsc, compareTransactionsByBusinessDateDesc } from '@/utils/transactionSort';
 import { generateHDPreviewPDF } from '@/utils/hdPreview';
 import { toast } from 'sonner';
+import { StatementEntriesView } from '@/components/shared/StatementEntriesView';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
@@ -372,87 +372,20 @@ export function FundDetails({ funds, transactions, currencies = [], onUpdateFund
         )}
 
         {/* ✅ Unified Fund Statement (Table OR Cards via toggle — same data source) */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-          className="rounded-xl bg-card shadow-sm border border-border overflow-hidden">
-          <div className="p-3 border-b border-border flex items-center justify-between gap-2">
-            <h3 className="text-sm font-bold">كشف حساب الصندوق ({formatNumber(stats.transactionCount)})</h3>
-            <div className="flex gap-0.5 p-0.5 bg-muted rounded-lg shrink-0">
-              <button
-                onClick={() => setViewMode('table')}
-                className={cn("p-1.5 rounded-md transition-all flex items-center gap-1 text-[10px] font-medium",
-                  viewMode === 'table' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}
-                title="عرض جدولي"
-              >
-                <List className="h-3.5 w-3.5" /> جدول
-              </button>
-              <button
-                onClick={() => setViewMode('cards')}
-                className={cn("p-1.5 rounded-md transition-all flex items-center gap-1 text-[10px] font-medium",
-                  viewMode === 'cards' ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                )}
-                title="عرض بطاقات"
-              >
-                <LayoutGrid className="h-3.5 w-3.5" /> بطاقات
-              </button>
-            </div>
-          </div>
-
-          {viewMode === 'table' ? (
-            ledgerRows.length === 0 ? (
-              <p className="text-center py-8 text-sm text-muted-foreground">لا توجد عمليات مسجلة</p>
-            ) : (
-              <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="text-center text-[11px] font-bold px-2">التاريخ</TableHead>
-                      <TableHead className="text-center text-[11px] font-bold px-2">البيان</TableHead>
-                      <TableHead className="text-center text-[11px] font-bold text-emerald-600 px-2">مدين</TableHead>
-                      <TableHead className="text-center text-[11px] font-bold text-rose-600 px-2">دائن</TableHead>
-                      <TableHead className="text-center text-[11px] font-bold px-2">الرصيد</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {ledgerRows.map((row) => (
-                      <TableRow key={row.id} className="text-xs">
-                        <TableCell className="text-center px-2 py-2 text-[11px] whitespace-nowrap">
-                          {formatDateGregorian(row.date)}
-                        </TableCell>
-                        <TableCell className="text-center px-2 py-2 text-[11px] max-w-[140px] truncate">
-                          {row.description || '-'}
-                        </TableCell>
-                        <TableCell className="text-center px-2 py-2 text-[11px] text-emerald-600 font-semibold">
-                          {row.type === 'in' ? `$${formatAmount(row.amount)}` : '-'}
-                        </TableCell>
-                        <TableCell className="text-center px-2 py-2 text-[11px] text-rose-600 font-semibold">
-                          {row.type === 'out' ? `$${formatAmount(row.amount)}` : '-'}
-                        </TableCell>
-                        <TableCell className={cn("text-center px-2 py-2 text-[11px] font-bold",
-                          row.runningBalance > 0 ? "text-emerald-600" : row.runningBalance < 0 ? "text-rose-600" : "")}>
-                          ${formatAmount(Math.abs(row.runningBalance))}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )
-          ) : (
-            <div className="p-2">
-              <UnifiedTransactionLog 
-                transactions={displayTransactions}
-                title=""
-                storageKey={`fund-${fund.id}`}
-                showExport={true}
-                maxHeight="480px"
-                currencies={currencies}
-                displayCurrencyCode={displayCurrency}
-                onDisplayCurrencyChange={setDisplayCurrency}
-                onDeleteTransaction={onDeleteTransaction}
-              />
-            </div>
-          )}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <StatementEntriesView
+            title={`كشف حساب الصندوق (${formatNumber(stats.transactionCount)})`}
+            rows={ledgerRows.map((row) => ({
+              id: row.id,
+              date: row.date,
+              description: row.description,
+              type: row.type,
+              amount: row.amount,
+              runningBalance: row.runningBalance,
+            }))}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+          />
         </motion.div>
 
         {/* Legal Footer */}
