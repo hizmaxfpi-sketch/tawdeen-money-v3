@@ -22,7 +22,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePersistedFilter } from '@/hooks/usePersistedFilters';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { calculateLedgerSummary, EMPTY_LEDGER_SUMMARY } from '@/utils/ledgerSummary';
-import { StatementEntriesView } from '@/components/shared/StatementEntriesView';
 
 const LEGAL_DISCLAIMER = 'هذا المستند تم إنشاؤه آلياً من النظام وهو معتمد بدون توقيع أو ختم. تخلي المؤسسة مسؤوليتها عن أي كشط، شطب، أو تعديل يدوي يطرأ على هذه الورقة.';
 
@@ -69,7 +68,6 @@ export function LedgerAccountsPage({ transactions, ledgerSummary }: LedgerAccoun
   const [loadingStatement, setLoadingStatement] = useState(false);
   const statementRef = useRef<HTMLDivElement>(null);
   const [showFilteredPreview, setShowFilteredPreview] = useState(false);
-  const [statementViewMode, setStatementViewMode] = useState<'table' | 'cards'>('table');
 
   // Get all unique types from actual contacts in DB, with custom types expanded
   const availableTypes = useMemo(() => {
@@ -332,9 +330,9 @@ export function LedgerAccountsPage({ transactions, ledgerSummary }: LedgerAccoun
           الحسابات الدفترية
         </h2>
         <div className="flex items-center gap-1">
-          <Button size="sm" variant="outline" className="gap-1 h-8 text-[11px] px-2 sm:text-xs" onClick={handleSyncBalances} disabled={isSyncing}>
+          <Button size="sm" variant="outline" className="gap-1 h-8 text-xs px-2" onClick={handleSyncBalances} disabled={isSyncing}>
             <RefreshCw className={cn("h-3.5 w-3.5", isSyncing && "animate-spin")} />
-            <span className="hidden sm:inline">تحديث الأرصدة</span>
+            تحديث الأرصدة
           </Button>
           {canCreate && (
             <Button size="sm" className="gap-1 h-8 text-xs px-2" onClick={handleAddAccount}>
@@ -752,19 +750,50 @@ export function LedgerAccountsPage({ transactions, ledgerSummary }: LedgerAccoun
                     </div>
                   </div>
 
-                  <div className="p-4 pt-0">
-                    <StatementEntriesView
-                      title={`كشف الحساب (${formatNumber(statementTxs.length)})`}
-                      rows={(() => {
-                        let running = 0;
-                        return statementTxs.map((t) => {
-                          if (t.type === 'in') running += t.amount; else running -= t.amount;
-                          return { id: t.id, date: t.date, description: t.description, type: t.type, amount: t.amount, runningBalance: running };
-                        });
-                      })()}
-                      viewMode={statementViewMode}
-                      onViewModeChange={setStatementViewMode}
-                    />
+                  <div style={{ padding: '0 16px 12px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#194178', marginBottom: '8px', textAlign: 'center' }}>
+                      سجل العمليات ({formatNumber(statementTxs.length)})
+                    </div>
+                    {statementTxs.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '20px', color: '#999', fontSize: '11px' }}>لا توجد عمليات مسجلة</div>
+                    ) : (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+                        <thead>
+                          <tr style={{ background: '#194178', color: 'white' }}>
+                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>التاريخ</th>
+                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>البيان</th>
+                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>مدين</th>
+                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>دائن</th>
+                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>الرصيد</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(() => {
+                            let running = 0;
+                            return statementTxs.map((t, i) => {
+                              if (t.type === 'in') running += t.amount; else running -= t.amount;
+                              return (
+                                <tr key={t.id} style={{ background: i % 2 === 0 ? '#fff' : '#f5f7fa', borderBottom: '1px solid #eee' }}>
+                                  <td style={{ padding: '5px 4px', textAlign: 'center' }}>{formatDateShort(t.date)}</td>
+                                  <td style={{ padding: '5px 4px', textAlign: 'center', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {t.description || '-'}
+                                  </td>
+                                  <td style={{ padding: '5px 4px', textAlign: 'center', color: '#16a34a', fontWeight: t.type === 'in' ? 'bold' : 'normal' }}>
+                                    {t.type === 'in' ? `$${formatAmount(t.amount)}` : '-'}
+                                  </td>
+                                  <td style={{ padding: '5px 4px', textAlign: 'center', color: '#dc2626', fontWeight: t.type === 'out' ? 'bold' : 'normal' }}>
+                                    {t.type === 'out' ? `$${formatAmount(t.amount)}` : '-'}
+                                  </td>
+                                  <td style={{ padding: '5px 4px', textAlign: 'center', fontWeight: 'bold' }}>
+                                    ${formatAmount(Math.abs(running))}
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
 
                   <div style={{ margin: '0 16px 8px', padding: '8px 12px', background: '#fafafa', borderRadius: '4px', border: '1px solid #eee' }}>
