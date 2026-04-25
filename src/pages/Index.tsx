@@ -251,7 +251,7 @@ const Index = () => {
         if (fundsLoading) return <ListSkeleton />;
         return <FundsPage funds={funds} totalLiquidity={snapshot.totalLiquidity} onAddFund={perms.canCreate('funds') ? addFund : undefined} onTransferFunds={perms.canEdit('funds') ? transferFunds : undefined} onRefresh={refreshAll} />;
       case 'accounts':
-        return <LedgerAccountsPage transactions={transactions} ledgerSummary={{ ledgerDebit: snapshot.ledgerDebit, ledgerCredit: snapshot.ledgerCredit, ledgerNet: snapshot.ledgerNet }} />;
+        return <LedgerAccountsPage transactions={transactions} ledgerSummary={liveLedger} />;
       case 'business':
         return (
           <BusinessPage
