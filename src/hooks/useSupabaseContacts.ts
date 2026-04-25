@@ -20,7 +20,7 @@ const CONTACTS_CACHE_TTL = 30_000;
 
 export function useSupabaseContacts() {
   const { user } = useAuth();
-  const PAGE_SIZE = 50; // زيادة حجم الصفحة لتقليل الطلبات
+  const PAGE_SIZE = 1000; // نحتاج كل الحسابات الفعلية للدفتر والملخصات، لا أول 50 فقط
   const [contacts, setContacts] = useState<Contact[]>(() => cacheGet<Contact[]>('contacts') || []);
   const [isLoading, setIsLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
@@ -42,15 +42,34 @@ export function useSupabaseContacts() {
     if (!initialLoaded) setIsLoading(true);
     else if (!reset) setLoadingMore(true);
 
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('id, name, type, custom_type, phone, email, company, address, notes, parent_contact_id, linked_contacts, total_transactions, total_debit, total_credit, balance, status, created_at, updated_at')
-      .order('updated_at', { ascending: false })
-      .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
+    const collected: any[] = [];
+    let nextPage = currentPage;
 
-    if (error) { console.error('Error fetching contacts:', error); }
-    else {
-      const mapped = (data || []).map(c => ({
+    while (true) {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('id, name, type, custom_type, phone, email, company, address, notes, parent_contact_id, linked_contacts, total_transactions, total_debit, total_credit, balance, status, created_at, updated_at')
+        .order('updated_at', { ascending: false })
+        .range(nextPage * PAGE_SIZE, (nextPage + 1) * PAGE_SIZE - 1);
+
+      if (error) {
+        console.error('Error fetching contacts:', error);
+        break;
+      }
+
+      const batch = data || [];
+      collected.push(...batch);
+
+      if (batch.length < PAGE_SIZE || !reset) {
+        setHasMore(batch.length === PAGE_SIZE && !reset);
+        break;
+      }
+
+      nextPage += 1;
+    }
+
+    if (collected.length >= 0) {
+      const mapped = collected.map(c => ({
         id: c.id,
         name: c.name,
         type: c.type as ContactType,
@@ -80,7 +99,6 @@ export function useSupabaseContacts() {
       } else {
         setContacts(prev => [...prev, ...mapped]);
       }
-      setHasMore((data || []).length === PAGE_SIZE);
     }
     setIsLoading(false);
     setLoadingMore(false);
