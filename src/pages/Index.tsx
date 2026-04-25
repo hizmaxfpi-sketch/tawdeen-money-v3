@@ -122,6 +122,27 @@ const Index = () => {
   // ✅ المصدر الموحد للأرقام: نداء RPC واحد محسوب في الخادم
   const { snapshot } = useDashboardSnapshot();
 
+  // ✅ حساب فوري لإجماليات الدفتر من العمليات المحلية (يطابق صفحة الدفتر تماماً)
+  // يستخدم snapshot كـ fallback فقط لو لم تُحمَّل البيانات بعد
+  const liveLedger = useMemo(() => {
+    const activeContactIds = new Set(
+      contacts.filter(c => c.status === 'active').map(c => c.id)
+    );
+    let debit = 0, credit = 0;
+    for (const tx of transactions) {
+      if (!tx.contactId || !activeContactIds.has(tx.contactId)) continue;
+      const amt = Number(tx.amount || 0);
+      if (tx.type === 'in') debit += amt;
+      else if (tx.type === 'out') credit += amt;
+    }
+    const hasLocal = transactions.length > 0 || contacts.length > 0;
+    return {
+      ledgerDebit: hasLocal ? debit : snapshot.ledgerDebit,
+      ledgerCredit: hasLocal ? credit : snapshot.ledgerCredit,
+      ledgerNet: hasLocal ? (debit - credit) : snapshot.ledgerNet,
+    };
+  }, [transactions, contacts, snapshot.ledgerDebit, snapshot.ledgerCredit, snapshot.ledgerNet]);
+
   // الإيرادات/المصاريف من العمليات النقدية فقط (للـ business view)
   const { directRevenue, businessExpenses } = useBusinessTransactions(transactions, {
     extraRevenue: productionEnabled ? productionSummary.totalSales : 0,
