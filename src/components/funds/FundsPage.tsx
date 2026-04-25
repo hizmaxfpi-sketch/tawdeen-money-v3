@@ -105,26 +105,25 @@ export function FundsPage({ funds, totalLiquidity, onAddFund, onTransferFunds, o
 
       <div className="flex items-center justify-between">
         <h2 className="text-base font-bold">{t('funds.title')}</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           {canManageCurrencies && (
-            <Button size="sm" variant="outline" onClick={handleReconcile} disabled={isReconciling} className="gap-1.5 h-8 text-xs" title="إعادة احتساب الأرصدة من العمليات الفعلية">
-              <Wrench className={cn("h-3.5 w-3.5", isReconciling && "animate-spin")} />
-              {isReconciling ? '...' : 'مزامنة الأرصدة'}
+            <Button size="sm" variant="outline" onClick={handleReconcile} disabled={isReconciling} className="h-8 w-8 p-0" title="مزامنة الأرصدة">
+              <Wrench className={cn("h-4 w-4", isReconciling && "animate-spin")} />
             </Button>
           )}
           {onRefresh && (
-            <Button size="sm" variant="outline" onClick={onRefresh} className="gap-1.5 h-8 text-xs">
-              <RefreshCw className="h-3.5 w-3.5" />{t('common.refresh')}
+            <Button size="sm" variant="outline" onClick={onRefresh} className="h-8 w-8 p-0" title={t('common.refresh')}>
+              <RefreshCw className="h-4 w-4" />
             </Button>
           )}
           {funds.length >= 2 && canTransferFunds && (
-            <Button size="sm" variant="outline" onClick={() => setShowTransferModal(true)} className="gap-1.5 h-8 text-xs">
-              <ArrowLeftRight className="h-3.5 w-3.5" />{t('funds.transfer')}
+            <Button size="sm" variant="outline" onClick={() => setShowTransferModal(true)} className="h-8 w-8 p-0" title={t('funds.transfer')}>
+              <ArrowLeftRight className="h-4 w-4" />
             </Button>
           )}
           {canCreateFunds && (
-            <Button size="sm" onClick={() => setShowAddForm(true)} className="gap-1.5 h-8 text-xs">
-              <Plus className="h-3.5 w-3.5" />{t('funds.add')}
+            <Button size="sm" onClick={() => setShowAddForm(true)} className="h-8 w-8 p-0" title={t('funds.add')}>
+              <Plus className="h-4 w-4" />
             </Button>
           )}
         </div>
