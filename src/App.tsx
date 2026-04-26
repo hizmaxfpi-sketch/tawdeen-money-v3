@@ -58,6 +58,7 @@ function AppInner() {
               <Route path="/auth" element={<Auth />} />
               <Route path="/admin" element={<SuperAdmin />} />
               <Route path="/" element={<ProtectedRoute><CompanyStatusGuard><Index /></CompanyStatusGuard></ProtectedRoute>} />
+              <Route path="/index" element={<ProtectedRoute><CompanyStatusGuard><Index /></CompanyStatusGuard></ProtectedRoute>} />
               <Route path="/shipping/add-container" element={<ProtectedRoute><CompanyStatusGuard><RoleGuard><AddContainer /></RoleGuard></CompanyStatusGuard></ProtectedRoute>} />
               <Route path="/shipping/add-shipment" element={<ProtectedRoute><CompanyStatusGuard><RoleGuard><AddShipment /></RoleGuard></CompanyStatusGuard></ProtectedRoute>} />
               <Route path="/shipping/edit-container/:id" element={<ProtectedRoute><CompanyStatusGuard><RoleGuard><EditContainer /></RoleGuard></CompanyStatusGuard></ProtectedRoute>} />
