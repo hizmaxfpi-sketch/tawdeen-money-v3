@@ -7,6 +7,18 @@ import { useRealtimeSync } from './useRealtimeSync';
 import { cacheSet, cacheGet } from '@/lib/offlineCache';
 import { guardOffline } from '@/lib/offlineGuard';
 
+// ✅ كاش module-level للشحن — يمنع إعادة الجلب الكاملة عند كل زيارة للصفحة
+let _cachedContainers: Container[] | null = null;
+let _cachedShipments: Shipment[] | null = null;
+let _shippingCacheUserId: string | null = null;
+let _shippingCacheTime = 0;
+const SHIPPING_CACHE_TTL = 45_000; // 45 ثانية
+const invalidateShippingCache = () => {
+  _cachedContainers = null;
+  _cachedShipments = null;
+  _shippingCacheTime = 0;
+};
+
 export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
   const enabled = opts.enabled !== false; // default: true (backward compatibility)
   const { user } = useAuth();
@@ -28,6 +40,18 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
   const fetchContainers = useCallback(async (reset = false) => {
     if (!user) return;
     const currentPage = reset ? 0 : containerPage;
+
+    // ✅ استخدام الكاش إذا كان حديثاً — يمنع الجلب الثقيل عند كل زيارة
+    if (reset && currentPage === 0
+        && _cachedContainers !== null
+        && _shippingCacheUserId === user.id
+        && (Date.now() - _shippingCacheTime) < SHIPPING_CACHE_TTL) {
+      setContainers(_cachedContainers);
+      setContainersLoading(false);
+      setContainersInitial(true);
+      return;
+    }
+
     if (!containersInitial) setContainersLoading(true);
     else if (!reset) setLoadingMoreContainers(true);
 
@@ -73,6 +97,9 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
       if (reset || currentPage === 0) {
         setContainers(mapped);
         cacheSet('containers', mapped);
+        _cachedContainers = mapped;
+        _shippingCacheUserId = user.id;
+        _shippingCacheTime = Date.now();
         setContainerPage(0);
       } else {
         setContainers(prev => [...prev, ...mapped]);
@@ -87,6 +114,18 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
   const fetchShipments = useCallback(async (reset = false) => {
     if (!user) return;
     const currentPage = reset ? 0 : shipmentPage;
+
+    // ✅ كاش 45 ثانية
+    if (reset && currentPage === 0
+        && _cachedShipments !== null
+        && _shippingCacheUserId === user.id
+        && (Date.now() - _shippingCacheTime) < SHIPPING_CACHE_TTL) {
+      setShipments(_cachedShipments);
+      setShipmentsLoading(false);
+      setShipmentsInitial(true);
+      return;
+    }
+
     if (!shipmentsInitial) setShipmentsLoading(true);
     else if (!reset) setLoadingMoreShipments(true);
 
@@ -132,6 +171,9 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
       if (reset || currentPage === 0) {
         setShipments(mapped);
         cacheSet('shipments', mapped);
+        _cachedShipments = mapped;
+        _shippingCacheUserId = user.id;
+        _shippingCacheTime = Date.now();
         setShipmentPage(0);
       } else {
         setShipments(prev => [...prev, ...mapped]);
@@ -216,6 +258,7 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
     });
     if (error) { toast.error('خطأ في إضافة الحاوية'); console.error(error); throw error; }
     realtimeRef.current.suppressNext();
+    invalidateShippingCache();
     await fetchContainers(true);
   }, [user, fetchContainers]);
 
@@ -251,6 +294,7 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
     }
     toast.success('تم تحديث الحاوية بنجاح');
     realtimeRef.current.suppressNext();
+    invalidateShippingCache();
     await fetchContainers(true);
   }, [fetchContainers]);
 
@@ -261,6 +305,7 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
     toast.success('تم حذف الحاوية وجميع شحناتها بنجاح');
     if (user) await (supabase.rpc as any)('sync_contact_balances');
     realtimeRef.current.suppressNext();
+    invalidateShippingCache();
     await Promise.all([fetchContainers(), fetchShipments()]);
   }, [user, fetchContainers, fetchShipments]);
 
@@ -319,6 +364,7 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
 
     toast.success(`تم إضافة الشحنة بنجاح - ${pkgNum}`);
     realtimeRef.current.suppressNext();
+    invalidateShippingCache();
     await Promise.all([fetchShipments(), fetchContainers()]);
     return shipmentId;
     
@@ -346,6 +392,7 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
     }
     toast.success('تم تحديث الشحنة بنجاح');
     realtimeRef.current.suppressNext();
+    invalidateShippingCache();
     await Promise.all([fetchShipments(), fetchContainers()]);
   }, [fetchShipments, fetchContainers]);
 
@@ -356,6 +403,7 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
     toast.success('تم حذف الشحنة بنجاح');
     if (user) await (supabase.rpc as any)('sync_contact_balances');
     realtimeRef.current.suppressNext();
+    invalidateShippingCache();
     await Promise.all([fetchShipments(), fetchContainers()]);
   }, [user, fetchShipments, fetchContainers]);
 

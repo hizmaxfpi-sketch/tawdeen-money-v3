@@ -60,6 +60,26 @@ function ListSkeleton() {
   );
 }
 
+// ✅ Skeleton موحّد لـ Suspense — يشبه شكل الصفحة (إحصائيات + قائمة) بدل وميض أبيض
+function PageFallback() {
+  return (
+    <div className="space-y-3 py-3 animate-fade-in">
+      <div className="grid grid-cols-2 gap-2">
+        <Skeleton className="h-20 rounded-xl" />
+        <Skeleton className="h-20 rounded-xl" />
+        <Skeleton className="h-20 rounded-xl" />
+        <Skeleton className="h-20 rounded-xl" />
+      </div>
+      <Skeleton className="h-10 w-full rounded-lg" />
+      <div className="space-y-2">
+        {[1, 2, 3, 4].map(i => (
+          <Skeleton key={i} className="h-16 w-full rounded-xl" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const Index = () => {
   const { user } = useAuth();
   const { dir, t } = useLanguage();
@@ -317,7 +337,7 @@ const Index = () => {
       )}>
         <Header />
         <main className="container max-w-lg mx-auto px-3 py-3 pb-24 md:max-w-4xl lg:max-w-5xl">
-          <Suspense fallback={<ListSkeleton />}>{renderPage()}</Suspense>
+          <Suspense fallback={<PageFallback />}><div className="animate-fade-in" key={currentPage}>{renderPage()}</div></Suspense>
         </main>
         {!showTransactionForm && perms.canCreate('transactions') && <FloatingAddButton onClick={() => handleOpenForm('in')} />}
         <div className="md:hidden">
