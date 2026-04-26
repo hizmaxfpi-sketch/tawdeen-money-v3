@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, memo, forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, Edit3, X, Check, RefreshCw } from 'lucide-react';
 import { Currency, CURRENCY_FLAGS } from '@/hooks/useCurrencies';
@@ -11,15 +11,11 @@ interface MarketRatesWidgetProps {
   onUpdateRate: (currencyId: string, rate: number) => void;
 }
 
-const QuickEditModal = memo(({ 
-  currencies, 
-  onUpdateRate, 
-  onClose 
-}: { 
+const QuickEditModal = memo(forwardRef<HTMLDivElement, { 
   currencies: Currency[]; 
   onUpdateRate: (id: string, rate: number) => void; 
   onClose: () => void;
-}) => {
+}>(({ currencies, onUpdateRate, onClose }, ref) => {
   const { t } = useLanguage();
   const [rates, setRates] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
@@ -44,6 +40,7 @@ const QuickEditModal = memo(({
 
   return (
     <motion.div
+      ref={ref}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -109,7 +106,7 @@ const QuickEditModal = memo(({
       </motion.div>
     </motion.div>
   );
-});
+}));
 
 QuickEditModal.displayName = 'QuickEditModal';
 
