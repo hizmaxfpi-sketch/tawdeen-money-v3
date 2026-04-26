@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Camera, Mic, DollarSign, Calendar, FileText, StickyNote, BookOpen, Coins } from 'lucide-react';
+import { X, Camera, Mic, DollarSign, Calendar, FileText, StickyNote, BookOpen, Coins, Loader2 } from 'lucide-react';
 import { Transaction, FundOption, AccountOption, TransactionCategory, TransactionType } from '@/types/finance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
