@@ -317,8 +317,8 @@ export function TransactionForm({
           <div className="flex gap-2 pt-2">
             <Button variant="outline" onClick={onClose} className="flex-1 h-9 text-xs">{t('common.cancel')}</Button>
             <Button onClick={handleSubmit} disabled={!amount || !description || !fundId || submitting}
-              className={cn("flex-1 h-9 text-xs", type === 'in' ? "bg-gradient-income" : "bg-gradient-expense")}>
-              {submitting ? '...' : t('tx.save')}
+              className={cn("flex-1 h-9 text-xs gap-1", type === 'in' ? "bg-gradient-income" : "bg-gradient-expense", submitting && "pointer-events-none opacity-90")}>
+              {submitting ? (<><Loader2 className="h-3.5 w-3.5 animate-spin" />{t('common.saving') || 'جاري الحفظ...'}</>) : t('tx.save')}
             </Button>
           </div>
         </div>
