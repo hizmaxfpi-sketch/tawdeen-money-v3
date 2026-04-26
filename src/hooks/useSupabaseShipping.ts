@@ -258,6 +258,7 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
     });
     if (error) { toast.error('خطأ في إضافة الحاوية'); console.error(error); throw error; }
     realtimeRef.current.suppressNext();
+    invalidateShippingCache();
     await fetchContainers(true);
   }, [user, fetchContainers]);
 
@@ -293,6 +294,7 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
     }
     toast.success('تم تحديث الحاوية بنجاح');
     realtimeRef.current.suppressNext();
+    invalidateShippingCache();
     await fetchContainers(true);
   }, [fetchContainers]);
 
@@ -303,6 +305,7 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
     toast.success('تم حذف الحاوية وجميع شحناتها بنجاح');
     if (user) await (supabase.rpc as any)('sync_contact_balances');
     realtimeRef.current.suppressNext();
+    invalidateShippingCache();
     await Promise.all([fetchContainers(), fetchShipments()]);
   }, [user, fetchContainers, fetchShipments]);
 
@@ -361,6 +364,7 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
 
     toast.success(`تم إضافة الشحنة بنجاح - ${pkgNum}`);
     realtimeRef.current.suppressNext();
+    invalidateShippingCache();
     await Promise.all([fetchShipments(), fetchContainers()]);
     return shipmentId;
     
@@ -388,6 +392,7 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
     }
     toast.success('تم تحديث الشحنة بنجاح');
     realtimeRef.current.suppressNext();
+    invalidateShippingCache();
     await Promise.all([fetchShipments(), fetchContainers()]);
   }, [fetchShipments, fetchContainers]);
 
@@ -398,6 +403,7 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
     toast.success('تم حذف الشحنة بنجاح');
     if (user) await (supabase.rpc as any)('sync_contact_balances');
     realtimeRef.current.suppressNext();
+    invalidateShippingCache();
     await Promise.all([fetchShipments(), fetchContainers()]);
   }, [user, fetchShipments, fetchContainers]);
 
