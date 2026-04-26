@@ -40,6 +40,18 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
   const fetchContainers = useCallback(async (reset = false) => {
     if (!user) return;
     const currentPage = reset ? 0 : containerPage;
+
+    // ✅ استخدام الكاش إذا كان حديثاً — يمنع الجلب الثقيل عند كل زيارة
+    if (reset && currentPage === 0
+        && _cachedContainers !== null
+        && _shippingCacheUserId === user.id
+        && (Date.now() - _shippingCacheTime) < SHIPPING_CACHE_TTL) {
+      setContainers(_cachedContainers);
+      setContainersLoading(false);
+      setContainersInitial(true);
+      return;
+    }
+
     if (!containersInitial) setContainersLoading(true);
     else if (!reset) setLoadingMoreContainers(true);
 
