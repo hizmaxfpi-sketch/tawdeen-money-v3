@@ -7,6 +7,18 @@ import { useRealtimeSync } from './useRealtimeSync';
 import { cacheSet, cacheGet } from '@/lib/offlineCache';
 import { guardOffline } from '@/lib/offlineGuard';
 
+// ✅ كاش module-level للشحن — يمنع إعادة الجلب الكاملة عند كل زيارة للصفحة
+let _cachedContainers: Container[] | null = null;
+let _cachedShipments: Shipment[] | null = null;
+let _shippingCacheUserId: string | null = null;
+let _shippingCacheTime = 0;
+const SHIPPING_CACHE_TTL = 45_000; // 45 ثانية
+const invalidateShippingCache = () => {
+  _cachedContainers = null;
+  _cachedShipments = null;
+  _shippingCacheTime = 0;
+};
+
 export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
   const enabled = opts.enabled !== false; // default: true (backward compatibility)
   const { user } = useAuth();
