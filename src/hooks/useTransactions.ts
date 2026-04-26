@@ -22,6 +22,10 @@ let _cacheUserId: string | null = null;
 let _cacheTime = 0;
 const CACHE_TTL = 30_000; // 30 ثانية
 
+// ✅ حماية من الحفظ المكرر (double-submit) — Set على مستوى الـ module
+// يمنع إرسال نفس العملية مرتين حتى لو ضغط المستخدم الزر بسرعة
+const _pendingSubmissions = new Set<string>();
+
 export function useTransactions() {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>(() => cacheGet<Transaction[]>('transactions') || []);
