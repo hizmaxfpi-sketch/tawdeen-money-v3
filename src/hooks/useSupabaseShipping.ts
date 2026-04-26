@@ -97,6 +97,9 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
       if (reset || currentPage === 0) {
         setContainers(mapped);
         cacheSet('containers', mapped);
+        _cachedContainers = mapped;
+        _shippingCacheUserId = user.id;
+        _shippingCacheTime = Date.now();
         setContainerPage(0);
       } else {
         setContainers(prev => [...prev, ...mapped]);
