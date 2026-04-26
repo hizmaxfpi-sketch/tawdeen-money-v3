@@ -139,38 +139,51 @@ export function useTransactions() {
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'> & { contactId?: string; currencyCode?: string; exchangeRate?: number }) => {
     if (!user) return;
     if (guardOffline()) return;
-    
-    const { data, error } = await supabase.rpc('process_transaction', {
-      p_type: transaction.type,
-      p_category: transaction.category,
-      p_amount: transaction.amount,
-      p_description: transaction.description,
-      p_date: transaction.date,
-      p_fund_id: transaction.fundId || null,
-      p_contact_id: transaction.contactId || null,
-      p_project_id: transaction.projectId || null,
-      p_notes: transaction.notes || null,
-      p_currency_code: transaction.currencyCode || 'USD',
-      p_exchange_rate: transaction.exchangeRate || 1,
-      p_to_fund_id: transaction.toFundId || null,
-    });
-    
-    if (error) { toast.error('خطأ في إضافة العملية'); console.error(error); return; }
-    // Save attachments separately if provided
-    if (data && transaction.attachment) {
-      await supabase.from('transactions').update({ attachments: [transaction.attachment] }).eq('id', data as string);
+
+    // ✅ منع الحفظ المكرر — مفتاح فريد لكل عملية بناءً على محتواها
+    const idempotencyKey = `${user.id}|${transaction.date}|${transaction.amount}|${transaction.description}|${transaction.fundId}|${transaction.type}|${transaction.category}`;
+    if (_pendingSubmissions.has(idempotencyKey)) {
+      console.warn('[useTransactions] Duplicate submission blocked:', idempotencyKey);
+      return;
     }
-    toast.success('تم إضافة العملية بنجاح');
-    // Log to activity (لا ننتظر)
-    if (user) {
-      logToActivity(user.id, 'transaction_created', 'transaction', data as string, transaction.description, { amount: transaction.amount, type: transaction.type, category: transaction.category });
+    _pendingSubmissions.add(idempotencyKey);
+
+    try {
+      const { data, error } = await supabase.rpc('process_transaction', {
+        p_type: transaction.type,
+        p_category: transaction.category,
+        p_amount: transaction.amount,
+        p_description: transaction.description,
+        p_date: transaction.date,
+        p_fund_id: transaction.fundId || null,
+        p_contact_id: transaction.contactId || null,
+        p_project_id: transaction.projectId || null,
+        p_notes: transaction.notes || null,
+        p_currency_code: transaction.currencyCode || 'USD',
+        p_exchange_rate: transaction.exchangeRate || 1,
+        p_to_fund_id: transaction.toFundId || null,
+      });
+
+      if (error) { toast.error('خطأ في إضافة العملية'); console.error(error); return; }
+      // Save attachments separately if provided
+      if (data && transaction.attachment) {
+        await supabase.from('transactions').update({ attachments: [transaction.attachment] }).eq('id', data as string);
+      }
+      toast.success('تم إضافة العملية بنجاح');
+      // Log to activity (لا ننتظر)
+      if (user) {
+        logToActivity(user.id, 'transaction_created', 'transaction', data as string, transaction.description, { amount: transaction.amount, type: transaction.type, category: transaction.category });
+      }
+      // مزامنة أرصدة الحسابات في الخلفية (لا ننتظر)
+      (supabase.rpc as any)('sync_contact_balances').catch(() => {});
+      // إبطال الكاش وترك Realtime يجلب البيانات (يمنع التكرار)
+      _cachedTransactions = null; _cacheTime = 0;
+      realtimeRef.current.suppressNext(500); // اسمح لـ Realtime بالتحديث بعد 500ms
+      return data;
+    } finally {
+      // إزالة المفتاح بعد ثانيتين كحماية إضافية
+      setTimeout(() => _pendingSubmissions.delete(idempotencyKey), 2000);
     }
-    // مزامنة أرصدة الحسابات في الخلفية (لا ننتظر)
-    (supabase.rpc as any)('sync_contact_balances').catch(() => {});
-    // إبطال الكاش وترك Realtime يجلب البيانات (يمنع التكرار)
-    _cachedTransactions = null; _cacheTime = 0;
-    realtimeRef.current.suppressNext(500); // اسمح لـ Realtime بالتحديث بعد 500ms
-    return data;
   }, [user]);
 
   // تحديث عملية موجودة (UPDATE وليس INSERT)
