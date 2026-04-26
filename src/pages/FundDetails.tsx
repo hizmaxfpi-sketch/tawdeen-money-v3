@@ -21,9 +21,10 @@ import { formatDateGregorian, formatAmount, formatNumber } from '@/utils/formatU
 import { compareTransactionsByBusinessDateAsc, compareTransactionsByBusinessDateDesc } from '@/utils/transactionSort';
 import { generateHDPreviewPDF } from '@/utils/hdPreview';
 import { toast } from 'sonner';
+import { StatementPreviewDialog } from '@/components/shared/StatementPreviewDialog';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog';
+} from '@/components/ui/dialog;
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,

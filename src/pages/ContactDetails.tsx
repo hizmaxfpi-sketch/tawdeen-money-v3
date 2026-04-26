@@ -1,6 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState, useMemo } from 'react';
 
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -8,7 +6,7 @@ import {
   ArrowRight, Edit2, Trash2, TrendingUp, TrendingDown, 
   Phone, Mail, Building2, MessageCircle, MapPin, 
   UserCheck, Truck, Ship, Briefcase, Handshake, User,
-  Plus, Printer
+  Plus, Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
