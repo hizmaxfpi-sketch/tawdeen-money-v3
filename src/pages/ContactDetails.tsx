@@ -17,12 +17,14 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { UnifiedTransactionLog } from '@/components/shared/UnifiedTransactionLog';
+import { StatementPreviewDialog } from '@/components/shared/StatementPreviewDialog';
 import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
 import { useSupabaseFinance } from '@/hooks/useSupabaseFinance';
 import { Contact, ContactType, CONTACT_TYPE_LABELS, CONTACT_TYPE_COLORS } from '@/types/contacts';
 import { Transaction } from '@/types/finance';
 import { useCurrencies, CURRENCY_FLAGS, DEFAULT_APP_CURRENCY } from '@/hooks/useCurrencies';
 import { calculateLedgerSummary } from '@/utils/ledgerSummary';
+import { exportAccountStatement } from '@/utils/accountStatementPdf';
 import {
   Dialog,
   DialogContent,
@@ -55,12 +57,12 @@ export function ContactDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   
-  const { user } = useAuth();
   const { contacts, updateContact, deleteContact } = useSupabaseContacts();
   const { transactions, funds, addTransaction, updateTransaction, deleteTransaction, getFundOptions } = useSupabaseFinance();
   const { currencies } = useCurrencies();
   
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [txSubmitting, setTxSubmitting] = useState(false);
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [transactionType, setTransactionType] = useState<'credit' | 'debit'>('credit');
@@ -79,37 +81,16 @@ export function ContactDetails() {
   const [txManualExchangeRate, setTxManualExchangeRate] = useState('');
 
   const contact = useMemo(() => contacts.find(c => c.id === id), [contacts, id]);
-  
   const fundOptions = getFundOptions();
 
-  // Fetch ALL contact transactions directly from DB (no pagination limit)
-  const [contactTransactions, setContactTransactions] = useState<Transaction[]>([]);
-  const [txLoading, setTxLoading] = useState(true);
+  const contactTransactions = useMemo(() => {
+    if (!contact) return [];
+    return transactions
+      .filter((transaction) => transaction.contactId === contact.id)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [contact, transactions]);
 
-  useEffect(() => {
-    if (!contact || !user) return;
-    setTxLoading(true);
-    supabase
-      .from('transactions')
-      .select('id, type, category, amount, description, date, fund_id, contact_id, project_id, notes, created_at, currency_code, exchange_rate, source_type, created_by_name, attachments')
-      .eq('contact_id', contact.id)
-      .order('date', { ascending: false })
-      .then(({ data, error }) => {
-        if (!error && data) {
-          setContactTransactions(data.map((t: any) => ({
-            id: t.id, type: t.type as any, category: t.category as any, amount: Number(t.amount),
-            description: t.description || '', date: t.date, fundId: t.fund_id || '',
-            contactId: t.contact_id || undefined, projectId: t.project_id || undefined,
-            notes: t.notes || undefined, createdAt: new Date(t.created_at),
-            currencyCode: t.currency_code || 'USD', exchangeRate: Number(t.exchange_rate || 1),
-            sourceType: t.source_type || 'manual', createdByName: t.created_by_name || undefined,
-            attachment: t.attachments?.[0] || undefined,
-          })));
-        }
-        setTxLoading(false);
-      });
-  }, [contact, user, transactions]);
-  // الإحصائيات - المصدر الوحيد هو سجل العمليات المالية نفسه
+  const txLoading = false;
   const stats = useMemo(() => {
     return calculateLedgerSummary(contactTransactions);
   }, [contactTransactions]);
@@ -366,7 +347,7 @@ export function ContactDetails() {
 
 
         {/* Quick Action Buttons */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <Button
             onClick={() => handleOpenTransactionForm('debit')}
             className="bg-emerald-600 hover:bg-emerald-700 text-white h-12 text-sm font-bold"
@@ -380,6 +361,10 @@ export function ContactDetails() {
           >
             <Plus className="h-4 w-4 ml-1" />
             دائن (Credit)
+          </Button>
+          <Button variant="outline" onClick={() => setShowPreview(true)} className="h-12 text-sm font-bold gap-1">
+            <Eye className="h-4 w-4" />
+            معاينة
           </Button>
         </div>
 
@@ -409,6 +394,47 @@ export function ContactDetails() {
           <BottomNav currentPage="accounts" onNavigate={(page) => navigate(`/?page=${page}`)} />
         </div>
       </div>
+
+      <StatementPreviewDialog
+        open={showPreview}
+        onOpenChange={setShowPreview}
+        dialogTitle={`كشف حساب - ${contact.name}`}
+        documentTitle="كشف حساب"
+        entityName={contact.name}
+        entityType={CONTACT_TYPE_LABELS[contact.type]}
+        entityMeta={[contact.company || '', contact.phone || '', contact.email || ''].filter(Boolean)}
+        transactions={contactTransactions}
+        fileBaseName={`كشف_حساب_HD_${contact.name}`}
+        tableTitle="سجل العمليات"
+        onExportPdf={(statementTransactions) => {
+          exportAccountStatement({
+            entityName: contact.name,
+            entityType: CONTACT_TYPE_LABELS[contact.type],
+            balance: stats.balance,
+            totalDebit: stats.totalDebit,
+            totalCredit: stats.totalCredit,
+            phone: contact.phone || undefined,
+            email: contact.email || undefined,
+            company: contact.company || undefined,
+            transactions: statementTransactions,
+          });
+        }}
+        onExportExcel={(statementTransactions) => {
+          const header = 'التاريخ,البيان,التصنيف,مدين,دائن,الرصيد\n';
+          let running = 0;
+          const rows = statementTransactions.map((transaction) => {
+            if (transaction.type === 'in') running += transaction.amount; else running -= transaction.amount;
+            return `${transaction.date},${(transaction.description || '').replace(/,/g, ' ')},${transaction.category},${transaction.type === 'in' ? transaction.amount : ''},${transaction.type === 'out' ? transaction.amount : ''},${running}`;
+          }).join('\n');
+          const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `كشف_حساب_${contact.name}_${Date.now()}.csv`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }}
+      />
 
       {/* Transaction Form Dialog */}
       <Dialog open={showTransactionForm} onOpenChange={(open) => {

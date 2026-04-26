@@ -21,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePersistedFilter } from '@/hooks/usePersistedFilters';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { StatementPreviewDialog } from '@/components/shared/StatementPreviewDialog';
 import { calculateLedgerSummary, EMPTY_LEDGER_SUMMARY } from '@/utils/ledgerSummary';
 
 const LEGAL_DISCLAIMER = 'هذا المستند تم إنشاؤه آلياً من النظام وهو معتمد بدون توقيع أو ختم. تخلي المؤسسة مسؤوليتها عن أي كشط، شطب، أو تعديل يدوي يطرأ على هذه الورقة.';
@@ -247,45 +248,32 @@ export function LedgerAccountsPage({ transactions, ledgerSummary }: LedgerAccoun
     setShowFilterModal(false);
   };
 
-  const fetchContactTransactions = async (contactId: string): Promise<Transaction[]> => {
-    if (!user) return [];
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('id, type, category, amount, description, date, fund_id, contact_id, project_id, notes, created_at')
-      .eq('contact_id', contactId)
-      .order('date', { ascending: true });
-    
-    if (error) { console.error('Error fetching contact transactions:', error); return []; }
-    return (data || []).map(t => ({
-      id: t.id, type: t.type as any, category: t.category as any, amount: Number(t.amount),
-      description: t.description || '', date: t.date, fundId: t.fund_id || '',
-      contactId: t.contact_id || undefined, projectId: t.project_id || undefined,
-      notes: t.notes || undefined, createdAt: new Date(t.created_at),
-    }));
+  const getContactTransactions = (contactId: string) => {
+    return transactions
+      .filter((transaction) => transaction.contactId === contactId)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   };
 
-  const handleHDPreview = async (contact: Contact) => {
-    setLoadingStatement(true);
+  const handleHDPreview = (contact: Contact) => {
     setStatementContact(contact);
-    const txs = await fetchContactTransactions(contact.id);
-    setStatementTxs(txs);
+    setStatementTxs(getContactTransactions(contact.id));
     setLoadingStatement(false);
   };
 
-  const handleExportStatementPDF = async (contact: Contact) => {
-    const contactTxs = await fetchContactTransactions(contact.id);
+  const handleExportStatementPDF = (contact: Contact) => {
+    const contactTxs = getContactTransactions(contact.id);
     const ledgerSummary = calculateLedgerSummary(contactTxs);
     exportAccountStatement({
       entityName: contact.name, entityType: contact.type === 'other' && contact.customType ? contact.customType : CONTACT_TYPE_LABELS[contact.type],
       balance: ledgerSummary.balance, totalDebit: ledgerSummary.totalDebit, totalCredit: ledgerSummary.totalCredit,
-      phone: contact.phone || undefined, email: contact.email || undefined, company: contact.company || undefined,
+      phone: contact.phone || undefined, email: undefined, company: contact.company || undefined,
       transactions: contactTxs,
     });
     toast.success('تم تصدير كشف الحساب PDF');
   };
 
-  const handleExportStatementExcel = async (contact: Contact) => {
-    const contactTxs = await fetchContactTransactions(contact.id);
+  const handleExportStatementExcel = (contact: Contact) => {
+    const contactTxs = getContactTransactions(contact.id);
     const header = 'التاريخ,البيان,التصنيف,مدين,دائن,الرصيد\n';
     let running = 0;
     const rows = contactTxs.map(t => {
@@ -299,14 +287,6 @@ export function LedgerAccountsPage({ transactions, ledgerSummary }: LedgerAccoun
     a.download = `كشف_حساب_${contact.name}_${Date.now()}.csv`;
     a.click(); URL.revokeObjectURL(url);
     toast.success('تم تصدير كشف الحساب Excel/CSV');
-  };
-
-  const handleDownloadHDPDF = async () => {
-    if (!statementRef.current || !statementContact) return;
-    try {
-      await generateHDPreviewPDF(statementRef.current, `كشف_حساب_HD_${statementContact.name}.pdf`);
-      toast.success('تم تصدير كشف الحساب HD');
-    } catch { toast.error('خطأ في التصدير'); }
   };
 
   const handleWhatsAppClick = (e: React.MouseEvent, phone: string) => {
@@ -696,130 +676,26 @@ export function LedgerAccountsPage({ transactions, ledgerSummary }: LedgerAccoun
         </DialogContent>
       </Dialog>
 
-      {/* Account Statement HD Preview Dialog */}
-      <Dialog open={!!statementContact} onOpenChange={(o) => !o && setStatementContact(null)}>
-        <DialogContent className="max-w-lg p-0 max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="p-4 pb-2">
-            <DialogTitle className="text-sm flex items-center gap-2">
-              <Eye className="h-4 w-4" />
-              كشف حساب - {statementContact?.name}
-            </DialogTitle>
-          </DialogHeader>
-
-          {statementContact && (
-            <>
-              {loadingStatement ? (
-                <div className="p-8 text-center text-muted-foreground text-xs">جاري تحميل البيانات...</div>
-              ) : (
-                <div ref={statementRef} className="mx-4 bg-white text-black rounded-lg overflow-hidden" style={{ direction: 'rtl' }}>
-                  <div style={{ background: '#194178', color: 'white', padding: '16px', textAlign: 'center' }}>
-                    <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '4px' }}>كشف حساب</h1>
-                    <p style={{ fontSize: '10px', opacity: 0.9 }}>توطين - المساعد المالي</p>
-                    <p style={{ fontSize: '9px', opacity: 0.8, marginTop: '2px' }}>تاريخ الإصدار: {formatDateGregorian(new Date(), 'long')}</p>
-                  </div>
-
-                  <div style={{ padding: '12px 16px', background: '#f5f7fa', textAlign: 'center' }}>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#194178' }}>{statementContact.name}</div>
-                    <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
-                      {statementContact.type === 'other' && statementContact.customType ? statementContact.customType : CONTACT_TYPE_LABELS[statementContact.type]}
-                      {statementContact.phone && ` | ${statementContact.phone}`}
-                      {statementContact.company && ` | ${statementContact.company}`}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', padding: '12px 16px' }}>
-                    <div style={{ textAlign: 'center', padding: '8px', background: '#dcfce7', borderRadius: '6px' }}>
-                      <div style={{ fontSize: '9px', color: '#166534' }}>مدين (Debit)</div>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#166534' }}>${formatNumber(statementSummary.totalDebit)}</div>
-                    </div>
-                    <div style={{ textAlign: 'center', padding: '8px', background: '#fef2f2', borderRadius: '6px' }}>
-                      <div style={{ fontSize: '9px', color: '#991b1b' }}>دائن (Credit)</div>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#991b1b' }}>${formatNumber(statementSummary.totalCredit)}</div>
-                    </div>
-                    <div style={{
-                      textAlign: 'center', padding: '8px', borderRadius: '6px',
-                      background: statementSummary.balance > 0 ? '#dcfce7' : statementSummary.balance < 0 ? '#fef2f2' : '#f5f5f5',
-                    }}>
-                      <div style={{ fontSize: '9px', color: '#666' }}>الرصيد</div>
-                      <div style={{
-                        fontSize: '13px', fontWeight: 'bold',
-                        color: statementSummary.balance > 0 ? '#16a34a' : statementSummary.balance < 0 ? '#dc2626' : '#666',
-                      }}>
-                        ${formatNumber(Math.abs(statementSummary.balance))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ padding: '0 16px 12px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#194178', marginBottom: '8px', textAlign: 'center' }}>
-                      سجل العمليات ({formatNumber(statementTxs.length)})
-                    </div>
-                    {statementTxs.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '20px', color: '#999', fontSize: '11px' }}>لا توجد عمليات مسجلة</div>
-                    ) : (
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
-                        <thead>
-                          <tr style={{ background: '#194178', color: 'white' }}>
-                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>التاريخ</th>
-                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>البيان</th>
-                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>مدين</th>
-                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>دائن</th>
-                            <th style={{ padding: '6px 4px', textAlign: 'center' }}>الرصيد</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(() => {
-                            let running = 0;
-                            return statementTxs.map((t, i) => {
-                              if (t.type === 'in') running += t.amount; else running -= t.amount;
-                              return (
-                                <tr key={t.id} style={{ background: i % 2 === 0 ? '#fff' : '#f5f7fa', borderBottom: '1px solid #eee' }}>
-                                  <td style={{ padding: '5px 4px', textAlign: 'center' }}>{formatDateShort(t.date)}</td>
-                                  <td style={{ padding: '5px 4px', textAlign: 'center', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {t.description || '-'}
-                                  </td>
-                                  <td style={{ padding: '5px 4px', textAlign: 'center', color: '#16a34a', fontWeight: t.type === 'in' ? 'bold' : 'normal' }}>
-                                    {t.type === 'in' ? `$${formatAmount(t.amount)}` : '-'}
-                                  </td>
-                                  <td style={{ padding: '5px 4px', textAlign: 'center', color: '#dc2626', fontWeight: t.type === 'out' ? 'bold' : 'normal' }}>
-                                    {t.type === 'out' ? `$${formatAmount(t.amount)}` : '-'}
-                                  </td>
-                                  <td style={{ padding: '5px 4px', textAlign: 'center', fontWeight: 'bold' }}>
-                                    ${formatAmount(Math.abs(running))}
-                                  </td>
-                                </tr>
-                              );
-                            });
-                          })()}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-
-                  <div style={{ margin: '0 16px 8px', padding: '8px 12px', background: '#fafafa', borderRadius: '4px', border: '1px solid #eee' }}>
-                    <p style={{ fontSize: '7px', color: '#888', textAlign: 'center', lineHeight: '1.6' }}>{LEGAL_DISCLAIMER}</p>
-                  </div>
-                  <div style={{ textAlign: 'center', padding: '8px', fontSize: '8px', color: '#999', borderTop: '1px solid #eee' }}>
-                    توطين © {new Date().getFullYear()} - جميع الحقوق محفوظة
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2 p-4 pt-2">
-                <Button size="sm" className="flex-1 gap-1 h-9 text-xs" onClick={handleDownloadHDPDF} disabled={loadingStatement}>
-                  <Download className="h-3.5 w-3.5" /> تحميل HD PDF
-                </Button>
-                <Button size="sm" variant="outline" className="flex-1 gap-1 h-9 text-xs" onClick={() => { handleExportStatementPDF(statementContact); setStatementContact(null); }}>
-                  <FileText className="h-3.5 w-3.5" /> PDF
-                </Button>
-                <Button size="sm" variant="outline" className="flex-1 gap-1 h-9 text-xs" onClick={() => { handleExportStatementExcel(statementContact); setStatementContact(null); }}>
-                  <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <StatementPreviewDialog
+        open={!!statementContact}
+        onOpenChange={(open) => {
+          if (!open) setStatementContact(null);
+        }}
+        dialogTitle={`كشف حساب - ${statementContact?.name || ''}`}
+        documentTitle="كشف حساب"
+        entityName={statementContact?.name || ''}
+        entityType={statementContact ? (statementContact.type === 'other' && statementContact.customType ? statementContact.customType : CONTACT_TYPE_LABELS[statementContact.type]) : ''}
+        entityMeta={statementContact ? [statementContact.phone || '', statementContact.company || ''].filter(Boolean) : []}
+        transactions={statementTxs}
+        fileBaseName={`كشف_حساب_HD_${statementContact?.name || 'account'}`}
+        tableTitle="سجل العمليات"
+        onExportPdf={() => {
+          if (statementContact) handleExportStatementPDF(statementContact);
+        }}
+        onExportExcel={() => {
+          if (statementContact) handleExportStatementExcel(statementContact);
+        }}
+      />
 
       {/* Filtered Preview Modal (independent) */}
       <Dialog open={showFilteredPreview} onOpenChange={setShowFilteredPreview}>

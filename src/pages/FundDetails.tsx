@@ -24,7 +24,7 @@ import { toast } from 'sonner';
 import { StatementPreviewDialog } from '@/components/shared/StatementPreviewDialog';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog;
+} from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -417,101 +417,19 @@ export function FundDetails({ funds, transactions, currencies = [], onUpdateFund
         </div>
       </div>
 
-      {/* HD Preview Dialog */}
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-lg p-0 max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="p-4 pb-2">
-            <DialogTitle className="text-sm flex items-center gap-2">
-              <Eye className="h-4 w-4" /> كشف صندوق - {fund.name}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div ref={previewRef} className="mx-4 bg-white text-black rounded-lg overflow-hidden" style={{ direction: 'rtl' }}>
-            <div style={{ background: '#194178', color: 'white', padding: '16px', textAlign: 'center' }}>
-              <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '4px' }}>كشف صندوق</h1>
-              <p style={{ fontSize: '10px', opacity: 0.9 }}>توطين - المساعد المالي</p>
-              <p style={{ fontSize: '9px', opacity: 0.8, marginTop: '2px' }}>تاريخ الإصدار: {formatDateGregorian(new Date(), 'long')}</p>
-            </div>
-
-            <div style={{ padding: '12px 16px', background: '#f5f7fa', textAlign: 'center' }}>
-              <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#194178' }}>{fund.name}</div>
-              <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>{FUND_LABELS[fund.type]}</div>
-            </div>
-
-            {/* 3 Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', padding: '12px 16px' }}>
-              <div style={{ textAlign: 'center', padding: '10px 6px', background: '#dcfce7', borderRadius: '6px' }}>
-                <div style={{ fontSize: '9px', color: '#166534', marginBottom: '2px' }}>مدين (Debit)</div>
-                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#166534' }}>${formatNumber(stats.totalIn)}</div>
-              </div>
-              <div style={{ textAlign: 'center', padding: '10px 6px', background: '#fef2f2', borderRadius: '6px' }}>
-                <div style={{ fontSize: '9px', color: '#991b1b', marginBottom: '2px' }}>دائن (Credit)</div>
-                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#991b1b' }}>${formatNumber(stats.totalOut)}</div>
-              </div>
-              <div style={{
-                textAlign: 'center', padding: '10px 6px', borderRadius: '6px',
-                background: stats.balance > 0 ? '#dcfce7' : stats.balance < 0 ? '#fef2f2' : '#f5f5f5',
-              }}>
-                <div style={{ fontSize: '9px', color: '#666', marginBottom: '2px' }}>الرصيد (Balance)</div>
-                <div style={{
-                  fontSize: '14px', fontWeight: 'bold',
-                  color: stats.balance > 0 ? '#16a34a' : stats.balance < 0 ? '#dc2626' : '#666',
-                }}>
-                  ${formatNumber(Math.abs(stats.balance))}
-                </div>
-              </div>
-            </div>
-
-            {/* Transactions Table */}
-            <div style={{ padding: '0 16px 12px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
-                <thead>
-                  <tr style={{ background: '#f0f4f8' }}>
-                    <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>التاريخ</th>
-                    <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>البيان</th>
-                    <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center', color: '#166534' }}>مدين</th>
-                    <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center', color: '#991b1b' }}>دائن</th>
-                    <th style={{ padding: '6px 4px', borderBottom: '2px solid #194178', textAlign: 'center' }}>الرصيد</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ledgerRows.map((row, i) => (
-                    <tr key={row.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                      <td style={{ padding: '5px 4px', textAlign: 'center', whiteSpace: 'nowrap' }}>{formatDateGregorian(row.date)}</td>
-                      <td style={{ padding: '5px 4px', textAlign: 'center' }}>{row.description || '-'}</td>
-                      <td style={{ padding: '5px 4px', textAlign: 'center', color: '#16a34a', fontWeight: 600 }}>
-                        {row.type === 'in' ? `$${formatAmount(row.amount)}` : '-'}
-                      </td>
-                      <td style={{ padding: '5px 4px', textAlign: 'center', color: '#dc2626', fontWeight: 600 }}>
-                        {row.type === 'out' ? `$${formatAmount(row.amount)}` : '-'}
-                      </td>
-                      <td style={{ padding: '5px 4px', textAlign: 'center', fontWeight: 'bold', color: row.runningBalance >= 0 ? '#16a34a' : '#dc2626' }}>
-                        ${formatAmount(Math.abs(row.runningBalance))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {ledgerRows.length === 0 && (
-                <p style={{ textAlign: 'center', padding: '20px', color: '#999', fontSize: '11px' }}>لا توجد عمليات</p>
-              )}
-            </div>
-
-            <div style={{ padding: '8px 16px', borderTop: '1px solid #e5e7eb', textAlign: 'center' }}>
-              <p style={{ fontSize: '8px', color: '#999', lineHeight: 1.6 }}>{LEGAL_DISCLAIMER}</p>
-            </div>
-          </div>
-
-          <div className="p-4 pt-2 flex gap-2">
-            <Button size="sm" variant="outline" className="flex-1 gap-1 text-xs" onClick={handleDownloadHDPDF}>
-              <Eye className="h-3.5 w-3.5" /> تصدير HD PDF
-            </Button>
-            <Button size="sm" variant="outline" className="flex-1 gap-1 text-xs" onClick={handleExportExcel}>
-              <Wallet className="h-3.5 w-3.5" /> تصدير Excel
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <StatementPreviewDialog
+        open={showPreview}
+        onOpenChange={setShowPreview}
+        dialogTitle={`كشف صندوق - ${fund.name}`}
+        documentTitle="كشف صندوق"
+        entityName={fund.name}
+        entityType={FUND_LABELS[fund.type]}
+        transactions={filteredTransactions}
+        fileBaseName={`كشف_صندوق_HD_${fund.name}`}
+        tableTitle="كشف حساب الصندوق"
+        emptyLabel="لا توجد عمليات"
+        onExportExcel={() => handleExportExcel()}
+      />
 
       {/* Edit Fund Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
