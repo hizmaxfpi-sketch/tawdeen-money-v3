@@ -171,6 +171,9 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
       if (reset || currentPage === 0) {
         setShipments(mapped);
         cacheSet('shipments', mapped);
+        _cachedShipments = mapped;
+        _shippingCacheUserId = user.id;
+        _shippingCacheTime = Date.now();
         setShipmentPage(0);
       } else {
         setShipments(prev => [...prev, ...mapped]);
