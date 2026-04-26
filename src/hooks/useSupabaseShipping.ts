@@ -114,6 +114,18 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
   const fetchShipments = useCallback(async (reset = false) => {
     if (!user) return;
     const currentPage = reset ? 0 : shipmentPage;
+
+    // ✅ كاش 45 ثانية
+    if (reset && currentPage === 0
+        && _cachedShipments !== null
+        && _shippingCacheUserId === user.id
+        && (Date.now() - _shippingCacheTime) < SHIPPING_CACHE_TTL) {
+      setShipments(_cachedShipments);
+      setShipmentsLoading(false);
+      setShipmentsInitial(true);
+      return;
+    }
+
     if (!shipmentsInitial) setShipmentsLoading(true);
     else if (!reset) setLoadingMoreShipments(true);
 
