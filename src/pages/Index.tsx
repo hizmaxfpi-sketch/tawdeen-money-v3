@@ -337,7 +337,7 @@ const Index = () => {
       )}>
         <Header />
         <main className="container max-w-lg mx-auto px-3 py-3 pb-24 md:max-w-4xl lg:max-w-5xl">
-          <Suspense fallback={<ListSkeleton />}>{renderPage()}</Suspense>
+          <Suspense fallback={<PageFallback />}><div className="animate-fade-in" key={currentPage}>{renderPage()}</div></Suspense>
         </main>
         {!showTransactionForm && perms.canCreate('transactions') && <FloatingAddButton onClick={() => handleOpenForm('in')} />}
         <div className="md:hidden">
