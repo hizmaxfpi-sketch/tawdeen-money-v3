@@ -24,8 +24,7 @@ import { AssetDetailsSheet } from './AssetDetailsSheet';
 import { RecurringObligationsTab } from './RecurringObligationsTab';
 import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
 import { cn } from '@/lib/utils';
-
-const CUSTOM_CATEGORIES_KEY = 'tawdeen_custom_categories';
+import { useCustomCategories } from '@/lib/customCategories';
 
 interface BusinessPageProps {
   transactions: Transaction[];
@@ -67,12 +66,9 @@ export function BusinessPage({
     paymentType: 'full', installmentCount: '1', depreciationFundId: '',
   });
 
-  // Build full category list including custom categories from localStorage
-  const customCategories = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem(CUSTOM_CATEGORIES_KEY) || '[]'); }
-    catch { return []; }
-  }, [showAddForm]); // re-read when form closes (new category may have been added)
-  
+  // Custom categories now come from a shared reactive store (live updates everywhere)
+  const customCategories = useCustomCategories();
+
   const allCategories = useMemo(() => {
     const base = [...REVENUE_CATEGORIES, ...EXPENSE_CATEGORIES];
     const existingValues = new Set(base.map(c => c.value));

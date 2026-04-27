@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { X, Plus, Trash2, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { FundOption } from '@/types/finance';
 import { REVENUE_CATEGORIES, EXPENSE_CATEGORIES } from '@/hooks/useBusinessTransactions';
+import { useCustomCategories, customCategoriesStore, makeCategoryValue } from '@/lib/customCategories';
+import { CategoryManagerDialog } from './CategoryManagerDialog';
 
 interface LineItem {
   name: string;
@@ -18,22 +20,6 @@ interface BusinessTransactionFormProps {
   fundOptions: FundOption[];
   onSubmit: (data: any) => Promise<any>;
   onClose: () => void;
-}
-
-const STORAGE_KEY = 'tawdeen_custom_categories';
-
-function getCustomCategories(): { value: string; label: string; type: 'revenue' | 'expense' }[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  } catch { return []; }
-}
-
-function saveCustomCategory(cat: { value: string; label: string; type: 'revenue' | 'expense' }) {
-  const existing = getCustomCategories();
-  if (!existing.find(c => c.value === cat.value)) {
-    existing.push(cat);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
-  }
 }
 
 export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: BusinessTransactionFormProps) {
@@ -51,23 +37,30 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
   const [submitting, setSubmitting] = useState(false);
   const [lineItems, setLineItems] = useState<LineItem[]>([{ name: '', amount: '' }]);
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showManageCategories, setShowManageCategories] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [customCategories, setCustomCategories] = useState(getCustomCategories);
+  const customCategories = useCustomCategories();
   const submittingRef = useRef(false);
 
   const baseCategories = type === 'revenue' ? REVENUE_CATEGORIES : EXPENSE_CATEGORIES;
   const userCustom = customCategories.filter(c => c.type === type);
-  const categories = [...baseCategories, ...userCustom];
+  // De-dupe by value to silence React duplicate-key warnings
+  const seen = new Set<string>();
+  const categories = [...baseCategories, ...userCustom].filter(c => {
+    if (seen.has(c.value)) return false;
+    seen.add(c.value); return true;
+  });
 
   const totalFromItems = lineItems.reduce((s, item) => s + (parseFloat(item.amount) || 0), 0);
   const effectiveAmount = useLineItems ? totalFromItems : parseFloat(amount) || 0;
 
   const handleAddCategory = () => {
     if (!newCategoryName.trim()) return;
-    const value = 'custom_' + newCategoryName.trim().replace(/\s+/g, '_').toLowerCase();
-    const newCat = { value, label: newCategoryName.trim(), type };
-    saveCustomCategory(newCat);
-    setCustomCategories(getCustomCategories());
+    const value = makeCategoryValue(newCategoryName);
+    const added = customCategoriesStore.add({ value, label: newCategoryName.trim(), type });
+    if (!added) {
+      // category exists — just select it
+    }
     setCategory(value);
     setNewCategoryName('');
     setShowAddCategory(false);
@@ -155,8 +148,11 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={() => setShowAddCategory(!showAddCategory)}>
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={() => setShowAddCategory(!showAddCategory)} title="إضافة فئة">
                 <Plus className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={() => setShowManageCategories(true)} title="إدارة الفئات">
+                <Settings2 className="h-3.5 w-3.5" />
               </Button>
             </div>
             {showAddCategory && (
@@ -247,6 +243,7 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
           </div>
         </div>
       </motion.div>
+      <CategoryManagerDialog open={showManageCategories} onOpenChange={setShowManageCategories} />
     </motion.div>
   );
 }
