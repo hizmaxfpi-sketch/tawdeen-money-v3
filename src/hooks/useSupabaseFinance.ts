@@ -188,13 +188,6 @@ export function useSupabaseFinance() {
     };
   }, [fetchAllRows, user]);
 
-  // مزامنة أرصدة الحسابات بعد أي عملية مالية
-  const syncContactBalances = useCallback(async () => {
-    if (!user) return;
-    await (supabase.rpc as any)('sync_contact_balances');
-    await contactsHook.syncBalances?.();
-  }, [user, contactsHook]);
-
   const refreshAll = useCallback(async () => {
     await Promise.all([
       fundsHook.fetchFunds(),
@@ -202,9 +195,7 @@ export function useSupabaseFinance() {
       projectsHook.fetchProjects(),
       debtsHook.fetchDebts(),
     ]);
-    // مزامنة أرصدة الحسابات من الدفتر الموحد
-    await syncContactBalances();
-  }, [fundsHook.fetchFunds, txHook.fetchTransactions, projectsHook.fetchProjects, debtsHook.fetchDebts, syncContactBalances]);
+  }, [fundsHook.fetchFunds, txHook.fetchTransactions, projectsHook.fetchProjects, debtsHook.fetchDebts]);
 
   const importData = useCallback(async (data: any) => {
     if (!user) return;
