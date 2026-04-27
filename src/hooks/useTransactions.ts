@@ -212,7 +212,7 @@ export function useTransactions() {
     if (user) {
       logToActivity(user.id, 'transaction_modified', 'transaction', transactionId, updates.description, { amount: updates.amount, type: updates.type, category: updates.category });
     }
-    (supabase.rpc as any)('sync_contact_balances').catch(() => {});
+    Promise.resolve((supabase.rpc as any)('sync_contact_balances')).catch(() => {});
     _cacheTime = 0;
     _suppressNext(500);
   }, [user]);
