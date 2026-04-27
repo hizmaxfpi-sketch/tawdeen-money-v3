@@ -24,8 +24,7 @@ import { AssetDetailsSheet } from './AssetDetailsSheet';
 import { RecurringObligationsTab } from './RecurringObligationsTab';
 import { useSupabaseContacts } from '@/hooks/useSupabaseContacts';
 import { cn } from '@/lib/utils';
-
-const CUSTOM_CATEGORIES_KEY = 'tawdeen_custom_categories';
+import { useCustomCategories } from '@/lib/customCategories';
 
 interface BusinessPageProps {
   transactions: Transaction[];
