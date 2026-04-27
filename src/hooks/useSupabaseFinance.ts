@@ -20,44 +20,14 @@ export function useSupabaseFinance() {
   const debtsHook = useDebts();
   const contactsHook = useSupabaseContacts();
 
-  // ⚠️ DEPRECATED: استخدم useDashboardSnapshot مباشرة للأرقام الموحدة.
-  // هذا الاستدعاء محفوظ للتوافق مع الشاشات القديمة، ويستخدم نفس RPC الموحد.
-  const [dbStats, setDbStats] = useState<FinanceStats>({
+  // ⚠️ DEPRECATED: getStats() always returns zeros here.
+  // The single source of truth for dashboard numbers is useDashboardSnapshot.
+  // This shim prevents N redundant get_dashboard_snapshot RPC calls
+  // (one per consumer of useSupabaseFinance) which was the main lag source.
+  const getStats = useCallback((): FinanceStats => ({
     totalLiquidity: 0, netCompanyProfit: 0, totalExpenses: 0,
     totalReceivables: 0, totalPayables: 0, liquidityChange: 0, profitChange: 0,
-  });
-
-  const fetchStats = useCallback(async () => {
-    if (!user) return;
-    // نستخدم RPC الموحد get_dashboard_snapshot كمصدر وحيد للحقيقة
-    const { data, error } = await (supabase.rpc as any)('get_dashboard_snapshot');
-    if (!error && data) {
-      const d = data as any;
-      setDbStats({
-        totalLiquidity: Number(d.totalLiquidity) || 0,
-        netCompanyProfit: Number(d.netCompanyProfit) || 0,
-        totalExpenses: Number(d.totalExpenses) || 0,
-        totalReceivables: Number(d.totalReceivables) || 0,
-        totalPayables: Number(d.totalPayables) || 0,
-        liquidityChange: 0,
-        profitChange: 0,
-      });
-    }
-  }, [user]);
-
-  // جلب الإحصائيات عند تغير البيانات (بـ debounce لمنع التتابع)
-  const statsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (!user) return;
-    if (statsTimerRef.current) clearTimeout(statsTimerRef.current);
-    statsTimerRef.current = setTimeout(() => {
-      fetchStats();
-      statsTimerRef.current = null;
-    }, 1500);
-    return () => { if (statsTimerRef.current) clearTimeout(statsTimerRef.current); };
-  }, [user, fundsHook.funds.length, txHook.transactions.length, debtsHook.debts.length]);
-
-  const getStats = useCallback((): FinanceStats => dbStats, [dbStats]);
+  }), []);
 
   // خيارات الحسابات من جهات الاتصال (التوحيد)
   const getAccountOptions = useCallback((): AccountOption[] =>
