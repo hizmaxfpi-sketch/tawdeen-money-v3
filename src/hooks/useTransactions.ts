@@ -228,7 +228,7 @@ export function useTransactions() {
     }
     // Optimistic removal
     setState({ transactions: _state.transactions.filter(t => t.id !== transactionId) });
-    (supabase.rpc as any)('sync_contact_balances').catch(() => {});
+    Promise.resolve((supabase.rpc as any)('sync_contact_balances')).catch(() => {});
     _cacheTime = 0;
     _suppressNext(500);
   }, [user]);
