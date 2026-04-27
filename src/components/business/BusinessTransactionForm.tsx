@@ -148,8 +148,11 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={() => setShowAddCategory(!showAddCategory)}>
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={() => setShowAddCategory(!showAddCategory)} title="إضافة فئة">
                 <Plus className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={() => setShowManageCategories(true)} title="إدارة الفئات">
+                <Settings2 className="h-3.5 w-3.5" />
               </Button>
             </div>
             {showAddCategory && (
