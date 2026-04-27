@@ -1,111 +1,112 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import {
-  Contact,
-  ContactType,
-  CreateContactInput,
-  ContactOption,
-  ContactsStats,
+  Contact, ContactType, CreateContactInput, ContactOption, ContactsStats,
 } from '@/types/contacts';
 import { useRealtimeSync } from './useRealtimeSync';
 import { cacheSet, cacheGet } from '@/lib/offlineCache';
 import { guardOffline } from '@/lib/offlineGuard';
 
-let _cachedContacts: Contact[] | null = null;
-let _contactsCacheUserId: string | null = null;
-let _contactsCacheTime = 0;
+// ============================================================
+// SINGLETON STORE for contacts — one fetch / one realtime channel
+// ============================================================
+
 const CONTACTS_CACHE_TTL = 30_000;
+
+type Listener = () => void;
+const listeners = new Set<Listener>();
+let _state: { contacts: Contact[]; loading: boolean } = {
+  contacts: cacheGet<Contact[]>('contacts') || [],
+  loading: true,
+};
+let _userId: string | null = null;
+let _cacheTime = 0;
+let _inflight: Promise<void> | null = null;
+let _bootstrappedUserId: string | null = null;
+let _suppressNext: (ms?: number) => void = () => {};
+
+const setState = (next: Partial<typeof _state>) => {
+  _state = { ..._state, ...next };
+  listeners.forEach(l => l());
+};
+const subscribe = (l: Listener) => { listeners.add(l); return () => { listeners.delete(l); }; };
+const getSnapshot = () => _state;
+
+const mapContact = (c: any): Contact => ({
+  id: c.id,
+  name: c.name,
+  type: c.type as ContactType,
+  customType: c.custom_type || undefined,
+  phone: c.phone || undefined,
+  email: c.email || undefined,
+  company: c.company || undefined,
+  address: c.address || undefined,
+  notes: c.notes || undefined,
+  parentContactId: c.parent_contact_id || undefined,
+  linkedContacts: c.linked_contacts || undefined,
+  totalTransactions: c.total_transactions,
+  totalDebit: Number(c.total_debit),
+  totalCredit: Number(c.total_credit),
+  balance: Number(c.balance),
+  status: c.status as Contact['status'],
+  createdAt: new Date(c.created_at),
+  updatedAt: new Date(c.updated_at),
+});
+
+async function _fetchContacts(userId: string, force = false): Promise<void> {
+  if (!force && _userId === userId && (Date.now() - _cacheTime) < CONTACTS_CACHE_TTL && _state.contacts.length > 0) {
+    setState({ loading: false });
+    return;
+  }
+  if (_inflight) return _inflight;
+  _inflight = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('id, name, type, custom_type, phone, email, company, address, notes, parent_contact_id, linked_contacts, total_transactions, total_debit, total_credit, balance, status, created_at, updated_at')
+        .order('updated_at', { ascending: false })
+        .range(0, 199); // first 200 contacts; pagination handled separately
+      if (error) { console.error('Error fetching contacts:', error); setState({ loading: false }); return; }
+      const mapped = (data || []).map(mapContact);
+      _userId = userId; _cacheTime = Date.now();
+      cacheSet('contacts', mapped);
+      setState({ contacts: mapped, loading: false });
+    } finally { _inflight = null; }
+  })();
+  return _inflight;
+}
 
 export function useSupabaseContacts() {
   const { user } = useAuth();
-  const PAGE_SIZE = 50; // زيادة حجم الصفحة لتقليل الطلبات
-  const [contacts, setContacts] = useState<Contact[]>(() => cacheGet<Contact[]>('contacts') || []);
-  const [isLoading, setIsLoading] = useState(true);
-  const [initialLoaded, setInitialLoaded] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [page, setPage] = useState(0);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
 
-  const fetchContacts = useCallback(async (reset = false) => {
-    if (!user) return;
-    // كاش للصفحة الأولى فقط
-    if (reset && _cachedContacts && _contactsCacheUserId === user.id && (Date.now() - _contactsCacheTime) < CONTACTS_CACHE_TTL) {
-      setContacts(_cachedContacts);
-      if (isLoading) setIsLoading(false);
-      setInitialLoaded(true);
-      return;
-    }
-    const currentPage = reset ? 0 : page;
-    if (!initialLoaded) setIsLoading(true);
-    else if (!reset) setLoadingMore(true);
-
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('id, name, type, custom_type, phone, email, company, address, notes, parent_contact_id, linked_contacts, total_transactions, total_debit, total_credit, balance, status, created_at, updated_at')
-      .order('updated_at', { ascending: false })
-      .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
-
-    if (error) { console.error('Error fetching contacts:', error); }
-    else {
-      const mapped = (data || []).map(c => ({
-        id: c.id,
-        name: c.name,
-        type: c.type as ContactType,
-        customType: (c as any).custom_type || undefined,
-        phone: c.phone || undefined,
-        email: c.email || undefined,
-        company: c.company || undefined,
-        address: c.address || undefined,
-        notes: c.notes || undefined,
-        parentContactId: c.parent_contact_id || undefined,
-        linkedContacts: c.linked_contacts || undefined,
-        totalTransactions: c.total_transactions,
-        totalDebit: Number(c.total_debit),
-        totalCredit: Number(c.total_credit),
-        balance: Number(c.balance),
-        status: c.status as Contact['status'],
-        createdAt: new Date(c.created_at),
-        updatedAt: new Date(c.updated_at),
-      }));
-      if (reset || currentPage === 0) {
-        setContacts(mapped);
-        cacheSet('contacts', mapped);
-        setPage(0);
-        _cachedContacts = mapped;
-        _contactsCacheUserId = user.id;
-        _contactsCacheTime = Date.now();
-      } else {
-        setContacts(prev => [...prev, ...mapped]);
-      }
-      setHasMore((data || []).length === PAGE_SIZE);
-    }
-    setIsLoading(false);
-    setLoadingMore(false);
-    setInitialLoaded(true);
-  }, [user, page, initialLoaded]);
-
   useEffect(() => {
-    if (user) fetchContacts(true);
+    if (!user) return;
+    if (_bootstrappedUserId !== user.id) {
+      _bootstrappedUserId = user.id;
+      _userId = null;
+      _fetchContacts(user.id, true);
+    } else if (_state.contacts.length === 0) {
+      _fetchContacts(user.id);
+    }
   }, [user]);
 
-  // Realtime: auto-refresh when contacts change
   const rt = useRealtimeSync(['contacts'], () => {
-    _cachedContacts = null;
-    _contactsCacheTime = 0;
-    fetchContacts(true);
+    if (!user) return;
+    _cacheTime = 0;
+    _fetchContacts(user.id, true);
   });
   realtimeRef.current = rt;
+  _suppressNext = rt.suppressNext;
 
-  const loadMore = useCallback(() => {
-    if (hasMore && !loadingMore) setPage(prev => prev + 1);
-  }, [hasMore, loadingMore]);
+  const fetchContacts = useCallback(async (_reset = true) => {
+    if (user) await _fetchContacts(user.id, true);
+  }, [user]);
 
-  useEffect(() => {
-    if (page > 0) fetchContacts();
-  }, [page]);
+  const contacts = state.contacts;
 
   const addContact = useCallback(async (input: CreateContactInput) => {
     if (!user) return;
@@ -124,34 +125,13 @@ export function useSupabaseContacts() {
     } as any).select().single();
     if (error) { toast.error('خطأ في إضافة جهة الاتصال'); console.error(error); return; }
     toast.success('تم إضافة جهة الاتصال بنجاح');
-    // تحديث متفائل: أضف الجهة فوراً للقائمة دون انتظار الجلب
     if (data) {
-      const newContact: Contact = {
-        id: (data as any).id,
-        name: (data as any).name,
-        type: (data as any).type as ContactType,
-        customType: (data as any).custom_type || undefined,
-        phone: (data as any).phone || undefined,
-        email: (data as any).email || undefined,
-        company: (data as any).company || undefined,
-        address: (data as any).address || undefined,
-        notes: (data as any).notes || undefined,
-        parentContactId: (data as any).parent_contact_id || undefined,
-        linkedContacts: (data as any).linked_contacts || undefined,
-        totalTransactions: 0,
-        totalDebit: 0,
-        totalCredit: 0,
-        balance: 0,
-        status: 'active',
-        createdAt: new Date((data as any).created_at),
-        updatedAt: new Date((data as any).updated_at),
-      };
-      setContacts(prev => [newContact, ...prev]);
-      _cachedContacts = null;
+      const newContact = mapContact({ ...data, total_transactions: 0, total_debit: 0, total_credit: 0, balance: 0, status: 'active' });
+      setState({ contacts: [newContact, ..._state.contacts] });
     }
-    // سجل النشاط في الخلفية
     supabase.from('activity_log').insert({ user_id: user.id, event_type: 'contact_created', entity_type: 'contact', entity_id: (data as any)?.id, entity_name: input.name, details: { type: input.type, customType: input.customType }, status: 'active' } as any).then(() => {}, () => {});
-    realtimeRef.current.suppressNext();
+    _cacheTime = 0;
+    _suppressNext();
     return data;
   }, [user]);
 
@@ -159,58 +139,47 @@ export function useSupabaseContacts() {
     if (!user) return;
     if (guardOffline()) return;
     const { error } = await supabase.from('contacts').update({
-      name: updates.name,
-      type: updates.type,
-      phone: updates.phone,
-      email: updates.email,
-      company: updates.company,
-      address: updates.address,
-      notes: updates.notes,
+      name: updates.name, type: updates.type, phone: updates.phone, email: updates.email,
+      company: updates.company, address: updates.address, notes: updates.notes,
     }).eq('id', id);
     if (error) { toast.error('خطأ في تحديث جهة الاتصال'); return; }
     toast.success('تم تحديث جهة الاتصال بنجاح');
-    // تحديث متفائل
-    setContacts(prev => prev.map(c => c.id === id ? { ...c, ...updates, updatedAt: new Date() } as Contact : c));
-    _cachedContacts = null;
+    setState({ contacts: _state.contacts.map(c => c.id === id ? { ...c, ...updates, updatedAt: new Date() } as Contact : c) });
     supabase.from('activity_log').insert({ user_id: user.id, event_type: 'contact_updated', entity_type: 'contact', entity_id: id, entity_name: updates.name || '', details: { type: updates.type }, status: 'active' } as any).then(() => {}, () => {});
-    realtimeRef.current.suppressNext();
+    _cacheTime = 0;
+    _suppressNext();
   }, [user]);
 
   const deleteContact = useCallback(async (id: string) => {
     if (!user) return;
     if (guardOffline()) return;
-    const contact = contacts.find(c => c.id === id);
+    const contact = _state.contacts.find(c => c.id === id);
     const { error } = await supabase.from('contacts').delete().eq('id', id);
     if (error) { toast.error('خطأ في حذف جهة الاتصال'); return; }
     toast.success('تم حذف جهة الاتصال');
-    setContacts(prev => prev.filter(c => c.id !== id));
-    _cachedContacts = null;
+    setState({ contacts: _state.contacts.filter(c => c.id !== id) });
     if (contact) {
       supabase.from('activity_log').insert({ user_id: user.id, event_type: 'contact_deleted', entity_type: 'contact', entity_id: id, entity_name: contact.name, details: { type: contact.type, balance: contact.balance }, status: 'deleted' } as any).then(() => {}, () => {});
     }
-    realtimeRef.current.suppressNext();
-  }, [user, contacts]);
+    _cacheTime = 0;
+    _suppressNext();
+  }, [user]);
 
-  // مزامنة أرصدة الحسابات من الدفتر الموحد (v_contact_balance)
   const syncBalances = useCallback(async () => {
     if (!user) return;
     await (supabase.rpc as any)('sync_contact_balances');
-    await fetchContacts(true);
-  }, [user, fetchContacts]);
+    _cacheTime = 0;
+    await _fetchContacts(user.id, true);
+  }, [user]);
 
-  const updateContactBalance = useCallback(async (_id: string, _amount: number, _type: 'debit' | 'credit') => {
-    // deprecated: الأرصدة تُحسب من الدفتر الموحد تلقائياً
-    await syncBalances();
-  }, [syncBalances]);
+  const updateContactBalance = useCallback(async () => { await syncBalances(); }, [syncBalances]);
 
   const linkContacts = useCallback(async (contactId: string, linkedContactId: string) => {
     const contact = contacts.find(c => c.id === contactId);
     if (!contact) return;
     const currentLinks = contact.linkedContacts || [];
     if (!currentLinks.includes(linkedContactId)) {
-      await supabase.from('contacts').update({
-        linked_contacts: [...currentLinks, linkedContactId],
-      }).eq('id', contactId);
+      await supabase.from('contacts').update({ linked_contacts: [...currentLinks, linkedContactId] }).eq('id', contactId);
       toast.success('تم ربط جهات الاتصال بنجاح');
       fetchContacts();
     }
@@ -229,12 +198,12 @@ export function useSupabaseContacts() {
 
   const searchContacts = useCallback((query: string) => {
     if (!query.trim()) return contacts;
-    const lowerQuery = query.toLowerCase();
+    const lq = query.toLowerCase();
     return contacts.filter(c =>
-      c.name.toLowerCase().includes(lowerQuery) ||
+      c.name.toLowerCase().includes(lq) ||
       c.phone?.includes(query) ||
-      c.email?.toLowerCase().includes(lowerQuery) ||
-      c.company?.toLowerCase().includes(lowerQuery)
+      c.email?.toLowerCase().includes(lq) ||
+      c.company?.toLowerCase().includes(lq)
     );
   }, [contacts]);
 
@@ -269,20 +238,24 @@ export function useSupabaseContacts() {
   [contacts]);
 
   const getStats = useCallback((): ContactsStats => {
-    const activeContacts = contacts.filter(c => c.status === 'active');
+    const active = contacts.filter(c => c.status === 'active');
     return {
-      totalContacts: activeContacts.length,
-      clients: activeContacts.filter(c => c.type === 'client').length,
-      vendors: activeContacts.filter(c => c.type === 'vendor').length,
-      shippingAgents: activeContacts.filter(c => c.type === 'shipping_agent').length,
-      employees: activeContacts.filter(c => c.type === 'employee').length,
-      totalReceivables: activeContacts.reduce((sum, c) => sum + Math.max(0, c.balance), 0),
-      totalPayables: activeContacts.reduce((sum, c) => sum + Math.max(0, -c.balance), 0),
+      totalContacts: active.length,
+      clients: active.filter(c => c.type === 'client').length,
+      vendors: active.filter(c => c.type === 'vendor').length,
+      shippingAgents: active.filter(c => c.type === 'shipping_agent').length,
+      employees: active.filter(c => c.type === 'employee').length,
+      totalReceivables: active.reduce((s, c) => s + Math.max(0, c.balance), 0),
+      totalPayables: active.reduce((s, c) => s + Math.max(0, -c.balance), 0),
     };
   }, [contacts]);
 
   return {
-    contacts, isLoading, hasMore, loadingMore, loadMore,
+    contacts,
+    isLoading: state.loading,
+    hasMore: false,
+    loadingMore: false,
+    loadMore: () => {},
     addContact, updateContact, deleteContact, updateContactBalance,
     linkContacts, unlinkContacts,
     getContact, searchContacts, filterByType, getLinkedContacts, getSubordinates,
