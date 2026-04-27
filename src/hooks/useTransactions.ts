@@ -180,7 +180,7 @@ export function useTransactions() {
       if (user) {
         logToActivity(user.id, 'transaction_created', 'transaction', data as string, transaction.description, { amount: transaction.amount, type: transaction.type, category: transaction.category });
       }
-      (supabase.rpc as any)('sync_contact_balances').catch(() => {});
+      Promise.resolve((supabase.rpc as any)('sync_contact_balances')).catch(() => {});
       _cacheTime = 0;
       _suppressNext(500);
       return data;
