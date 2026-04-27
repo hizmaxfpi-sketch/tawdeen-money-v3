@@ -167,7 +167,6 @@ export function useSupabaseContacts() {
 
   const syncBalances = useCallback(async () => {
     if (!user) return;
-    await (supabase.rpc as any)('sync_contact_balances');
     _cacheTime = 0;
     await _fetchContacts(user.id, true);
   }, [user]);

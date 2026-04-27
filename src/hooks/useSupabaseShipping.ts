@@ -73,7 +73,7 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
         originCountry: c.origin_country || undefined,
         destinationCountry: c.destination_country || undefined,
         status: c.status as any,
-        isManullyClosed: c.is_manually_closed || false,
+        isManuallyClosed: c.is_manually_closed || false,
         departureDate: c.departure_date || undefined,
         arrivalDate: c.arrival_date || undefined,
         clearanceDate: c.clearance_date || undefined,
@@ -303,11 +303,10 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
     const { error } = await supabase.rpc('delete_container_with_shipments', { p_container_id: id });
     if (error) { toast.error('خطأ في حذف الحاوية'); console.error(error); return; }
     toast.success('تم حذف الحاوية وجميع شحناتها بنجاح');
-    if (user) await (supabase.rpc as any)('sync_contact_balances');
     realtimeRef.current.suppressNext();
     invalidateShippingCache();
     await Promise.all([fetchContainers(), fetchShipments()]);
-  }, [user, fetchContainers, fetchShipments]);
+  }, [fetchContainers, fetchShipments]);
 
   // ============= إضافة شحنة =============
   const addShipment = useCallback(async (data: Partial<Shipment> & {
@@ -401,11 +400,10 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
     const { error } = await supabase.rpc('delete_shipment_with_accounting', { p_shipment_id: id });
     if (error) { toast.error('خطأ في حذف الشحنة'); console.error(error); return; }
     toast.success('تم حذف الشحنة بنجاح');
-    if (user) await (supabase.rpc as any)('sync_contact_balances');
     realtimeRef.current.suppressNext();
     invalidateShippingCache();
     await Promise.all([fetchShipments(), fetchContainers()]);
-  }, [user, fetchShipments, fetchContainers]);
+  }, [fetchShipments, fetchContainers]);
 
   const addShipmentPayment = useCallback(async (
     shipmentId: string, amount: number, fundId?: string, note?: string,
@@ -421,7 +419,6 @@ export function useSupabaseShipping(opts: { enabled?: boolean } = {}) {
     } as any);
     if (error) { toast.error('خطأ في تسجيل الدفعة'); console.error(error); return; }
     toast.success('تم تسجيل الدفعة بنجاح');
-    if (user) await (supabase.rpc as any)('sync_contact_balances');
     realtimeRef.current.suppressNext();
     await fetchShipments();
   }, [user, fetchShipments]);

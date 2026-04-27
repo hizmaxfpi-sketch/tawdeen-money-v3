@@ -8,6 +8,9 @@ type TableName = 'funds' | 'transactions' | 'contacts' | 'containers' | 'shipmen
  * يستمع لتغييرات الجداول عبر Realtime ويستدعي callback عند أي تغيير.
  * يُستخدم لإبطال الكاش وإعادة جلب البيانات تلقائياً مع debounce لمنع الجلب المتكرر.
  */
+// Global state to track active channels and prevent duplicates
+const activeChannels = new Map<string, { channel: any; refCount: number }>();
+
 export function useRealtimeSync(tables: TableName[], onChangeCallback: () => void, debounceMs = 800) {
   const { user } = useAuth();
   const callbackRef = useRef(onChangeCallback);
@@ -16,33 +19,48 @@ export function useRealtimeSync(tables: TableName[], onChangeCallback: () => voi
   const suppressUntilRef = useRef(0);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || tables.length === 0) return;
 
-    const channelName = `realtime-sync-${tables.join('-')}-${user.id.slice(0, 8)}`;
-    const channel = supabase.channel(channelName);
+    const sortedTables = [...tables].sort();
+    const channelName = `rt-${sortedTables.join('-')}`;
 
-    tables.forEach((table) => {
-      channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table },
-        () => {
-          // Skip if we're in a suppression window (mutation just happened)
-          if (Date.now() < suppressUntilRef.current) return;
-          // Debounce: batch multiple events into one callback
-          if (timerRef.current) clearTimeout(timerRef.current);
-          timerRef.current = setTimeout(() => {
-            callbackRef.current();
-            timerRef.current = null;
-          }, debounceMs);
-        }
-      );
-    });
+    let channel: any;
+    const existing = activeChannels.get(channelName);
 
-    channel.subscribe();
+    if (existing) {
+      channel = existing.channel;
+      existing.refCount++;
+    } else {
+      channel = supabase.channel(channelName);
+      sortedTables.forEach((table) => {
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table },
+          () => {
+            if (Date.now() < suppressUntilRef.current) return;
+            if (timerRef.current) clearTimeout(timerRef.current);
+            timerRef.current = setTimeout(() => {
+              callbackRef.current();
+              timerRef.current = null;
+            }, debounceMs);
+          }
+        );
+      });
+      channel.subscribe();
+      activeChannels.set(channelName, { channel, refCount: 1 });
+    }
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
-      supabase.removeChannel(channel);
+
+      const current = activeChannels.get(channelName);
+      if (current) {
+        current.refCount--;
+        if (current.refCount <= 0) {
+          supabase.removeChannel(current.channel);
+          activeChannels.delete(channelName);
+        }
+      }
     };
   }, [user, tables.join(','), debounceMs]);
 

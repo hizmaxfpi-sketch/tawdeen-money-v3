@@ -191,6 +191,8 @@ const Index = () => {
     totalExpenses: snapshot.totalExpenses,
     totalReceivables: snapshot.totalReceivables,
     totalPayables: snapshot.totalPayables,
+    totalIncome: snapshot.totalIncome,
+    totalOutcome: snapshot.totalOutcome,
     liquidityChange: 0,
     profitChange: 0,
   }), [snapshot]);
@@ -248,9 +250,9 @@ const Index = () => {
             onDeleteTransaction={perms.canDelete('transactions') ? handleDeleteTransaction : undefined}
             hasMore={hasMoreTransactions}
             onLoadMore={loadMoreTransactions}
-            ledgerDebit={liveLedger.ledgerDebit}
-            ledgerCredit={liveLedger.ledgerCredit}
-            ledgerNet={liveLedger.ledgerNet}
+            ledgerDebit={snapshot.ledgerDebit}
+            ledgerCredit={snapshot.ledgerCredit}
+            ledgerNet={snapshot.ledgerNet}
             projectProfit={snapshot.projectProfit}
             containerProfit={snapshot.containerProfit}
             directRevenue={directRevenue}

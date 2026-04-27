@@ -131,5 +131,18 @@ export function useDashboardSnapshot() {
     return fetchSnapshot(true);
   }, [fetchSnapshot]);
 
+  // Export static method to allow invalidation from other hooks
+  useEffect(() => {
+    (window as any).__invalidateDashboardCache = () => {
+      _cache = null;
+      _cacheTime = 0;
+    };
+  }, []);
+
   return { snapshot, loading, refresh };
 }
+
+export const invalidateDashboardCache = () => {
+  _cache = null;
+  _cacheTime = 0;
+};

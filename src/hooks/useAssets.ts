@@ -316,7 +316,7 @@ export function useAssets() {
           .eq('id', assetId);
       }
 
-      await (supabase.rpc as any)('sync_contact_balances');
+      // Automated by DB triggers
       toast.success('تم إضافة الأصل');
       await fetchAssets();
     } finally {
@@ -374,7 +374,7 @@ export function useAssets() {
         .update({ paid_amount: newPaid })
         .eq('id', payment.assetId);
 
-      await (supabase.rpc as any)('sync_contact_balances');
+      // Automated by DB triggers
       toast.success('تم سداد القسط');
       await fetchAssets();
     } finally {
@@ -542,7 +542,7 @@ export function useAssets() {
       ]);
 
       await (supabase.from('assets' as any) as any).delete().eq('id', id);
-      await (supabase.rpc as any)('sync_contact_balances');
+      // Automated by DB triggers
 
       toast.success('تم حذف الأصل');
       await fetchAssets();

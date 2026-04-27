@@ -7,6 +7,7 @@ import { calculateMonthlyTrend, calculateExpenseBreakdown } from '@/utils/calcul
 import { useRealtimeSync } from './useRealtimeSync';
 import { cacheSet, cacheGet } from '@/lib/offlineCache';
 import { guardOffline } from '@/lib/offlineGuard';
+import { invalidateDashboardCache } from './useDashboardSnapshot';
 
 // ============================================================
 // SINGLETON STORE — one fetch / one realtime subscription / one snapshot
@@ -15,19 +16,35 @@ import { guardOffline } from '@/lib/offlineGuard';
 // After: a single module-level store; components subscribe to changes.
 // ============================================================
 
-const PAGE_SIZE = 1000;
+const PAGE_SIZE = 50;
 const CACHE_TTL = 30_000;
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
-let _state: { transactions: Transaction[]; loading: boolean } = {
+let _state: {
+  transactions: Transaction[];
+  loading: boolean;
+  hasMore: boolean;
+  page: number;
+} = {
   transactions: cacheGet<Transaction[]>('transactions') || [],
   loading: true,
+  hasMore: true,
+  page: 0,
 };
 let _userId: string | null = null;
 let _cacheTime = 0;
 let _inflight: Promise<void> | null = null;
+
+// Filters as part of the module state to support persistence and proper refetching
+let _filters: {
+  type?: 'in' | 'out' | 'all';
+  category?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+} = {};
 
 const setState = (next: Partial<typeof _state>) => {
   _state = { ..._state, ...next };
@@ -58,21 +75,46 @@ const mapTransaction = (t: any): Transaction => ({
   createdAt: new Date(t.created_at),
 });
 
-async function _fetchTransactions(userId: string, force = false): Promise<void> {
-  if (!force && _userId === userId && (Date.now() - _cacheTime) < CACHE_TTL && _state.transactions.length > 0) {
+async function _fetchTransactions(userId: string, force = false, reset = false): Promise<void> {
+  const page = reset ? 0 : _state.page;
+
+  if (!force && !reset && _userId === userId && (Date.now() - _cacheTime) < CACHE_TTL && _state.transactions.length > 0) {
     setState({ loading: false });
     return;
   }
-  if (_inflight) return _inflight;
+  if (_inflight && !reset) return _inflight;
 
   _inflight = (async () => {
     try {
-      const { data, error } = await supabase
+      if (reset) {
+        setState({ loading: true, page: 0 });
+      }
+
+      let query = supabase
         .from('transactions')
-        .select('id, type, category, amount, description, date, fund_id, account_id, contact_id, project_id, notes, attachments, created_at, currency_code, exchange_rate, source_type, created_by_name')
+        .select('id, type, category, amount, description, date, fund_id, account_id, contact_id, project_id, notes, attachments, created_at, currency_code, exchange_rate, source_type, created_by_name');
+
+      // Server-side filtering
+      if (_filters.type && _filters.type !== 'all') {
+        query = query.eq('type', _filters.type);
+      }
+      if (_filters.category) {
+        query = query.eq('category', _filters.category);
+      }
+      if (_filters.search) {
+        query = query.ilike('description', `%${_filters.search}%`);
+      }
+      if (_filters.dateFrom) {
+        query = query.gte('date', _filters.dateFrom);
+      }
+      if (_filters.dateTo) {
+        query = query.lte('date', _filters.dateTo);
+      }
+
+      const { data, error } = await query
         .order('date', { ascending: false })
         .order('created_at', { ascending: false })
-        .range(0, PAGE_SIZE - 1);
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (error) {
         console.error('Error fetching transactions:', error);
@@ -80,11 +122,18 @@ async function _fetchTransactions(userId: string, force = false): Promise<void> 
         setState({ loading: false });
         return;
       }
+
       const mapped = (data || []).map(mapTransaction);
-      _userId = userId;
-      _cacheTime = Date.now();
-      cacheSet('transactions', mapped);
-      setState({ transactions: mapped, loading: false });
+
+      if (reset || page === 0) {
+        _userId = userId;
+        _cacheTime = Date.now();
+        cacheSet('transactions', mapped);
+        setState({ transactions: mapped, loading: false, hasMore: mapped.length === PAGE_SIZE, page: 0 });
+      } else {
+        const nextTransactions = [..._state.transactions, ...mapped];
+        setState({ transactions: nextTransactions, loading: false, hasMore: mapped.length === PAGE_SIZE });
+      }
     } finally {
       _inflight = null;
     }
@@ -106,6 +155,11 @@ let _suppressNext: (ms?: number) => void = () => {};
 
 export function useTransactions() {
   const { user } = useAuth();
+
+  const invalidateLocalCache = useCallback(() => {
+    _cacheTime = 0;
+    invalidateDashboardCache();
+  }, []);
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
 
@@ -130,8 +184,16 @@ export function useTransactions() {
   realtimeRef.current = rt;
   _suppressNext = rt.suppressNext;
 
-  const fetchTransactions = useCallback(async (_reset = false, _full = false) => {
-    if (user) await _fetchTransactions(user.id, true);
+  const fetchTransactions = useCallback(async (reset = false, filters?: typeof _filters) => {
+    if (!user) return;
+    if (filters) _filters = filters;
+    await _fetchTransactions(user.id, true, reset);
+  }, [user]);
+
+  const loadMore = useCallback(async () => {
+    if (!user || _state.loading || !_state.hasMore) return;
+    setState({ page: _state.page + 1 });
+    await _fetchTransactions(user.id, true, false);
   }, [user]);
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'> & { contactId?: string; currencyCode?: string; exchangeRate?: number }) => {
@@ -180,9 +242,9 @@ export function useTransactions() {
       if (user) {
         logToActivity(user.id, 'transaction_created', 'transaction', data as string, transaction.description, { amount: transaction.amount, type: transaction.type, category: transaction.category });
       }
-      Promise.resolve((supabase.rpc as any)('sync_contact_balances')).catch(() => {});
-      _cacheTime = 0;
+      invalidateLocalCache();
       _suppressNext(500);
+      _fetchTransactions(user.id, true, true); // Immediate refetch of the first page
       return data;
     } finally {
       setTimeout(() => _pendingSubmissions.delete(idempotencyKey), 2000);
@@ -212,12 +274,13 @@ export function useTransactions() {
     if (user) {
       logToActivity(user.id, 'transaction_modified', 'transaction', transactionId, updates.description, { amount: updates.amount, type: updates.type, category: updates.category });
     }
-    Promise.resolve((supabase.rpc as any)('sync_contact_balances')).catch(() => {});
-    _cacheTime = 0;
+    invalidateLocalCache();
     _suppressNext(500);
-  }, [user]);
+    _fetchTransactions(user.id, true, true);
+  }, [user, invalidateLocalCache]);
 
   const deleteTransaction = useCallback(async (transactionId: string) => {
+    if (!user) return;
     if (guardOffline()) return;
     const txToDelete = _state.transactions.find(t => t.id === transactionId);
     const { error } = await supabase.rpc('reverse_transaction', { p_transaction_id: transactionId });
@@ -228,10 +291,10 @@ export function useTransactions() {
     }
     // Optimistic removal
     setState({ transactions: _state.transactions.filter(t => t.id !== transactionId) });
-    Promise.resolve((supabase.rpc as any)('sync_contact_balances')).catch(() => {});
-    _cacheTime = 0;
+    invalidateLocalCache();
     _suppressNext(500);
-  }, [user]);
+    _fetchTransactions(user.id, true, true);
+  }, [user, invalidateLocalCache]);
 
   const getMonthlyTrend = useCallback((): TrendData[] => calculateMonthlyTrend(state.transactions), [state.transactions]);
   const getExpenseBreakdown = useCallback((): ChartData[] => calculateExpenseBreakdown(state.transactions), [state.transactions]);
@@ -239,11 +302,11 @@ export function useTransactions() {
   return {
     transactions: state.transactions,
     loading: state.loading,
-    loadingMore: false,
+    loadingMore: _inflight !== null && state.page > 0,
     initialLoaded: !state.loading,
-    hasMore: false,
+    hasMore: state.hasMore,
     addTransaction, updateTransaction, deleteTransaction,
-    loadMore: () => {},
+    loadMore,
     getMonthlyTrend, getExpenseBreakdown,
     fetchTransactions,
   };

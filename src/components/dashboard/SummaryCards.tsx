@@ -32,29 +32,22 @@ interface SummaryCardsProps {
 }
 
 export function SummaryCards({
-  stats, fundTransactions,
+  stats,
   displayCurrency = 'USD', currencies = [],
   ledgerDebit = 0, ledgerCredit = 0, ledgerNet = 0,
   projectProfit = 0, containerProfit = 0,
-  directRevenue = 0, businessExpenses = 0,
   onExpensesClick,
   showLedger = true, showFunds = true, showBusiness = true,
   showProjects = true, showShipping = true,
   showProduction = false, productionSales = 0, productionMaterialsValue = 0, productionProductsValue = 0,
 }: SummaryCardsProps) {
   const { t } = useLanguage();
-  const cashTxs = fundTransactions || [];
-  const fundIn = cashTxs.reduce((sum, tx) => tx.type === 'in' ? sum + tx.amount : sum, 0);
-  const fundOut = cashTxs.reduce((sum, tx) => tx.type === 'out' ? sum + tx.amount : sum, 0);
-  const fundRemaining = stats.totalLiquidity;
 
-  // Exclude profits from disabled modules
-  const effectiveProjectProfit = showProjects ? projectProfit : 0;
-  const effectiveContainerProfit = showShipping ? containerProfit : 0;
-  // الإيرادات الكلية = الإيرادات اليدوية + مبيعات الإنتاج (إن مفعّل) + أرباح المشاريع/الحاويات
-  const totalRevenue = directRevenue + effectiveProjectProfit + effectiveContainerProfit;
-  // المصاريف الكلية = مصاريف الأعمال (تشمل تلقائياً تكلفة المواد المستهلكة عبر useBusinessTransactions)
-  const netProfit = totalRevenue - businessExpenses;
+  const fundRemaining = stats.totalLiquidity;
+  const totalIn = stats.totalIncome || 0;
+  const totalOut = stats.totalOutcome || 0;
+  const totalExpenses = stats.totalExpenses || 0;
+  const netProfit = stats.netCompanyProfit || 0;
 
   const conv = (v: number) => convertForDisplay(v, displayCurrency, currencies);
   const sym = getCurrencySymbol(displayCurrency, currencies);
@@ -71,16 +64,16 @@ export function SummaryCards({
     showFunds && {
       label: t('funds.title'),
       cards: [
-        { key: 'fund-in', label: t('common.in'), value: conv(fundIn), icon: ArrowDownLeft, colorClass: 'text-income', gradient: 'bg-gradient-income' },
-        { key: 'fund-out', label: t('common.out'), value: conv(fundOut), icon: ArrowUpRight, colorClass: 'text-expense', gradient: 'bg-gradient-expense' },
+        { key: 'fund-in', label: t('common.in'), value: conv(totalIn), icon: ArrowDownLeft, colorClass: 'text-income', gradient: 'bg-gradient-income' },
+        { key: 'fund-out', label: t('common.out'), value: conv(totalOut), icon: ArrowUpRight, colorClass: 'text-expense', gradient: 'bg-gradient-expense' },
         { key: 'fund-remaining', label: t('common.net'), value: conv(fundRemaining), icon: Wallet, colorClass: 'text-primary', gradient: 'bg-gradient-primary' },
       ],
     },
     showBusiness && {
       label: t('nav.business'),
       cards: [
-        { key: 'biz-revenue', label: t('common.revenue'), value: conv(totalRevenue), icon: DollarSign, colorClass: 'text-income', gradient: 'bg-gradient-income' },
-        { key: 'biz-expenses', label: t('common.expenses'), value: conv(businessExpenses), icon: TrendingDown, colorClass: 'text-expense', gradient: 'bg-gradient-expense', onClick: onExpensesClick },
+        { key: 'biz-revenue', label: t('common.revenue'), value: conv(totalIn), icon: DollarSign, colorClass: 'text-income', gradient: 'bg-gradient-income' },
+        { key: 'biz-expenses', label: t('common.expenses'), value: conv(totalExpenses), icon: TrendingDown, colorClass: 'text-expense', gradient: 'bg-gradient-expense', onClick: onExpensesClick },
         { key: 'biz-profit', label: t('dashboard.netProfit'), value: conv(netProfit), icon: Calculator, colorClass: netProfit >= 0 ? 'text-income' : 'text-expense', gradient: 'bg-gradient-primary' },
       ],
     },

@@ -76,7 +76,7 @@ export function ContainerCard({
   const [submittingExpense, setSubmittingExpense] = useState(false);
 
   const isOverCapacity = container.usedCapacity > container.capacity;
-  const isClosed = container.isManullyClosed;
+  const isClosed = container.isManuallyClosed;
   const canAddShipment = container.status === 'loading' && !isClosed;
   const status = statusLabels[container.status] || statusLabels.loading;
 

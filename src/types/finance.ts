@@ -227,7 +227,7 @@ export interface Container {
   totalRevenue: number;              // إجمالي الإيرادات (من الشحنات)
   profit: number;                    // الربح = الإيرادات - التكاليف
   status: ContainerStatus;
-  isManullyClosed: boolean;          // إقفال يدوي
+  isManuallyClosed: boolean;          // إقفال يدوي
   departureDate?: string;
   arrivalDate?: string;
   clearanceDate?: string;            // تاريخ التخليص

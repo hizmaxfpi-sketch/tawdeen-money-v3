@@ -262,25 +262,30 @@ Deno.serve(async (req) => {
       results.contacts = { success, errors };
     }
 
-    // 2. Ledger accounts
+    // 2. Ledger accounts (Legacy - Merged into contacts)
+    // We only restore these if they don't already exist as contacts to prevent data loss,
+    // but they are officially deprecated.
     if (ledgerAccounts.length) {
       let success = 0, errors = 0;
       for (const la of ledgerAccounts) {
-        const { error } = await supabase.from("ledger_accounts").upsert({
-          id: asString(la.id) ?? crypto.randomUUID(),
+        const id = asString(la.id);
+        if (id && validContactIds.has(id)) continue; // Skip if already handled by contacts
+
+        const { error } = await supabase.from("contacts").upsert({
+          id: id ?? crypto.randomUUID(),
           user_id: resolveRowUserId(la.user_id),
-          name: asString(la.name) ?? "حساب",
-          type: validEnum(la.type, ["client", "vendor", "partner", "investor", "employee", "custom"] as const, "client"),
-          custom_type: asString(la.custom_type ?? la.customType),
+          name: asString(la.name) ?? "حساب مستعاد",
+          type: validEnum(la.type, ["client", "vendor", "partner", "investor", "employee", "other"] as any, "other"),
           phone: asString(la.phone),
           email: asString(la.email),
           address: asString(la.address),
           notes: asString(la.notes),
           balance: asNumber(la.balance),
+          status: "active",
         }, { onConflict: "id" });
-        if (error) { console.error("LedgerAccount:", JSON.stringify(error)); errors++; } else success++;
+        if (error) { console.error("LegacyLedgerAccount:", JSON.stringify(error)); errors++; } else success++;
       }
-      results.ledger_accounts = { success, errors };
+      results.legacy_ledger_migrated = { success, errors };
     }
 
     // 3. Currencies
@@ -402,7 +407,7 @@ Deno.serve(async (req) => {
           total_cost: asNumber(ct.total_cost ?? ct.totalCost),
           total_revenue: asNumber(ct.total_revenue ?? ct.totalRevenue),
           profit: asNumber(ct.profit),
-          is_manually_closed: ct.is_manually_closed ?? ct.isManullyClosed ?? false,
+          is_manually_closed: ct.is_manually_closed ?? ct.isManuallyClosed ?? false,
           departure_date: asString(ct.departure_date ?? ct.departureDate),
           arrival_date: asString(ct.arrival_date ?? ct.arrivalDate),
           clearance_date: asString(ct.clearance_date ?? ct.clearanceDate),
