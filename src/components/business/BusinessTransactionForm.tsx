@@ -243,6 +243,7 @@ export function BusinessTransactionForm({ fundOptions, onSubmit, onClose }: Busi
           </div>
         </div>
       </motion.div>
+      <CategoryManagerDialog open={showManageCategories} onOpenChange={setShowManageCategories} />
     </motion.div>
   );
 }
