@@ -5,12 +5,11 @@ import { useFunds } from './useFunds';
 import { useTransactions } from './useTransactions';
 import { useProjects } from './useProjects';
 import { useDebts } from './useDebts';
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { useCallback } from 'react';
 import { FinanceStats, AccountOption } from '@/types/finance';
 import { useSupabaseContacts } from './useSupabaseContacts';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { calculateMonthlyTrend, calculateExpenseBreakdown } from '@/utils/calculationEngine';
 
 export function useSupabaseFinance() {
   const { user } = useAuth();
