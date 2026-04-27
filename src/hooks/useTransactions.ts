@@ -15,15 +15,18 @@ import { guardOffline } from '@/lib/offlineGuard';
 // After: a single module-level store; components subscribe to changes.
 // ============================================================
 
-const PAGE_SIZE = 1000;
+const PAGE_SIZE = 50;
 const CACHE_TTL = 30_000;
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
-let _state: { transactions: Transaction[]; loading: boolean } = {
+let _state: { transactions: Transaction[]; loading: boolean; hasMore: boolean; offset: number; loadingMore: boolean } = {
   transactions: cacheGet<Transaction[]>('transactions') || [],
   loading: true,
+  hasMore: true,
+  offset: 0,
+  loadingMore: false,
 };
 let _userId: string | null = null;
 let _cacheTime = 0;
@@ -58,12 +61,18 @@ const mapTransaction = (t: any): Transaction => ({
   createdAt: new Date(t.created_at),
 });
 
-async function _fetchTransactions(userId: string, force = false): Promise<void> {
-  if (!force && _userId === userId && (Date.now() - _cacheTime) < CACHE_TTL && _state.transactions.length > 0) {
+async function _fetchTransactions(userId: string, force = false, append = false): Promise<void> {
+  const currentOffset = append ? _state.offset : 0;
+
+  if (!force && !append && _userId === userId && (Date.now() - _cacheTime) < CACHE_TTL && _state.transactions.length > 0) {
     setState({ loading: false });
     return;
   }
   if (_inflight) return _inflight;
+
+  if (append) {
+    setState({ loadingMore: true });
+  }
 
   _inflight = (async () => {
     try {
@@ -72,19 +81,32 @@ async function _fetchTransactions(userId: string, force = false): Promise<void> 
         .select('id, type, category, amount, description, date, fund_id, account_id, contact_id, project_id, notes, attachments, created_at, currency_code, exchange_rate, source_type, created_by_name')
         .order('date', { ascending: false })
         .order('created_at', { ascending: false })
-        .range(0, PAGE_SIZE - 1);
+        .range(currentOffset, currentOffset + PAGE_SIZE - 1);
 
       if (error) {
         console.error('Error fetching transactions:', error);
         toast.error('خطأ في جلب البيانات');
-        setState({ loading: false });
+        setState({ loading: false, loadingMore: false });
         return;
       }
+
       const mapped = (data || []).map(mapTransaction);
-      _userId = userId;
-      _cacheTime = Date.now();
-      cacheSet('transactions', mapped);
-      setState({ transactions: mapped, loading: false });
+      const newTransactions = append ? [..._state.transactions, ...mapped] : mapped;
+      const hasMore = (data || []).length === PAGE_SIZE;
+
+      if (!append) {
+        _userId = userId;
+        _cacheTime = Date.now();
+        cacheSet('transactions', mapped);
+      }
+
+      setState({
+        transactions: newTransactions,
+        loading: false,
+        loadingMore: false,
+        hasMore,
+        offset: append ? _state.offset + (data || []).length : (data || []).length
+      });
     } finally {
       _inflight = null;
     }
@@ -180,7 +202,6 @@ export function useTransactions() {
       if (user) {
         logToActivity(user.id, 'transaction_created', 'transaction', data as string, transaction.description, { amount: transaction.amount, type: transaction.type, category: transaction.category });
       }
-      Promise.resolve((supabase.rpc as any)('sync_contact_balances')).catch(() => {});
       _cacheTime = 0;
       _suppressNext(500);
       return data;
@@ -212,7 +233,6 @@ export function useTransactions() {
     if (user) {
       logToActivity(user.id, 'transaction_modified', 'transaction', transactionId, updates.description, { amount: updates.amount, type: updates.type, category: updates.category });
     }
-    Promise.resolve((supabase.rpc as any)('sync_contact_balances')).catch(() => {});
     _cacheTime = 0;
     _suppressNext(500);
   }, [user]);
@@ -228,7 +248,6 @@ export function useTransactions() {
     }
     // Optimistic removal
     setState({ transactions: _state.transactions.filter(t => t.id !== transactionId) });
-    Promise.resolve((supabase.rpc as any)('sync_contact_balances')).catch(() => {});
     _cacheTime = 0;
     _suppressNext(500);
   }, [user]);
@@ -236,14 +255,20 @@ export function useTransactions() {
   const getMonthlyTrend = useCallback((): TrendData[] => calculateMonthlyTrend(state.transactions), [state.transactions]);
   const getExpenseBreakdown = useCallback((): ChartData[] => calculateExpenseBreakdown(state.transactions), [state.transactions]);
 
+  const loadMore = useCallback(async () => {
+    if (user && state.hasMore && !state.loadingMore) {
+      await _fetchTransactions(user.id, true, true);
+    }
+  }, [user, state.hasMore, state.loadingMore]);
+
   return {
     transactions: state.transactions,
     loading: state.loading,
-    loadingMore: false,
+    loadingMore: state.loadingMore,
     initialLoaded: !state.loading,
-    hasMore: false,
+    hasMore: state.hasMore,
     addTransaction, updateTransaction, deleteTransaction,
-    loadMore: () => {},
+    loadMore,
     getMonthlyTrend, getExpenseBreakdown,
     fetchTransactions,
   };

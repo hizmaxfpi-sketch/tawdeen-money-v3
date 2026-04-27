@@ -22,6 +22,7 @@ import EditContact from "./pages/EditContact";
 import { ContactDetails } from "./pages/ContactDetails";
 import { FundDetails } from "./pages/FundDetails";
 import { ProjectDetails } from "./pages/ProjectDetails";
+import TransactionsPage from "./pages/TransactionsPage";
 import NotFound from "./pages/NotFound";
 import TrackShipment from "./pages/TrackShipment";
 import { useSupabaseFinance } from "@/hooks/useSupabaseFinance";
@@ -66,6 +67,7 @@ function AppInner() {
               <Route path="/funds/:id" element={<ProtectedRoute><CompanyStatusGuard><FundDetailsWrapper /></CompanyStatusGuard></ProtectedRoute>} />
               <Route path="/projects/:id" element={<ProtectedRoute><CompanyStatusGuard><ProjectDetails /></CompanyStatusGuard></ProtectedRoute>} />
               <Route path="/ledger/:id" element={<ProtectedRoute><CompanyStatusGuard><ContactDetails /></CompanyStatusGuard></ProtectedRoute>} />
+              <Route path="/transactions" element={<ProtectedRoute><CompanyStatusGuard><TransactionsPage /></CompanyStatusGuard></ProtectedRoute>} />
               <Route path="/contacts/add" element={<ProtectedRoute><CompanyStatusGuard><RoleGuard><AddContact /></RoleGuard></CompanyStatusGuard></ProtectedRoute>} />
               <Route path="/contacts/edit/:id" element={<ProtectedRoute><CompanyStatusGuard><RoleGuard><EditContact /></RoleGuard></CompanyStatusGuard></ProtectedRoute>} />
               <Route path="/track" element={<TrackShipment />} />
