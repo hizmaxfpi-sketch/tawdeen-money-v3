@@ -1,149 +1,146 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Transaction, TransactionType, TransactionCategory, TrendData, ChartData } from '@/types/finance';
 import { calculateMonthlyTrend, calculateExpenseBreakdown } from '@/utils/calculationEngine';
-import { compareTransactionsByBusinessDateDesc } from '@/utils/transactionSort';
 import { useRealtimeSync } from './useRealtimeSync';
 import { cacheSet, cacheGet } from '@/lib/offlineCache';
 import { guardOffline } from '@/lib/offlineGuard';
+
+// ============================================================
+// SINGLETON STORE — one fetch / one realtime subscription / one snapshot
+// shared across every component that calls useTransactions().
+// Before: every page mounted its own copy → N fetches, N channels, lag.
+// After: a single module-level store; components subscribe to changes.
+// ============================================================
+
+const PAGE_SIZE = 1000;
+const CACHE_TTL = 30_000;
+
+type Listener = () => void;
+const listeners = new Set<Listener>();
+
+let _state: { transactions: Transaction[]; loading: boolean } = {
+  transactions: cacheGet<Transaction[]>('transactions') || [],
+  loading: true,
+};
+let _userId: string | null = null;
+let _cacheTime = 0;
+let _inflight: Promise<void> | null = null;
+
+const setState = (next: Partial<typeof _state>) => {
+  _state = { ..._state, ...next };
+  listeners.forEach(l => l());
+};
+
+const subscribe = (l: Listener) => { listeners.add(l); return () => { listeners.delete(l); }; };
+const getSnapshot = () => _state;
+
+const mapTransaction = (t: any): Transaction => ({
+  id: t.id,
+  type: t.type as TransactionType,
+  category: t.category as TransactionCategory,
+  amount: Number(t.amount),
+  description: t.description || '',
+  date: t.date,
+  fundId: t.fund_id || '',
+  accountId: t.account_id || undefined,
+  contactId: t.contact_id || undefined,
+  projectId: t.project_id || undefined,
+  notes: t.notes || undefined,
+  attachment: t.attachments?.[0] || undefined,
+  currencyCode: t.currency_code || 'USD',
+  exchangeRate: Number(t.exchange_rate || 1),
+  toFundId: undefined,
+  sourceType: t.source_type || 'manual',
+  createdByName: t.created_by_name || undefined,
+  createdAt: new Date(t.created_at),
+});
+
+async function _fetchTransactions(userId: string, force = false): Promise<void> {
+  if (!force && _userId === userId && (Date.now() - _cacheTime) < CACHE_TTL && _state.transactions.length > 0) {
+    setState({ loading: false });
+    return;
+  }
+  if (_inflight) return _inflight;
+
+  _inflight = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('id, type, category, amount, description, date, fund_id, account_id, contact_id, project_id, notes, attachments, created_at, currency_code, exchange_rate, source_type, created_by_name')
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(0, PAGE_SIZE - 1);
+
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        toast.error('خطأ في جلب البيانات');
+        setState({ loading: false });
+        return;
+      }
+      const mapped = (data || []).map(mapTransaction);
+      _userId = userId;
+      _cacheTime = Date.now();
+      cacheSet('transactions', mapped);
+      setState({ transactions: mapped, loading: false });
+    } finally {
+      _inflight = null;
+    }
+  })();
+  return _inflight;
+}
 
 // Activity log helper (fire-and-forget)
 const logToActivity = async (userId: string, eventType: string, entityType: string, entityId: string | null, entityName: string | null, details: Record<string, any> = {}, status = 'active') => {
   try { await supabase.from('activity_log').insert({ user_id: userId, event_type: eventType, entity_type: entityType, entity_id: entityId, entity_name: entityName, details, status } as any); } catch {}
 };
 
-const PAGE_SIZE = 1000; // جلب كامل بصفحات داخلية كبيرة
-
-// كاش بسيط لمنع إعادة الجلب عند التنقل بين الصفحات
-let _cachedTransactions: any[] | null = null;
-let _cacheUserId: string | null = null;
-let _cacheTime = 0;
-const CACHE_TTL = 30_000; // 30 ثانية
-
-// ✅ حماية من الحفظ المكرر (double-submit) — Set على مستوى الـ module
-// يمنع إرسال نفس العملية مرتين حتى لو ضغط المستخدم الزر بسرعة
+// Frontend guard against rapid double-submit
 const _pendingSubmissions = new Set<string>();
+
+// Track which auth user has already triggered initial fetch + realtime
+let _bootstrappedUserId: string | null = null;
+let _suppressNext: (ms?: number) => void = () => {};
 
 export function useTransactions() {
   const { user } = useAuth();
-  const [transactions, setTransactions] = useState<Transaction[]>(() => cacheGet<Transaction[]>('transactions') || []);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [initialLoaded, setInitialLoaded] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [page, setPage] = useState(0);
+  const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const realtimeRef = useRef<{ suppressNext: (ms?: number) => void }>({ suppressNext: () => {} });
 
-  const mapTransaction = (t: any): Transaction => ({
-    id: t.id,
-    type: t.type as TransactionType,
-    category: t.category as TransactionCategory,
-    amount: Number(t.amount),
-    description: t.description || '',
-    date: t.date,
-    fundId: t.fund_id || '',
-    accountId: t.account_id || undefined,
-    contactId: t.contact_id || undefined,
-    projectId: t.project_id || undefined,
-    notes: t.notes || undefined,
-    attachment: t.attachments?.[0] || undefined,
-    currencyCode: t.currency_code || 'USD',
-    exchangeRate: Number(t.exchange_rate || 1),
-    toFundId: undefined,
-    sourceType: t.source_type || 'manual',
-    createdByName: t.created_by_name || undefined,
-    createdAt: new Date(t.created_at),
-  });
-
-  // fullRefresh: true => جلب كل الصفحات (التحميل الأولي فقط)
-  // false/quickRefresh => جلب أول صفحة فقط بعد عمليات الإضافة/التعديل/الحذف لتسريع الاستجابة
-  const fetchTransactions = useCallback(async (reset = false, fullRefresh = false) => {
-    if (!user) return;
-
-    // استخدام الكاش إذا كان حديثاً
-    if (!reset && _cachedTransactions && _cacheUserId === user.id && (Date.now() - _cacheTime) < CACHE_TTL) {
-      setTransactions(_cachedTransactions as any);
-      setLoading(false);
-      setInitialLoaded(true);
-      return;
-    }
-
-    if (!initialLoaded) setLoading(true);
-
-    // جلب صفحات داخلية حتى تنتهي (أو صفحة واحدة فقط في الوضع السريع)
-    const all: any[] = [];
-    let from = 0;
-    while (true) {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('id, type, category, amount, description, date, fund_id, account_id, contact_id, project_id, notes, attachments, created_at, currency_code, exchange_rate, source_type, created_by_name')
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .range(from, from + PAGE_SIZE - 1);
-
-      if (error) {
-        console.error('Error fetching transactions:', error);
-        toast.error('خطأ في جلب البيانات');
-        setLoading(false);
-        setLoadingMore(false);
-        return;
-      }
-      const batch = data || [];
-      all.push(...batch);
-      if (batch.length < PAGE_SIZE) break;
-      // في الوضع السريع نتوقف بعد أول صفحة (1000 سجل تكفي للعرض الفوري)
-      if (!fullRefresh) break;
-      from += PAGE_SIZE;
-    }
-
-    const mapped = all.map(mapTransaction);
-    setTransactions(mapped);
-    cacheSet('transactions', mapped);
-    _cachedTransactions = mapped;
-    _cacheUserId = user.id;
-    _cacheTime = Date.now();
-    setPage(0);
-    setHasMore(false);
-    setLoading(false);
-    setLoadingMore(false);
-    setInitialLoaded(true);
-  }, [user, initialLoaded]);
-
+  // Bootstrap once per user (across all components)
   useEffect(() => {
-    if (user) fetchTransactions(true, true);
+    if (!user) return;
+    if (_bootstrappedUserId !== user.id) {
+      _bootstrappedUserId = user.id;
+      _userId = null; // force refetch on user change
+      _fetchTransactions(user.id, true);
+    } else if (_state.transactions.length === 0) {
+      _fetchTransactions(user.id);
+    }
   }, [user]);
 
-  // Realtime: auto-refresh when transactions change
+  // ONE realtime subscription for the whole app
   const rt = useRealtimeSync(['transactions'], () => {
-    _cachedTransactions = null;
+    if (!user) return;
     _cacheTime = 0;
-    fetchTransactions(true, false);
+    _fetchTransactions(user.id, true);
   });
   realtimeRef.current = rt;
+  _suppressNext = rt.suppressNext;
 
-  const loadMore = useCallback(() => {
-    if (!loading && !loadingMore && hasMore) {
-      setPage(prev => prev + 1);
-    }
-  }, [loading, loadingMore, hasMore]);
+  const fetchTransactions = useCallback(async (_reset = false, _full = false) => {
+    if (user) await _fetchTransactions(user.id, true);
+  }, [user]);
 
-  useEffect(() => {
-    if (page > 0) {
-      fetchTransactions();
-    }
-  }, [page]);
-
-  // استخدام RPC للذرية
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'> & { contactId?: string; currencyCode?: string; exchangeRate?: number }) => {
     if (!user) return;
     if (guardOffline()) return;
 
-    // ✅ منع الحفظ المكرر — مفتاح فريد لكل عملية بناءً على محتواها
     const idempotencyKey = `${user.id}|${transaction.date}|${transaction.amount}|${transaction.description}|${transaction.fundId}|${transaction.type}|${transaction.category}`;
     if (_pendingSubmissions.has(idempotencyKey)) {
-      console.warn('[useTransactions] Duplicate submission blocked:', idempotencyKey);
+      console.warn('[useTransactions] Duplicate submission blocked (frontend):', idempotencyKey);
       return;
     }
     _pendingSubmissions.add(idempotencyKey);
@@ -164,33 +161,38 @@ export function useTransactions() {
         p_to_fund_id: transaction.toFundId || null,
       });
 
-      if (error) { toast.error('خطأ في إضافة العملية'); console.error(error); return; }
-      // Save attachments separately if provided
+      if (error) {
+        // Backend dedup index caught a duplicate (DB-level guarantee)
+        const msg = (error as any)?.message || '';
+        if (msg.includes('transactions_manual_dedup_idx') || (error as any)?.code === '23505') {
+          console.warn('[useTransactions] Duplicate blocked at DB level');
+          toast.info('تم تجاهل عملية مكررة');
+          return;
+        }
+        toast.error('خطأ في إضافة العملية');
+        console.error(error);
+        return;
+      }
       if (data && transaction.attachment) {
         await supabase.from('transactions').update({ attachments: [transaction.attachment] }).eq('id', data as string);
       }
       toast.success('تم إضافة العملية بنجاح');
-      // Log to activity (لا ننتظر)
       if (user) {
         logToActivity(user.id, 'transaction_created', 'transaction', data as string, transaction.description, { amount: transaction.amount, type: transaction.type, category: transaction.category });
       }
-      // مزامنة أرصدة الحسابات في الخلفية (لا ننتظر)
       (supabase.rpc as any)('sync_contact_balances').catch(() => {});
-      // إبطال الكاش وترك Realtime يجلب البيانات (يمنع التكرار)
-      _cachedTransactions = null; _cacheTime = 0;
-      realtimeRef.current.suppressNext(500); // اسمح لـ Realtime بالتحديث بعد 500ms
+      _cacheTime = 0;
+      _suppressNext(500);
       return data;
     } finally {
-      // إزالة المفتاح بعد ثانيتين كحماية إضافية
       setTimeout(() => _pendingSubmissions.delete(idempotencyKey), 2000);
     }
   }, [user]);
 
-  // تحديث عملية موجودة (UPDATE وليس INSERT)
   const updateTransaction = useCallback(async (transactionId: string, updates: Omit<Transaction, 'id' | 'createdAt'> & { contactId?: string; currencyCode?: string; exchangeRate?: number }) => {
     if (!user) return;
     if (guardOffline()) return;
-    
+
     const { error } = await supabase.rpc('update_transaction', {
       p_transaction_id: transactionId,
       p_type: updates.type,
@@ -204,44 +206,44 @@ export function useTransactions() {
       p_currency_code: updates.currencyCode || 'USD',
       p_exchange_rate: updates.exchangeRate || 1,
     });
-    
+
     if (error) { toast.error('خطأ في تعديل العملية'); console.error(error); return; }
     toast.success('تم تعديل العملية بنجاح');
     if (user) {
       logToActivity(user.id, 'transaction_modified', 'transaction', transactionId, updates.description, { amount: updates.amount, type: updates.type, category: updates.category });
     }
     (supabase.rpc as any)('sync_contact_balances').catch(() => {});
-    _cachedTransactions = null; _cacheTime = 0;
-    realtimeRef.current.suppressNext(500);
+    _cacheTime = 0;
+    _suppressNext(500);
   }, [user]);
 
-  // استخدام RPC للحذف الذري
   const deleteTransaction = useCallback(async (transactionId: string) => {
     if (guardOffline()) return;
-    // Capture transaction details before deleting for audit trail
-    const txToDelete = transactions.find(t => t.id === transactionId);
-    const { error } = await supabase.rpc('reverse_transaction', {
-      p_transaction_id: transactionId,
-    });
+    const txToDelete = _state.transactions.find(t => t.id === transactionId);
+    const { error } = await supabase.rpc('reverse_transaction', { p_transaction_id: transactionId });
     if (error) { toast.error('خطأ في حذف العملية'); console.error(error); return; }
     toast.success('تم حذف العملية');
     if (user && txToDelete) {
       logToActivity(user.id, 'transaction_deleted', 'transaction', transactionId, txToDelete.description, { amount: txToDelete.amount, type: txToDelete.type, category: txToDelete.category }, 'deleted');
     }
-    // تحديث متفائل: إزالة العملية فوراً من القائمة
-    setTransactions(prev => prev.filter(t => t.id !== transactionId));
+    // Optimistic removal
+    setState({ transactions: _state.transactions.filter(t => t.id !== transactionId) });
     (supabase.rpc as any)('sync_contact_balances').catch(() => {});
-    _cachedTransactions = null; _cacheTime = 0;
-    realtimeRef.current.suppressNext(500);
-  }, [user, transactions]);
+    _cacheTime = 0;
+    _suppressNext(500);
+  }, [user]);
 
-  const getMonthlyTrend = useCallback((): TrendData[] => calculateMonthlyTrend(transactions), [transactions]);
-
-  const getExpenseBreakdown = useCallback((): ChartData[] => calculateExpenseBreakdown(transactions), [transactions]);
+  const getMonthlyTrend = useCallback((): TrendData[] => calculateMonthlyTrend(state.transactions), [state.transactions]);
+  const getExpenseBreakdown = useCallback((): ChartData[] => calculateExpenseBreakdown(state.transactions), [state.transactions]);
 
   return {
-    transactions, loading, loadingMore, initialLoaded, hasMore,
-    addTransaction, updateTransaction, deleteTransaction, loadMore,
+    transactions: state.transactions,
+    loading: state.loading,
+    loadingMore: false,
+    initialLoaded: !state.loading,
+    hasMore: false,
+    addTransaction, updateTransaction, deleteTransaction,
+    loadMore: () => {},
     getMonthlyTrend, getExpenseBreakdown,
     fetchTransactions,
   };
