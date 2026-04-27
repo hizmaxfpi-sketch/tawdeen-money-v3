@@ -2424,6 +2424,7 @@ export type Database = {
         Args: { p_client_code: string; p_package_number: string }
         Returns: Json
       }
+      tx_dedup_bucket: { Args: { ts: string }; Returns: number }
       update_container_with_accounting: {
         Args: {
           p_arrival_date?: string
